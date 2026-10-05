@@ -39,7 +39,14 @@ export function Milestones() {
               <li key={ms.id} className="ms-item reveal" style={{ animationDelay: `${Math.min(i, 10) * 50}ms` }}>
                 <div className="ms-rail"><span className="ms-dot"><Icon name="star" size={11} filled /></span></div>
                 <button className="ms-card" onClick={() => mem && navigate(`/memory/${mem.id}`)}>
-                  {ms.photoMediaId && <div className="ms-photo"><MediaImg id={ms.photoMediaId} size="thumb" /></div>}
+                  {ms.photoMediaId ? (
+                    <div className="ms-photo"><MediaImg id={ms.photoMediaId} size="thumb" /></div>
+                  ) : mem ? (
+                    <span className="ms-photo is-empty" role="button" tabIndex={0} aria-label="Add a photo" onClick={(e) => { e.stopPropagation(); navigate(`/memory/${mem.id}/edit`); }}>
+                      <Icon name="camera" size={20} />
+                      <small>Add photo</small>
+                    </span>
+                  ) : null}
                   <div className="ms-text">
                     <p className="eyebrow">{fmtLong(ms.date)} · {ageLabel(baby.birthDate, ms.date)}</p>
                     <h3 className="display">{ms.title}</h3>

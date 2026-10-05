@@ -103,6 +103,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const items: MediaItem[] = [];
     for (const f of files) items.push(await MediaService.ingest(f, { name: (f as File).name }));
     if (babyId) await repo().media.saveMedia(babyId, items);
+    // make new media visible to actions that run before the next render
+    const merged = new Map(stateRef.current.media);
+    items.forEach((i) => merged.set(i.id, i));
+    stateRef.current = { ...stateRef.current, media: merged };
     setState((s) => {
       const media = new Map(s.media);
       items.forEach((i) => media.set(i.id, i));
@@ -214,12 +218,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       let milestones = s.milestones;
       if (next.milestoneId) {
         const ms = s.milestones.find((m) => m.id === next.milestoneId);
-        if (ms && (patch.date || patch.caption !== undefined)) {
-          const upd = { ...ms, date: next.date, description: next.caption };
+        const photoGone = !ms?.photoMediaId || !next.mediaIds.includes(ms.photoMediaId);
+        if (ms && (patch.date || patch.caption !== undefined || patch.title !== undefined || patch.mediaIds)) {
+          const firstPhoto = next.mediaIds.find((id) => s.media.get(id)?.kind === 'photo') ?? next.mediaIds.find((id) => s.media.get(id)?.kind === 'video');
+          const upd = {
+            ...ms, title: next.title || ms.title, date: next.date, description: next.caption,
+            photoMediaId: photoGone ? firstPhoto : ms.photoMediaId,
+          };
           await repo().milestones.saveMilestone(upd);
           milestones = s.milestones.map((m) => (m.id === upd.id ? upd : m));
         }
       }
+      stateRef.current = { ...stateRef.current, memories: sortMemories(stateRef.current.memories.map((m) => (m.id === id ? next : m))), milestones };
       setState((st) => ({ ...st, memories: sortMemories(st.memories.map((m) => (m.id === id ? next : m))), milestones }));
     },
 

@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { AddSheet } from './components/AddSheet';
+import { DropZone } from './components/DropZone';
 import { Wordmark } from './components/Icon';
 import { Toaster } from './components/ui';
 import { match, navigate, useRoute } from './lib/router';
@@ -62,6 +63,7 @@ export function App() {
     <AppProvider>
       <Routes />
       <AddSheet />
+      <DropZone />
       <Toaster />
     </AppProvider>
   );

@@ -7,6 +7,7 @@ import type { Memory, MemoryType } from '../lib/types';
 import { cx, firstName, fmtLong, fmtMonthYear, plural, toISODate, todayISO } from '../lib/util';
 import { useApp } from '../state/store';
 import { pendingCapture } from '../state/ui';
+import { EDITOR_DROP_EVENT } from '../components/DropZone';
 
 const TYPES: { value: MemoryType; label: string }[] = [
   { value: 'moment', label: 'Everyday moment' },
@@ -71,12 +72,21 @@ export function MemoryEditor({ editId }: { editId?: string }) {
   const [busy, setBusy] = useState(false);
   const [groupByDay, setGroupByDay] = useState(true);
   const picker = useRef<HTMLInputElement>(null);
+  const camera = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!editing && locals.length) setDate(guessed);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [guessed]);
   useEffect(() => () => locals.forEach((l) => URL.revokeObjectURL(l.url)), []); // eslint-disable-line react-hooks/exhaustive-deps
+  const addFiles = (files: File[]) =>
+    setLocals((l) => [...l, ...files.map((f) => ({ file: f, url: URL.createObjectURL(f), kind: (f.type.startsWith('video') ? 'video' : 'photo') as Local['kind'] }))]);
+
+  useEffect(() => {
+    const onDrop = (e: Event) => addFiles((e as CustomEvent<File[]>).detail);
+    window.addEventListener(EDITOR_DROP_EVENT, onDrop);
+    return () => window.removeEventListener(EDITOR_DROP_EVENT, onDrop);
+  });
 
   const days = useMemo(() => {
     const map = new Map<string, Local[]>();
@@ -96,9 +106,6 @@ export function MemoryEditor({ editId }: { editId?: string }) {
     type === 'story' ? `Tell ${name} about today…`
       : isMilestoneFlow || type === 'milestone' || type === 'first' ? `What happened? How did it feel?`
         : locals.length ? 'What happened? (optional)' : `What do you want to remember?`;
-
-  const addFiles = (files: File[]) =>
-    setLocals((l) => [...l, ...files.map((f) => ({ file: f, url: URL.createObjectURL(f), kind: (f.type.startsWith('video') ? 'video' : 'photo') as Local['kind'] }))]);
 
   const canSave = !!(locals.length || caption.trim() || title.trim() || (editing && editing.mediaIds.length));
 
@@ -167,7 +174,23 @@ export function MemoryEditor({ editId }: { editId?: string }) {
             <button className="editor-thumb is-add" onClick={() => picker.current?.click()} aria-label="Add more photos or videos"><Icon name="plus" size={22} /></button>
           </div>
         )}
-        <input ref={picker} type="file" accept="image/*,video/*" multiple hidden onChange={(e) => { addFiles([...(e.target.files ?? [])]); e.target.value = ''; }} />
+        {locals.length === 0 && existing.length === 0 && (
+          <div className="editor-add-media">
+            <button className="editor-add-main" onClick={() => picker.current?.click()} data-testid="editor-add-photos">
+              <Icon name="image" size={22} />
+              <span>
+                <strong>Add photos or a video</strong>
+                <small>{isMilestoneFlow ? 'The picture that goes with this first' : 'Optional, but it makes the page'}</small>
+              </span>
+            </button>
+            <button className="editor-add-cam" onClick={() => camera.current?.click()} aria-label="Take a photo">
+              <Icon name="camera" size={20} />
+              <span>Camera</span>
+            </button>
+          </div>
+        )}
+        <input ref={picker} type="file" accept="image/*,video/*" multiple hidden onChange={(e) => { addFiles([...(e.target.files ?? [])]); e.target.value = ''; }} data-testid="editor-file-input" />
+        <input ref={camera} type="file" accept="image/*" capture="environment" hidden onChange={(e) => { addFiles([...(e.target.files ?? [])]); e.target.value = ''; }} />
 
         {isMilestoneFlow && !editing && (
           <div className="editor-firsts">
@@ -184,7 +207,7 @@ export function MemoryEditor({ editId }: { editId?: string }) {
           className="editor-title"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder={isMilestoneFlow ? 'Or name your own — “First time stealing Dad’s glasses”' : 'Title (optional)'}
+          placeholder={isMilestoneFlow ? 'Or name your own first' : 'Title (optional)'}
           data-testid="memory-title"
         />
         <textarea
