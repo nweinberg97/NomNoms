@@ -29,7 +29,11 @@ No accounts, keys, database or backend needed. Click **Continue with Google** (i
 
 Requires Node 18+.
 
-**Live site:** https://nweinberg97.github.io/NomNoms/ — every push to `main` builds and deploys it through GitHub Actions (`.github/workflows/pages.yml`). To enable real Google/Apple sign-in there, add `GOOGLE_CLIENT_ID` / `APPLE_CLIENT_ID` / `APPLE_REDIRECT_URI` as repository *variables* (Settings → Secrets and variables → Actions → Variables) and add the Pages URL to the OAuth client's allowed origins.
+**Live site:** https://nweinberg97.github.io/NomNoms/
+
+GitHub Pages works with either Pages source setting:
+- **Deploy from a branch** (`main`, root): Pages serves `index.html` at the repo root, a self-contained build of the app. Regenerate it with `npm run build:pages` and commit it whenever you change the app.
+- **GitHub Actions**: `.github/workflows/pages.yml` builds `dist/` and deploys it on every push to `main`, so `index.html` no longer needs updating by hand. To enable real Google/Apple sign-in there, add `GOOGLE_CLIENT_ID` / `APPLE_CLIENT_ID` / `APPLE_REDIRECT_URI` as repository *variables* (Settings → Secrets and variables → Actions → Variables) and add the Pages URL to the OAuth client's allowed origins.
 
 ## What you can do
 

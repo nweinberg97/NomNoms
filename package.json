@@ -2,7 +2,7 @@
   "name": "nomnoms",
   "version": "0.1.0",
   "private": true,
-  "description": "NomNoms — the baby book that builds itself.",
+  "description": "NomNoms \u2014 the baby book that builds itself.",
   "type": "module",
   "scripts": {
     "dev": "node scripts/build.mjs --dev",
@@ -10,7 +10,8 @@
     "build:single": "node scripts/build.mjs --single",
     "preview": "npx serve dist",
     "typecheck": "tsc --noEmit",
-    "media": "python3 scripts/generate-demo-media.py"
+    "media": "python3 scripts/generate-demo-media.py",
+    "build:pages": "node scripts/build.mjs --single && cp dist-single/nomnoms.html index.html"
   },
   "dependencies": {
     "html-to-image": "^1.11.13",
@@ -27,5 +28,7 @@
   "optionalDependencies": {
     "sharp": "^0.34.0"
   },
-  "engines": { "node": ">=18" }
+  "engines": {
+    "node": ">=18"
+  }
 }
