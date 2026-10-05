@@ -1,0 +1,31 @@
+{
+  "name": "nomnoms",
+  "version": "0.1.0",
+  "private": true,
+  "description": "NomNoms — the baby book that builds itself.",
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/build.mjs --dev",
+    "build": "node scripts/build.mjs",
+    "build:single": "node scripts/build.mjs --single",
+    "preview": "npx serve dist",
+    "typecheck": "tsc --noEmit",
+    "media": "python3 scripts/generate-demo-media.py"
+  },
+  "dependencies": {
+    "html-to-image": "^1.11.13",
+    "pdf-lib": "^1.17.1",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "esbuild": "^0.28.0",
+    "typescript": "^5.9.0"
+  },
+  "optionalDependencies": {
+    "sharp": "^0.34.0"
+  },
+  "engines": { "node": ">=18" }
+}
