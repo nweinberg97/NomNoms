@@ -26,6 +26,8 @@ export function CameraCapture({ mode, onClose, onDone, onFallback }: {
   const [recording, setRecording] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [flash, setFlash] = useState(false);
+  /** The photo or clip just taken, shown full-screen to keep or retake. */
+  const [review, setReview] = useState<{ file: File; url: string; kind: 'photo' | 'video' } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -85,7 +87,7 @@ export function CameraCapture({ mode, onClose, onDone, onFallback }: {
     c.toBlob((b) => {
       if (!b) return;
       const file = new File([b], `nomnoms-${Date.now()}.jpg`, { type: 'image/jpeg', lastModified: Date.now() });
-      setShots((s) => [...s, { file, url: URL.createObjectURL(b) }]);
+      setReview({ file, url: URL.createObjectURL(b), kind: 'photo' });
     }, 'image/jpeg', 0.92);
   };
 
@@ -105,7 +107,8 @@ export function CameraCapture({ mode, onClose, onDone, onFallback }: {
       const mime = rec.mimeType || 'video/webm';
       const blob = new Blob(chunks.current, { type: mime });
       const ext = mime.includes('mp4') ? 'mp4' : 'webm';
-      onDone([new File([blob], `nomnoms-${Date.now()}.${ext}`, { type: mime, lastModified: Date.now() })]);
+      const file = new File([blob], `nomnoms-${Date.now()}.${ext}`, { type: mime, lastModified: Date.now() });
+      setReview({ file, url: URL.createObjectURL(blob), kind: 'video' });
     };
     recRef.current = rec;
     rec.start(250);
@@ -113,12 +116,32 @@ export function CameraCapture({ mode, onClose, onDone, onFallback }: {
     setRecording(true);
   };
 
+  const retake = () => {
+    if (review) URL.revokeObjectURL(review.url);
+    setReview(null);
+    // the preview <video> may have paused while hidden
+    requestAnimationFrame(() => videoRef.current?.play().catch(() => undefined));
+  };
+
+  /** Keep this shot: with earlier kept shots ("Take another"), it goes straight to the editor. */
+  const keep = (another: boolean) => {
+    if (!review) return;
+    const kept = [...shots.map((s) => s.file), review.file];
+    if (another) {
+      setShots((s) => [...s, { file: review.file, url: review.url }]);
+      setReview(null);
+      requestAnimationFrame(() => videoRef.current?.play().catch(() => undefined));
+      return;
+    }
+    onDone(kept);
+  };
+
   return createPortal(
     <div className="camera" role="dialog" aria-label={mode === 'photo' ? 'Camera' : 'Video camera'}>
       <div className="camera-top">
         <button className="camera-btn" onClick={onClose} aria-label="Close camera"><Icon name="x" /></button>
         {recording && <span className="camera-rec"><i />{fmtDuration(elapsed)}</span>}
-        <button className="camera-btn" onClick={() => setFacing((f) => (f === 'user' ? 'environment' : 'user'))} aria-label="Flip camera" disabled={recording}>
+        <button className="camera-btn" onClick={() => setFacing((f) => (f === 'user' ? 'environment' : 'user'))} aria-label="Flip camera" disabled={recording || !!review}>
           <Icon name="flipcam" />
         </button>
       </div>
@@ -126,6 +149,15 @@ export function CameraCapture({ mode, onClose, onDone, onFallback }: {
       <div className="camera-stage">
         <video ref={videoRef} playsInline muted className={cx(facing === 'user' && 'is-mirrored', ready && 'is-ready')} />
         {flash && <div className="camera-flash" />}
+        {review && (
+          <div className="camera-review" data-testid="camera-review">
+            {review.kind === 'photo' ? (
+              <img src={review.url} alt="The photo you just took" />
+            ) : (
+              <video src={review.url} autoPlay loop playsInline controls />
+            )}
+          </div>
+        )}
         {error && (
           <div className="camera-error">
             <Icon name="camera" size={28} />
@@ -135,6 +167,17 @@ export function CameraCapture({ mode, onClose, onDone, onFallback }: {
         )}
       </div>
 
+      {review ? (
+        <div className="camera-bottom is-review">
+          <button className="btn btn-ghost-dark" onClick={retake} data-testid="camera-retake"><Icon name="undo" size={16} /> Retake</button>
+          {review.kind === 'photo' && (
+            <button className="btn btn-ghost-dark" onClick={() => keep(true)} data-testid="camera-another"><Icon name="plus" size={16} /> Take another</button>
+          )}
+          <button className="btn btn-light" onClick={() => keep(false)} data-testid="camera-use">
+            <Icon name="check" size={16} /> {review.kind === 'photo' ? (shots.length ? `Use ${shots.length + 1} photos` : 'Use photo') : 'Use video'}
+          </button>
+        </div>
+      ) : (
       <div className="camera-bottom">
         <div className="camera-shots">
           {shots.slice(-3).map((s) => <img key={s.url} src={s.url} alt="" />)}
@@ -152,6 +195,7 @@ export function CameraCapture({ mode, onClose, onDone, onFallback }: {
           )}
         </div>
       </div>
+      )}
     </div>,
     document.body,
   );

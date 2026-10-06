@@ -315,6 +315,11 @@
 .camera-stage video { width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .5s; }
 .camera-stage video.is-ready { opacity: 1; }
 .camera-stage video.is-mirrored { transform: scaleX(-1); }
+.camera-review { position: absolute; inset: 0; background: #0f0d0c; display: grid; place-items: center; animation: fadeIn .2s both; }
+.camera-review img, .camera-review video { width: 100%; height: 100%; object-fit: contain; }
+.camera-bottom.is-review { display: flex; justify-content: center; align-items: center; gap: 10px; flex-wrap: wrap; }
+.btn-ghost-dark { background: rgba(255, 255, 255, .12); color: #fff; border: 1px solid rgba(255, 255, 255, .22); }
+.btn-ghost-dark:hover:not(:disabled) { background: rgba(255, 255, 255, .2); }
 .camera-flash { position: absolute; inset: 0; background: #fff; animation: fadeIn .18s reverse both; }
 .camera-error { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 32px; text-align: center; color: rgba(255, 255, 255, .85); max-width: 420px; margin: 0 auto; }
 .camera-bottom { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 20px 20px calc(28px + var(--safe-b)); }
