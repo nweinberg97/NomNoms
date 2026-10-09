@@ -5,6 +5,7 @@ import type { Book, BookPage, MediaItem, Memory } from '../lib/types';
 import { cx } from '../lib/util';
 import { BookPageView, type PageContext } from './BookPageView';
 import { toSpreads } from './layoutEngine';
+import { pageRatio } from './styles';
 
 function useWide() {
   const q = '(min-width: 900px) and (min-aspect-ratio: 1/1)';
@@ -90,7 +91,7 @@ export function Reader({ book, memories, media, startPage = 0, onClose, banner, 
   }, []);
 
   const memMap = useMemo(() => new Map(memories.map((m) => [m.id, m])), [memories]);
-  const ctxFor = (p: BookPage): PageContext => ({ memories: memMap, media, interactive: true, pageNumber: pages.indexOf(p) });
+  const ctxFor = (p: BookPage): PageContext => ({ memories: memMap, media, interactive: true, pageNumber: pages.indexOf(p), style: book.style });
   const chapters = pages.map((p, i) => ({ p, i })).filter(({ p }) => p.layout === 'chapter');
   const spread = spreads[cur] ?? [];
   const currentChapter = [...chapters].reverse().find(({ i }) => i <= firstPageIdx(cur));
@@ -123,7 +124,7 @@ export function Reader({ book, memories, media, startPage = 0, onClose, banner, 
         }}
       >
         <button className="reader-arrow is-prev" onClick={() => go(-1)} disabled={cur === 0} aria-label="Previous page"><Icon name="chevron-left" size={26} stroke={1.4} /></button>
-        <div key={`${cur}-${wide}`} className={cx('spread', wide && 'is-wide', spread.length === 1 && wide && 'is-single', `turn-${dir}`)}>
+        <div key={`${cur}-${wide}`} className={cx('spread', wide && 'is-wide', spread.length === 1 && wide && 'is-single', `turn-${dir}`)} style={{ '--pr': pageRatio(book.style) } as React.CSSProperties}>
           {wide && spread.length === 1 && firstPageIdx(cur) === 0 && <div className="spread-blank" />}
           {spread.map((p, i) => (
             <div key={p.id} className={cx('spread-page', wide && (spread.length === 1 && firstPageIdx(cur) === 0 ? 'is-right' : i === 0 ? 'is-left' : 'is-right'))}>
@@ -144,7 +145,7 @@ export function Reader({ book, memories, media, startPage = 0, onClose, banner, 
           <div className="reader-thumbs-grid">
             {pages.map((p, i) => (
               <button key={p.id} className={cx('reader-thumb', spread.some((s) => s.id === p.id) && 'is-on')} onClick={() => goToPage(i)}>
-                <BookPageView page={p} ctx={{ memories: memMap, media, interactive: false }} />
+                <BookPageView page={p} ctx={{ memories: memMap, media, interactive: false, style: book.style }} />
                 <span>{i === 0 ? 'Cover' : i}</span>
               </button>
             ))}

@@ -43,7 +43,7 @@ export function BookHome() {
   const printed = useMemo(() => (book ? printablePages(book.pages, media, memMap) : []), [book, media, memMap]);
   if (!baby) return null;
   const name = firstName(baby.name);
-  const ctx: PageContext = { memories: memMap, media, interactive: false };
+  const ctx: PageContext = { memories: memMap, media, interactive: false, style: book?.style };
   const pending = newSinceBuild(book, memories);
 
   if (!book) {

@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { getFontEmbedCSS, toCanvas } from 'html-to-image';
 import { BookPageView, type PageContext } from '../book/BookPageView';
 import type { BookPage } from '../lib/types';
+import { PALETTES, pageRatio, resolveStyle, type PaletteId } from '../book/styles';
 
 /**
  * Renders book pages off-screen with the exact same component the reader
@@ -42,9 +43,9 @@ export async function rasterizePages(
       }
       const canvas = await toCanvas(node, {
         width,
-        height: Math.round(width * 1.25),
+        height: Math.round(width * pageRatio(ctx.style)),
         pixelRatio: 1,
-        backgroundColor: '#fbf8f2',
+        backgroundColor: PALETTES[resolveStyle(ctx.style).palette as PaletteId].swatch[0],
         fontEmbedCSS: fontCSS || undefined,
         skipFonts: !fontCSS,
         cacheBust: false,

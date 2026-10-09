@@ -61,7 +61,7 @@ export function BuildBook() {
   const finalBook = book ?? (ready ? storeBook : undefined);
 
   if (!baby) return null;
-  const ctx = { memories: new Map(memories.map((m) => [m.id, m])), media, interactive: false };
+  const ctx = { memories: new Map(memories.map((m) => [m.id, m])), media, interactive: false, style: finalBook?.style };
   const printed = finalBook ? printablePages(finalBook.pages, media, ctx.memories) : [];
   const chapterCount = printed.filter((p) => p.layout === 'chapter').length;
 

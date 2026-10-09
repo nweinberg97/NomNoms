@@ -1,7 +1,8 @@
 import React from 'react';
 import { Logo } from '../components/Icon';
 import { MediaImg, VideoCard } from '../components/Media';
-import type { BookPage, MediaItem, Memory } from '../lib/types';
+import type { BookPage, BookStyle, MediaItem, Memory } from '../lib/types';
+import { resolveStyle, styleVars } from './styles';
 import { cx, fmtLong, fmtShort } from '../lib/util';
 
 export interface PageContext {
@@ -13,6 +14,8 @@ export interface PageContext {
   /** Editor only: tapping a photo on the page selects that slot. */
   onPhotoTap?: (mediaId: string, slot: number) => void;
   selectedSlot?: number;
+  /** The book's look (palette, type, page shape). Omitted = original look. */
+  style?: BookStyle;
   /** Set internally: the page's photo slots, so each photo knows its index. */
   pageMediaIds?: string[];
 }
@@ -255,7 +258,14 @@ export function BookPageView({ page, ctx, className, onClick }: { page: BookPage
   }
 
   return (
-    <div className={cx('bp', `bp-${page.layout}-page`, onClick && 'is-clickable', className)} onClick={onClick} data-layout={page.layout}>
+    <div
+      className={cx('bp', `bp-${page.layout}-page`, onClick && 'is-clickable', className)}
+      onClick={onClick}
+      data-layout={page.layout}
+      data-shape={resolveStyle(ctx.style).shape}
+      data-palette={resolveStyle(ctx.style).palette}
+      style={ctx.style ? styleVars(ctx.style) : undefined}
+    >
       {body}
       {pn !== undefined && page.layout !== 'cover' && page.layout !== 'full-bleed' && <span className="bp-num">{pn}</span>}
     </div>

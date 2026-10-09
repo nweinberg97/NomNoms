@@ -46,7 +46,10 @@ const fontFaces = (url) => `
 @font-face { font-family: 'Lora'; src: url(${url('Lora-Italic-Variable.woff')}) format('woff'); font-weight: 400 700; font-style: italic; font-display: swap; }
 @font-face { font-family: 'Inter'; src: url(${url('Inter-Regular.woff')}) format('woff'); font-weight: 400; font-display: swap; }
 @font-face { font-family: 'Inter'; src: url(${url('Inter-Medium.woff')}) format('woff'); font-weight: 500; font-display: swap; }
-@font-face { font-family: 'Inter'; src: url(${url('Inter-SemiBold.woff')}) format('woff'); font-weight: 600 700; font-display: swap; }`;
+@font-face { font-family: 'Inter'; src: url(${url('Inter-SemiBold.woff')}) format('woff'); font-weight: 600 700; font-display: swap; }
+@font-face { font-family: 'Poppins'; src: url(${url('Poppins-Light.woff')}) format('woff'); font-weight: 300; font-display: swap; }
+@font-face { font-family: 'Poppins'; src: url(${url('Poppins-Regular.woff')}) format('woff'); font-weight: 400; font-display: swap; }
+@font-face { font-family: 'Poppins'; src: url(${url('Poppins-Medium.woff')}) format('woff'); font-weight: 500 600; font-display: swap; }`;
 
 function html({ css, js, head = '', fonts }) {
   return `<!doctype html>

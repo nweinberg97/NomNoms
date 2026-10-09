@@ -133,6 +133,15 @@ export interface BookPage {
   quiet?: boolean;
   /** Alternate treatment of the same template, chosen to keep rhythm varied. */
   variant?: 'a' | 'b';
+  /** Set when the parent changed this page by hand; "Make it nicer" leaves it alone. */
+  edited?: boolean;
+}
+
+/** How the book looks. Missing fields mean the original NomNoms look. */
+export interface BookStyle {
+  palette?: string;
+  type?: string;
+  shape?: string;
 }
 
 export type ShareVisibility = 'private' | 'link' | 'family';
@@ -156,6 +165,7 @@ export interface Book {
   /** Memory count/fingerprint at last build, to tell the parent when there's something new. */
   builtFrom: string[];
   share: ShareSettings;
+  style?: BookStyle;
   generatedAt?: ISODateTime;
   updatedAt: ISODateTime;
 }

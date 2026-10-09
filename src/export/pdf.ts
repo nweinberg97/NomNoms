@@ -3,9 +3,8 @@ import type { PageContext } from '../book/BookPageView';
 import type { Book } from '../lib/types';
 import { downloadBlob, rasterizePages } from './offscreen';
 import { printablePages } from '../book/layoutEngine';
+import { SHAPES, resolveStyle, type ShapeId } from '../book/styles';
 
-const PT_W = 576; // 8in
-const PT_H = 720; // 10in
 
 /**
  * Client-side PDF: every page is rendered by the real page component at
@@ -15,8 +14,9 @@ const PT_H = 720; // 10in
  */
 export async function exportBookPdf(book: Book, ctx: PageContext, onProgress?: (done: number, total: number) => void) {
   // the printed book never contains videos (they belong to the film)
+  const [PT_W, PT_H] = SHAPES[resolveStyle(book.style).shape as ShapeId].pt;
   const pages = printablePages(book.pages, ctx.media, ctx.memories);
-  const images = await rasterizePages(pages, ctx, { width: 1350, quality: 0.84, onProgress: (d, t) => onProgress?.(d, t + 1) });
+  const images = await rasterizePages(pages, { ...ctx, style: book.style }, { width: 1350, quality: 0.84, onProgress: (d, t) => onProgress?.(d, t + 1) });
   const pdf = await PDFDocument.create();
   pdf.setTitle(`${book.title} — ${book.subtitle}`);
   pdf.setAuthor('NomNoms');

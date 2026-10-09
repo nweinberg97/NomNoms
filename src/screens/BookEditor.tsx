@@ -1,16 +1,18 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { BookPageView, type PageContext } from '../book/BookPageView';
-import { LAYOUT_LABELS, LAYOUT_SLOTS, compatibleLayouts } from '../book/layoutEngine';
+import { LAYOUT_LABELS, LAYOUT_SLOTS, compatibleLayouts, generateBook } from '../book/layoutEngine';
+import { polishBook } from '../book/polish';
+import { PALETTES, SHAPES, TYPES, pageRatio, resolveStyle, type PaletteId, type ShapeId, type TypeId } from '../book/styles';
 import { Icon } from '../components/Icon';
 import { MediaImg } from '../components/Media';
 import { Shell } from '../components/Shell';
 import { Confirm, Empty, Segmented, Sheet, Spinner, toast } from '../components/ui';
 import { navigate } from '../lib/router';
-import type { Book, BookPage, LayoutType, Memory } from '../lib/types';
+import type { Book, BookPage, BookStyle, LayoutType, Memory } from '../lib/types';
 import { cx, fmtShort, plural, uid } from '../lib/util';
 import { useApp, useChronological } from '../state/store';
 
-type Tab = 'photos' | 'layout' | 'words' | 'page';
+type Tab = 'photos' | 'layout' | 'words' | 'style' | 'page';
 const STRUCTURAL: LayoutType[] = ['cover', 'chapter', 'closing'];
 const SINGLE: LayoutType[] = ['full-bleed', 'hero-caption', 'split', 'story', 'milestone'];
 
@@ -69,7 +71,7 @@ export function BookEditor() {
 
   const pageMems = page.memoryIds.map((id) => memMap.get(id)).filter(Boolean) as Memory[];
   const photoOf = (id: string) => media.get(id)?.kind === 'photo';
-  const ctx: PageContext = { memories: memMap, media, interactive: false };
+  const ctx: PageContext = { memories: memMap, media, interactive: false, style: book.style };
 
   /* ── every change goes through here, so it can be undone ── */
   const commit = async (nextPages: BookPage[], patch: Partial<Book> = {}, msg?: string) => {
@@ -77,7 +79,7 @@ export function BookEditor() {
     await saveBook({ ...book, ...patch, pages: nextPages });
     if (msg) toast(msg, { icon: 'check', ms: 1500 });
   };
-  const setPage = (p: BookPage, msg?: string, patch: Partial<Book> = {}) => commit(pages.map((x) => (x.id === p.id ? p : x)), patch, msg);
+  const setPage = (p: BookPage, msg?: string, patch: Partial<Book> = {}) => commit(pages.map((x) => (x.id === p.id ? { ...p, edited: true } : x)), patch, msg);
   const undo = async () => {
     const prev = history[history.length - 1];
     if (!prev) return;
@@ -160,6 +162,17 @@ export function BookEditor() {
     setPicker(null);
   };
 
+  /* ── style ── */
+  const style = resolveStyle(book.style);
+  const setStyle = (patch: BookStyle, msg: string) => commit(pages, { style: { ...style, ...patch } }, msg);
+  const polish = async () => {
+    const { book: fresh } = generateBook({ baby, memories: chron, media, previous: book });
+    const { book: nicer, changed } = polishBook(book, fresh, media, memMap);
+    if (!changed) { toast('Already looking its best. Nothing to change', { icon: 'sparkle', ms: 2200 }); return; }
+    await commit(nicer.pages, {});
+    toast(`${plural(changed, 'page')} redesigned. Your own changes stayed as they were`, { icon: 'sparkle', ms: 2600 });
+  };
+
   /* ── photo pools for the picker ── */
   const chapterMemIds = pages.filter((p) => p.chapterId && p.chapterId === page.chapterId).flatMap((p) => p.memoryIds);
   const pool = {
@@ -184,7 +197,7 @@ export function BookEditor() {
   const canPhotos = page.layout !== 'closing' && page.layout !== 'video';
 
   return (
-    <div className="be">
+    <div className="be" style={{ '--pr': pageRatio(book.style) } as React.CSSProperties}>
       <header className="be-top">
         <button className="icon-btn" onClick={() => navigate('/book')} aria-label="Back to the book"><Icon name="arrow-left" /></button>
         <div className="be-title">
@@ -222,6 +235,7 @@ export function BookEditor() {
               { value: 'photos', label: 'Photos', icon: 'image' },
               { value: 'layout', label: 'Layout', icon: 'layout' },
               { value: 'words', label: 'Words', icon: 'pen' },
+              { value: 'style', label: 'Style', icon: 'palette' },
               { value: 'page', label: 'Page', icon: 'book' },
             ]}
           />
@@ -314,6 +328,49 @@ export function BookEditor() {
                 ))}
                 {!pageMems.length && !STRUCTURAL.includes(page.layout) && <p className="muted">This page has no words.</p>}
                 <p className="muted small">Words you change here also change the memory itself.</p>
+              </div>
+            )}
+
+            {tab === 'style' && (
+              <div className="be-style" data-testid="style-panel">
+                <button className="be-nicer" onClick={polish} data-testid="make-nicer">
+                  <span className="be-nicer-icon"><Icon name="sparkle" size={18} /></span>
+                  <span><strong>Make it nicer</strong><small>Fits photos to their pages and smooths the rhythm. Your own changes stay.</small></span>
+                </button>
+
+                <p className="be-style-h">Colours</p>
+                <div className="be-swatches" role="radiogroup" aria-label="Colours">
+                  {(Object.keys(PALETTES) as PaletteId[]).map((id) => (
+                    <button key={id} role="radio" aria-checked={style.palette === id} className={cx('be-swatch', style.palette === id && 'is-on')} onClick={() => style.palette !== id && setStyle({ palette: id }, `${PALETTES[id].label} colours`)} data-testid={`palette-${id}`}>
+                      <span className="be-swatch-chip" style={{ background: PALETTES[id].swatch[0] }}>
+                        <i style={{ background: PALETTES[id].swatch[1] }} />
+                        <i style={{ background: PALETTES[id].swatch[2] }} />
+                      </span>
+                      <span>{PALETTES[id].label}</span>
+                    </button>
+                  ))}
+                </div>
+
+                <p className="be-style-h">Type</p>
+                <div className="be-types" role="radiogroup" aria-label="Type">
+                  {(Object.keys(TYPES) as TypeId[]).map((id) => (
+                    <button key={id} role="radio" aria-checked={style.type === id} className={cx('be-type', style.type === id && 'is-on')} onClick={() => style.type !== id && setStyle({ type: id }, `${TYPES[id].label} type`)} data-testid={`type-${id}`}>
+                      <span className="be-type-aa" style={{ fontFamily: (TYPES[id].vars['--serif'] as string | undefined) ?? 'var(--serif)' }}>Aa</span>
+                      <span><strong>{TYPES[id].label}</strong><small>{TYPES[id].sample}</small></span>
+                    </button>
+                  ))}
+                </div>
+
+                <p className="be-style-h">Page shape</p>
+                <div className="be-shapes" role="radiogroup" aria-label="Page shape">
+                  {(Object.keys(SHAPES) as ShapeId[]).map((id) => (
+                    <button key={id} role="radio" aria-checked={style.shape === id} className={cx('be-shape', style.shape === id && 'is-on')} onClick={() => style.shape !== id && setStyle({ shape: id }, `${SHAPES[id].label} pages · ${SHAPES[id].size}`)} data-testid={`shape-${id}`}>
+                      <span className="be-shape-box"><i style={{ aspectRatio: `1 / ${SHAPES[id].ratio}`, height: Math.round(28 * Math.min(1, SHAPES[id].ratio)) }} /></span>
+                      <span><strong>{SHAPES[id].label}</strong><small>{SHAPES[id].size}</small></span>
+                    </button>
+                  ))}
+                </div>
+                <p className="muted small">Changes the whole book, its PDF and the shared link. Undo goes back.</p>
               </div>
             )}
 

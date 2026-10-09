@@ -174,6 +174,7 @@ export function generateBook({ baby, memories, media, previous }: BuildInput): {
     pages,
     hiddenMemoryIds: [...hidden],
     chapterTitles: previous?.chapterTitles ?? {},
+    ...(previous?.style ? { style: previous.style } : {}),
     builtFrom: fingerprint(memories),
     share: previous?.share ?? { visibility: 'private', token: uid('s').replace('s-', ''), familyEmails: [], updatedAt: nowISO() },
     generatedAt: nowISO(),
