@@ -5,7 +5,7 @@ import { Shell } from '../components/Shell';
 import { navigate } from '../lib/router';
 
 /**
- * "Coming soon": a first look at Little Legends and Dumplings.
+ * "Coming soon": a first look at NomNoms Baby Tales and NomNoms Dumplings.
  * Shown on the landing page, as its own screen in the app, and linked from Home.
  * Purely presentational: nothing here reads or writes family data.
  */
@@ -21,17 +21,17 @@ export function ComingSoonSection({ heading = true }: { heading?: boolean }) {
 
       <article className="cs-feature">
         <div className="cs-visual">
-          <div className="cs-book" role="img" aria-label="An open Little Legends picture book: Juno dressed as a pirate at the beach with Dad">
+          <div className="cs-book" role="img" aria-label="An open NomNoms Baby Tales picture book, The Adventures of Juno: Juno dressed as a pirate at the beach with Dad">
             <div className="cs-book-art" dangerouslySetInnerHTML={{ __html: LEGENDS_SCENE }} />
             <div className="cs-book-text">
-              <small>Where’s Juno’s sock? · Page 3</small>
+              <small>The Adventures of Juno · Page 3</small>
               <p>Is it at the beach with <strong>Dad</strong>? No! Just a crab in a tiny hat.</p>
             </div>
           </div>
         </div>
         <div className="cs-copy">
           <span className="cs-pill">Coming soon</span>
-          <h3 className="display">Little Legends</h3>
+          <h3 className="display">NomNoms Baby Tales</h3>
           <p className="cs-one">Turn your little one and their favourite people into storybook characters, starring in adventures made just for them.</p>
           <ul className="cs-chips"><li>Avatars made with Genmoji</li><li>Hats, glasses and costumes</li><li>Printed or digital</li></ul>
         </div>
@@ -39,7 +39,7 @@ export function ComingSoonSection({ heading = true }: { heading?: boolean }) {
 
       <article className="cs-feature is-flip">
         <div className="cs-visual">
-          <div className="cs-shelf" role="img" aria-label="Four small Dumpling books: Juno turns one, Our first Halloween, Stinson Beach, and For Mom">
+          <div className="cs-shelf" role="img" aria-label="Four small NomNoms Dumplings books: Juno turns one, Our first Halloween, Stinson Beach, and For Mom">
             {DUMPLING_COVERS.map((c) => (
               <div key={c.id} className={`cs-dumpling is-${c.id}`} dangerouslySetInnerHTML={{ __html: c.svg }} />
             ))}
@@ -47,13 +47,13 @@ export function ComingSoonSection({ heading = true }: { heading?: boolean }) {
         </div>
         <div className="cs-copy">
           <span className="cs-pill">Coming soon</span>
-          <h3 className="display">Dumplings</h3>
+          <h3 className="display">NomNoms Dumplings</h3>
           <p className="cs-one">Dump your photos from a birthday, holiday or trip, and get back a beautiful little book of that day.</p>
           <ul className="cs-chips"><li>Finds the occasion for you</li><li>A design for every occasion</li><li>Videos go into a mini film</li></ul>
         </div>
       </article>
 
-      <p className="cs-fine">Illustrations are previews. Little Legends avatars use Genmoji, on Apple devices with Apple Intelligence.</p>
+      <p className="cs-fine">Illustrations are previews. Baby Tales avatars use Genmoji, on Apple devices with Apple Intelligence.</p>
     </section>
   );
 }
@@ -74,7 +74,7 @@ export function ComingSoonCard() {
       <span className="cs-card-art" dangerouslySetInnerHTML={{ __html: DUMPLING_COVERS[0].svg }} />
       <span className="cs-card-text">
         <span className="eyebrow">Coming soon</span>
-        <strong>Little Legends &amp; Dumplings</strong>
+        <strong>Baby Tales &amp; Dumplings</strong>
         <small>Storybooks starring your family, and little books for big days.</small>
       </span>
       <Icon name="chevron-right" />

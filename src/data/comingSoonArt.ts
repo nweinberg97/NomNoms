@@ -1,5 +1,5 @@
 /**
- * Artwork for the "Coming soon" section: a page from a Little Legends story
+ * Artwork for the "Coming soon" section: a page from a Baby Tales story
  * and four Dumplings covers. Static, hand-made SVG (placeholders until the
  * real illustrations exist), so nothing is fetched or stored.
  */
