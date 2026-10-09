@@ -44,9 +44,13 @@ GitHub Pages works with either Pages source setting:
 - **Timeline** grouped into chapters, with search ("grandma", "beach", "first"), filters (photos, videos, milestones, stories, favorites) and a chapter jump.
 - **Milestones**: a timeline of firsts with the baby's age at each, plus gentle prompts for firsts still to come. Custom milestones welcome ("First time stealing Dad's glasses").
 - **Favorites** (♡) feed the cover, chapter openers and the film.
-- **Build My Book**: the "magic" sequence, then an automatically designed book.
+- **Two clear outputs**: *Make the book* (the printable book and its PDF) and *Make the film* (a short movie with music). Videos belong to the film: the printed book drops them on the fly, re-fitting each page so there's never a hole. The saved book itself is never changed by this.
+- **Build My Book**: the "magic" sequence, then an automatically designed book. "Update book" adds new memories into their chapters and leaves every page you edited as it is.
 - **Book reader**: two-page spreads on desktop, single pages on phones, keyboard/swipe/arrow navigation, contents, page grid, and videos that play right on the page.
-- **Book editor**: drag to reorder pages, change layout, swap photos, edit captions and chapter titles, hide a memory, add a memory back in, regenerate the whole layout (hidden memories, chapter titles and cover photo are kept).
+- **Book editor, phone first**: tap any photo on the page to replace it (from the memory, the chapter, everything, or straight from the phone), move it earlier/later or remove it; pick a layout from live mini pages; edit words; move a page with "Move, then tap where"; add or remove pages; Undo for every change. On a computer pages can also be dragged.
+- **Style**: five colour palettes, three type pairings (Classic Lora, Modern Inter, Playful Poppins) and three page shapes (portrait 8×10, square 8×8, landscape 11×8.5). Every layout reflows for each shape. *Make it nicer* fits photos to the page shape and smooths the rhythm, but only on pages the parent hasn't touched.
+- **Film**: short / medium / long, three built-in royalty-free soundtracks composed in the browser (Lullaby, Sunny, Dreamy) or your own song file, choose which moments are in. Settings are remembered.
+- **Backup & restore**: one .zip with every memory, caption, photo and (optionally) video. Restore on any device, from Settings or the first screen ("Moving from another device?"). Restoring merges and never deletes.
 - **Export**: PDF (8×10 in, every page exactly as designed), backup JSON, Memory Film (play in-app or save as a video file).
 - **Share**: Private (default) / Family (invite by email) / Anyone with link, for the whole book or a single chapter, plus "Preview as family". A single memory can be shared as a beautifully set image card.
 - **Settings**: baby details, privacy, storage, connected services, account, load demo / delete all data.
@@ -106,17 +110,48 @@ Adding a cloud provider means implementing `MediaProvider` (`upload / get / getT
 3. **Pages** chosen from each memory's content: milestone → typographic arch page (or full-bleed variant when milestones crowd together); video → video page; long text → story page with a drop cap, or a quote page if there's no photo; 1 photo → full-bleed / hero + caption / split; 2 → editorial two-up; 3 → three-image grid; 4 → four-up; 5+ → collage. Small everyday single-photo moments are gathered into "Little moments" grids so 500 casual photos still read well.
 4. **Rhythm**: identical layouts never sit back to back; landscape photos get promoted to full bleed; continuation pages drop repeated captions.
 
-Templates: Cover, Chapter opener, Full bleed, Hero + caption, Split image, Editorial two-up, Three/Four image grid, Memory collage, Milestone, Story, Video, Quote, Closing. All pages are 8×10 portrait and sized with container-query units, so one component renders identically everywhere.
+Templates: Cover, Chapter opener, Full bleed, Hero + caption, Split image, Editorial two-up, Three/Four image grid, Memory collage, Milestone, Story, Video, Quote, Closing. Pages are sized with container-query units (`cqmin`), so one component renders identically everywhere and in every shape. Styles (`book/styles.ts`) only redefine the page's colour and type tokens; a book without a `style` looks exactly like the original design.
+
+`mergeIntoBook()` updates an existing book without disturbing it, `printablePages()` derives the printed book (no videos, no gaps) and `polishBook()` (`book/polish.ts`) is the *Make it nicer* pass.
 
 ### Export
 
-- **PDF** — client-side: each page is rendered by `BookPageView` off-screen, rasterized (html-to-image, ~170 dpi) and assembled with pdf-lib. A server renderer (vector text, print bleed) can replace this later without changing the book model.
-- **Memory Film** — `export/film.ts` builds a timeline (title card → chapter cards → photo/video shots → end card) and draws it to a canvas with Ken Burns motion and crossfades. The same renderer plays in-app and records to MP4/WebM via `MediaRecorder` in Chrome, Edge and Safari 18+. The timeline is data, so a server-side pipeline (ffmpeg/Remotion) can render the identical film to MP4 with music.
-- **Backup** — all memories, milestones, media references and the book as JSON.
+- **PDF** — client-side: the printable pages are rendered by `BookPageView` off-screen, rasterized (html-to-image) and assembled with pdf-lib at the book's page size (8×10, 8×8 or 11×8.5 in). A server renderer (vector text, print bleed) can replace this later without changing the book model.
+- **Memory Film** — `export/film.ts` builds a timeline (title card → chapter cards → photo/video shots → end card) and draws it to a canvas with Ken Burns motion and crossfades. The same renderer plays in-app and records to MP4/WebM via `MediaRecorder` in Chrome, Edge and Safari 18+. Music is rendered with an `OfflineAudioContext` (`export/music.ts`) and mixed into the recording. The timeline is data, so a server-side pipeline (ffmpeg/Remotion) can render the identical film later.
+- **Backup** — see *Protecting family data* below.
 
 ### Sharing and privacy
 
 Books are **private by default**. Sharing is an explicit per-book choice: Private, Family (invite list), or Anyone with link; whole book or one chapter. In this prototype a share link resolves through a local index, so it opens on the same device ("Preview as family" shows exactly what a relative would see). With a backend, the same `ShareSettings` drive a server-checked `/book/:token`.
+
+## Protecting family data
+
+Real families keep their only copy of these memories here, so every release follows these rules:
+
+1. **Storage names never change.** localStorage keys `nomnoms:v1:<account>:{babies,memories:<baby>,milestones:<baby>,media:<baby>,book:<baby>,prefs,schema}`, the IndexedDB database `nomnoms-media` and its `files` store are fixed. New fields are additive and optional; old records must render unchanged.
+2. **Migrations are versioned and reversible.** `services/schema.ts` keeps `SCHEMA_VERSION` and a `MIGRATIONS` map. Before migrating it snapshots the account (`nomnoms:snapshot:<account>:latest`) and restores it if any step throws. To change the data shape: bump the version, add a migration, add an upgrade test.
+3. **Media is never overwritten.** `writeStored()` skips keys that already exist; restore writes files before records, and merges by id.
+4. **Upgrade test before every push**: load data with the live build, open the new build, and check every key and media file is byte-for-byte the same.
+5. **Ask the browser to keep the data** (`navigator.storage.persist()`), show a storage meter in Settings, warn when videos get large, and nudge for a backup.
+
+### Backup format (also the future import format)
+
+A backup is a .zip: `manifest.json` + `media/<storageKey>.<ext>` (+ `.thumb.jpg`). The manifest is `{ format: "nomnoms-backup", formatVersion: 1, appSchema, exportedAt, includesVideos, account, prefs, babies: [{ baby, memories, milestones, media, book }], files: [{ storageKey, path, thumbPath, mimeType, size }], skipped }`.
+
+### Moving to Supabase
+
+The backup is designed to be the one-time import into a backend:
+
+1. Tables mirror the types in `lib/types.ts`: `families`, `babies`, `memories`, `milestones`, `media_items`, `books` (book pages as `jsonb`), `preferences`. Every row has `family_id` with row-level security on it; ids are kept as text so links between records survive.
+2. An import script (Edge Function or Node) reads `manifest.json`, uploads each `files[]` entry to Storage at `<family_id>/<storageKey>`, then upserts records by id (`on conflict do nothing`, the same never-overwrite rule as restore) and rewrites each media item to `storageProvider: "supabase"`.
+3. In the app, add `SupabaseRepository` (implements `Repositories`) and `SupabaseMediaProvider` (implements `MediaProvider`), then point the store at them. On first sign-in, offer "Move this device's book to your account", which builds a backup in memory and runs the same import.
+
+## Backlog
+
+- **Printed books for sale**: order a hardcover from the PDF via a print partner (Lulu / Peecho / Prodigi API), vector PDF with bleed, pricing and checkout. This is the main monetisation path.
+- **Cloud sync** (Supabase as above) so phone and computer share one book without backup files; family members with roles.
+- **Spotify**: its API doesn't allow mixing tracks into an exported video, so the film uses built-in royalty-free music or the parent's own song file. A licensed music library could add more tracks later.
+- Server-rendered MP4 film; more palettes and type pairings; per-chapter styles.
 
 ## Authentication setup
 
@@ -155,11 +190,11 @@ NomNoms Web / iOS / Android
 
 ## Built deliberately without
 
-No backend, database, Firebase/Supabase, payments, family permissions, social feed, or trackers (feeding, sleep, diapers). One family, one baby, one beautiful living book.
+No backend, database, Firebase/Supabase, payments, family permissions, social feed, or trackers (feeding, sleep, diapers). One family, one baby, one beautiful living book. Moving between devices works with a backup file until cloud sync lands.
 
 ## Notes
 
 - **Demo media**: the demo family's "photos" and clips are generated abstract light-and-texture images (`scripts/generate-demo-media.py`), so the repo ships no stock photography of real people. Add your own photos and the book uses them.
-- **Fonts**: Lora (display) and Inter (interface) are self-hosted subsets under the SIL Open Font License.
+- **Fonts**: Lora (display), Inter (interface) and Poppins (Playful book style) are self-hosted under the SIL Open Font License.
 - **Tooling**: plain esbuild instead of a framework CLI keeps the toolchain to one small dependency; React 19 + TypeScript.
 - **Browser support**: current Chrome, Safari, Firefox and Edge. In-app camera needs HTTPS (or localhost). Saving the film as a video needs `MediaRecorder` canvas capture.
