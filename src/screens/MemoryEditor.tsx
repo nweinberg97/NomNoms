@@ -7,6 +7,7 @@ import type { Memory, MemoryType } from '../lib/types';
 import { cx, firstName, fmtLong, fmtMonthYear, plural, toISODate, todayISO } from '../lib/util';
 import { useApp } from '../state/store';
 import { pendingCapture } from '../state/ui';
+import { formatBytes } from '../services/backup/BackupService';
 import { EDITOR_DROP_EVENT } from '../components/DropZone';
 
 const TYPES: { value: MemoryType; label: string }[] = [
@@ -174,6 +175,15 @@ export function MemoryEditor({ editId }: { editId?: string }) {
             <button className="editor-thumb is-add" onClick={() => picker.current?.click()} aria-label="Add more photos or videos"><Icon name="plus" size={22} /></button>
           </div>
         )}
+        {(() => {
+          const big = locals.filter((l) => l.kind === 'video').reduce((n, l) => n + l.file.size, 0);
+          return big > 80 * 1024 * 1024 ? (
+            <p className="editor-warn" role="note">
+              <Icon name="video" size={15} />
+              <span>These videos are {formatBytes(big)}. Videos fill this device’s storage quickly. Trim long clips in Photos first, and save a backup in Settings regularly.</span>
+            </p>
+          ) : null;
+        })()}
         {locals.length === 0 && existing.length === 0 && (
           <div className="editor-add-media">
             <button className="editor-add-main" onClick={() => picker.current?.click()} data-testid="editor-add-photos">

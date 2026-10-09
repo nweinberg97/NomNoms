@@ -7,6 +7,7 @@ import { LocalRepository } from '../repositories/LocalRepository';
 import type { Repositories } from '../repositories/types';
 import { AuthService } from '../services/auth/AuthService';
 import { MediaService } from '../services/media/MediaService';
+import { ensureSchema, requestPersistentStorage } from '../services/schema';
 
 export interface NewMemoryInput {
   type?: MemoryType;
@@ -48,6 +49,8 @@ interface Actions {
   buildBook(): Promise<Book>;
   saveBook(book: Book): Promise<void>;
   resetAll(): Promise<void>;
+  /** Re-read everything from storage (after a restore). */
+  reload(): Promise<void>;
   savePrefs(p: Preferences): Promise<void>;
   ingest(files: Blob[]): Promise<MediaItem[]>;
 }
@@ -69,6 +72,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setState({ ready: true, babies: [], memories: [], milestones: [], media: new Map(), prefs: {} });
       return { hasBaby: false };
     }
+    ensureSchema(account.id);
     const repo = new LocalRepository(account.id);
     repoRef.current = repo;
     const babies = await repo.babies.getBabies();
@@ -101,6 +105,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const ingest = useCallback(async (files: Blob[]) => {
     const babyId = stateRef.current.baby?.id;
     const items: MediaItem[] = [];
+    void requestPersistentStorage();
     for (const f of files) items.push(await MediaService.ingest(f, { name: (f as File).name }));
     if (babyId) await repo().media.saveMedia(babyId, items);
     // make new media visible to actions that run before the next render
@@ -283,6 +288,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     async resetAll() {
       await repo().clearAll();
       await MediaService.browser.clear();
+      await loadAccount(AuthService.current());
+    },
+
+    async reload() {
       await loadAccount(AuthService.current());
     },
 

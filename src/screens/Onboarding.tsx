@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Icon, Wordmark } from '../components/Icon';
 import { Spinner, toast } from '../components/ui';
+import { RestoreButton } from '../components/DataCard';
 import { navigate } from '../lib/router';
 import { firstName, todayISO } from '../lib/util';
 import { useApp } from '../state/store';
@@ -85,6 +86,11 @@ export function Onboarding() {
         </form>
 
         <div className="onboard-alt reveal reveal-2">
+          <p className="eyebrow">Moving from another device?</p>
+          <h3 className="display">Restore a backup</h3>
+          <p className="muted">Choose the backup file you saved from NomNoms on your phone or computer. All your memories, photos and book come with it.</p>
+          <RestoreButton className="btn btn-ghost" label="Choose backup file" />
+          <hr className="onboard-hr" />
           <p className="eyebrow">Just looking?</p>
           <h3 className="display">Open the Hale family’s book</h3>
           <p className="muted">A full first year — 70+ memories, milestones, little stories and videos — so you can see what NomNoms makes.</p>

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Icon, AppleMark, GoogleMark } from '../components/Icon';
 import { MediaImg } from '../components/Media';
+import { DataCard } from '../components/DataCard';
 import { PageHeader, Shell } from '../components/Shell';
 import { Confirm, toast } from '../components/ui';
 import { kv } from '../lib/kv';
@@ -64,6 +65,8 @@ export function Settings() {
             </div>
           </div>
         </section>
+
+        <DataCard />
 
         <section className="set-card reveal reveal-1">
           <h2 className="set-h">Book & export</h2>

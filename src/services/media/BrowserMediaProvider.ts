@@ -133,6 +133,29 @@ export class BrowserMediaProvider implements MediaProvider {
     }
   }
 
+  /** Raw stored file + thumbnail for a key (used by backup). */
+  async readStored(key: string): Promise<{ blob: Blob; thumb?: Blob } | undefined> {
+    const r = await this.row(key);
+    return r ? { blob: r.blob, thumb: r.thumb } : undefined;
+  }
+
+  /** Write a file under an existing key (used by restore). Never overwrites a key that already holds data. */
+  async writeStored(key: string, blob: Blob, thumb?: Blob): Promise<'written' | 'exists'> {
+    const existing = await this.row(key);
+    if (existing) return 'exists';
+    const row: Row = { key, blob, thumb };
+    try {
+      const db = await this.dbp;
+      if (db) await this.tx('readwrite', (s) => s.put(row));
+      else this.mem.set(key, row);
+    } catch (e) {
+      this.persistent = false;
+      this.mem.set(key, row);
+      throw e;
+    }
+    return 'written';
+  }
+
   async clear() {
     this.mem.clear();
     try {

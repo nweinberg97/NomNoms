@@ -3,7 +3,6 @@ import { Icon } from '../components/Icon';
 import { PageHeader, Shell } from '../components/Shell';
 import { Segmented, Sheet, Spinner, toast } from '../components/ui';
 import { exportBookPdf } from '../export/pdf';
-import { downloadBlob } from '../export/offscreen';
 import { navigate } from '../lib/router';
 import type { ShareVisibility } from '../lib/types';
 import { cx, firstName, nowISO, plural } from '../lib/util';
@@ -126,11 +125,6 @@ export function ExportScreen() {
     }
   };
 
-  const backup = () => {
-    const data = { exportedAt: nowISO(), app: 'NomNoms', version: 1, baby, memories, milestones, media: [...media.values()], book };
-    downloadBlob(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }), `nomnoms-${firstName(baby.name).toLowerCase()}-backup.json`);
-    toast('Backup downloaded (memories & book; photos stay where they’re stored)', { icon: 'download', ms: 4200 });
-  };
 
   return (
     <Shell>
@@ -170,8 +164,8 @@ export function ExportScreen() {
         <article className="export-card reveal reveal-4">
           <span className="export-icon"><Icon name="cloud" size={22} /></span>
           <h3 className="display">Backup</h3>
-          <p className="muted">Download every memory, caption and milestone as a file you can keep. Photos stay in your storage.</p>
-          <button className="btn btn-ghost" onClick={backup}><Icon name="download" size={16} /> Download backup</button>
+          <p className="muted">One file with every memory, photo and video. Keep it safe, or use it to move NomNoms to another phone or computer.</p>
+          <button className="btn btn-ghost" onClick={() => navigate('/settings')}><Icon name="download" size={16} /> Backup &amp; restore</button>
         </article>
       </div>
       <ShareSheet open={share} onClose={() => setShare(false)} />

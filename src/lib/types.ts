@@ -164,4 +164,5 @@ export interface Preferences {
   bookTitle?: string;
   reduceMotion?: boolean;
   lastSeenBuild?: ISODateTime;
+  lastBackupAt?: ISODateTime;
 }
