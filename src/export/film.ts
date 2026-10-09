@@ -17,8 +17,8 @@ const FADE = 0.7;
 export type Shot =
   | { kind: 'title'; dur: number; title: string; sub: string; line: string }
   | { kind: 'chapter'; dur: number; n: number; title: string; sub: string }
-  | { kind: 'photo'; dur: number; media: MediaItem; title?: string; date: string; caption?: string; milestone?: boolean; seed: number }
-  | { kind: 'video'; dur: number; media: MediaItem; title?: string; date: string }
+  | { kind: 'photo'; dur: number; media: MediaItem; title?: string; date: string; caption?: string; milestone?: boolean; seed: number; memoryId?: string }
+  | { kind: 'video'; dur: number; media: MediaItem; title?: string; date: string; memoryId?: string }
   | { kind: 'end'; dur: number; title: string; sub: string };
 
 export interface Timeline {
@@ -26,9 +26,30 @@ export interface Timeline {
   duration: number;
 }
 
-export function buildTimeline(baby: Baby, book: Book | undefined, memories: Memory[], media: Map<string, MediaItem>, mode: 'highlights' | 'full'): Timeline {
+export type FilmLength = 'short' | 'medium' | 'long';
+export const FILM_LENGTHS: Record<FilmLength, { label: string; perChapter: number; photo: number; chapter: number; videoMax: number }> = {
+  short: { label: 'Short', perChapter: 1, photo: 2.8, chapter: 2.2, videoMax: 4 },
+  medium: { label: 'Medium', perChapter: 2, photo: 3.2, chapter: 2.6, videoMax: 5 },
+  long: { label: 'Long', perChapter: 4, photo: 3.6, chapter: 3, videoMax: 6 },
+};
+
+export interface TimelineOptions {
+  length: FilmLength;
+  /** Memory ids the parent took out of the film. */
+  excluded?: string[];
+}
+
+/** Memory ids in the film, in order (for the "moments" list). */
+export function timelineMemoryIds(tl: Timeline) {
+  return tl.shots.flatMap((s) => ('memoryId' in s && s.memoryId ? [s.memoryId] : []));
+}
+
+export function buildTimeline(baby: Baby, book: Book | undefined, memories: Memory[], media: Map<string, MediaItem>, mode: 'highlights' | 'full' | TimelineOptions): Timeline {
+  const opts: TimelineOptions = typeof mode === 'string' ? { length: mode === 'highlights' ? 'short' : 'long' } : mode;
+  const L = FILM_LENGTHS[opts.length];
+  const excluded = new Set(opts.excluded ?? []);
   const memMap = new Map(memories.map((m) => [m.id, m]));
-  const hl = mode === 'highlights';
+  const hl = opts.length === 'short';
   const shots: Shot[] = [];
   const chron = [...memories].sort((a, b) => a.date.localeCompare(b.date));
   const first = chron[0]?.date ?? baby.birthDate;
@@ -63,17 +84,17 @@ export function buildTimeline(baby: Baby, book: Book | undefined, memories: Memo
   let seed = 1;
   groups.forEach((g, gi) => {
     const ranked = [...g.mems]
-      .filter((m) => m.mediaIds.some((id) => media.get(id)?.kind !== 'audio'))
+      .filter((m) => !excluded.has(m.id) && m.mediaIds.some((id) => media.get(id)?.kind !== 'audio'))
       .map((m) => ({ m, score: (m.favorite ? 4 : 0) + (m.milestoneId ? 3 : 0) + (m.caption ? 1 : 0) }))
       .sort((a, b) => b.score - a.score);
-    const picks = ranked.slice(0, hl ? 1 : 4).map((r) => r.m).sort((a, b) => a.date.localeCompare(b.date));
+    const picks = ranked.slice(0, L.perChapter).map((r) => r.m).sort((a, b) => a.date.localeCompare(b.date));
     if (!picks.length) return;
-    shots.push({ kind: 'chapter', dur: hl ? 2.2 : 3, n: gi + 1, title: g.title, sub: g.sub });
+    shots.push({ kind: 'chapter', dur: L.chapter, n: gi + 1, title: g.title, sub: g.sub });
     for (const m of picks) {
       const vid = m.mediaIds.map((id) => media.get(id)).find((x) => x?.kind === 'video');
       const photo = m.mediaIds.map((id) => media.get(id)).find((x) => x?.kind === 'photo');
-      if (vid && !hl) shots.push({ kind: 'video', dur: Math.min(6, Math.max(3.5, vid.duration ?? 5)), media: vid, title: m.title, date: fmtLong(m.date) });
-      else if (photo || vid) shots.push({ kind: 'photo', dur: hl ? 2.8 : 3.6, media: (photo ?? vid)!, title: m.title, date: fmtLong(m.date), caption: hl ? undefined : m.caption, milestone: !!m.milestoneId, seed: seed++ });
+      if (vid && (!hl || !photo)) shots.push({ kind: 'video', dur: Math.min(L.videoMax, Math.max(3, vid.duration ?? 5)), media: vid, title: m.title, date: fmtLong(m.date), memoryId: m.id });
+      else if (photo || vid) shots.push({ kind: 'photo', dur: L.photo, media: (photo ?? vid)!, title: m.title, date: fmtLong(m.date), caption: hl ? undefined : m.caption, milestone: !!m.milestoneId, seed: seed++, memoryId: m.id });
     }
   });
   shots.push({ kind: 'end', dur: 4, title: 'To be continued…', sub: 'Made with NomNoms' });

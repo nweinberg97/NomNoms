@@ -160,9 +160,19 @@ export interface Book {
   updatedAt: ISODateTime;
 }
 
+/** Film choices, remembered between visits. */
+export interface FilmPrefs {
+  length: 'short' | 'medium' | 'long';
+  music: 'lullaby' | 'sunny' | 'dreamy' | 'own' | 'none';
+  excluded: string[];
+  ownSongMediaId?: string;
+  ownSongName?: string;
+}
+
 export interface Preferences {
   bookTitle?: string;
   reduceMotion?: boolean;
   lastSeenBuild?: ISODateTime;
   lastBackupAt?: ISODateTime;
+  film?: FilmPrefs;
 }

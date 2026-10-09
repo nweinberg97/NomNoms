@@ -3,6 +3,7 @@ import { Icon } from '../components/Icon';
 import { PageHeader, Shell } from '../components/Shell';
 import { Segmented, Sheet, Spinner, toast } from '../components/ui';
 import { exportBookPdf } from '../export/pdf';
+import { printablePages } from '../book/layoutEngine';
 import { navigate } from '../lib/router';
 import type { ShareVisibility } from '../lib/types';
 import { cx, firstName, nowISO, plural } from '../lib/util';
@@ -113,7 +114,7 @@ export function ExportScreen() {
 
   const pdf = async () => {
     if (!book) return navigate('/book/build');
-    setProgress([0, book.pages.length + 1]);
+    setProgress([0, printablePages(book.pages, media, new Map(memories.map((m) => [m.id, m]))).length + 1]);
     try {
       const r = await exportBookPdf(book, { memories: new Map(memories.map((m) => [m.id, m])), media }, (d, t) => setProgress([d, t]));
       toast(`Downloaded ${r.name} · ${r.pages} pages`, { icon: 'download', ms: 4200 });
@@ -133,7 +134,7 @@ export function ExportScreen() {
         <article className="export-card is-primary reveal reveal-1">
           <span className="export-icon"><Icon name="download" size={22} /></span>
           <h3 className="display">PDF book</h3>
-          <p className="muted">Every page exactly as designed — 8×10 in, ready to print or send. {book ? `${plural(book.pages.length, 'page')}.` : ''}</p>
+          <p className="muted">Every page exactly as designed, 8×10 in, ready to print or send. Videos are left out; they’re in the film. {book ? `${plural(printablePages(book.pages, media, new Map(memories.map((m) => [m.id, m]))).length, 'page')}.` : ''}</p>
           {progress ? (
             <div className="progress-wrap" role="status">
               <div className="progress"><span style={{ width: `${(progress[0] / progress[1]) * 100}%` }} /></div>

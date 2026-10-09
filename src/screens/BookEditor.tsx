@@ -211,6 +211,7 @@ export function BookEditor() {
           </div>
           <button className="be-nav is-next" onClick={() => setSel(Math.min(pages.length - 1, i + 1))} disabled={i >= pages.length - 1} aria-label="Next page" data-testid="be-next"><Icon name="chevron-right" /></button>
           {canPhotos && page.mediaIds.length > 0 && slot === null && <p className="be-hint">Tap a photo to change, move or remove it</p>}
+          {page.layout === 'video' && <p className="be-hint is-film"><Icon name="film" size={13} /> Only in the film. This page isn’t printed</p>}
         </section>
 
         <section className="be-tools">
@@ -228,7 +229,7 @@ export function BookEditor() {
           <div className="be-panel">
             {tab === 'photos' && (
               !canPhotos ? (
-                <p className="muted">{page.layout === 'video' ? 'This page shows a video. Videos appear in the film, and on a still frame in the printed book.' : 'This page has no photos.'}</p>
+                <p className="muted">{page.layout === 'video' ? 'This page is a video. Videos play in the film. The book and its PDF leave them out without leaving a gap.' : 'This page has no photos.'}</p>
               ) : (
                 <>
                   <div className="be-slots">
@@ -356,6 +357,7 @@ export function BookEditor() {
               data-testid={`thumb-${k}`}
             >
               <BookPageView page={p} ctx={ctx} />
+              {p.layout === 'video' && <i className="be-film-badge">Film</i>}
               <span>{k === 0 ? 'Cover' : k}</span>
             </button>
           </React.Fragment>

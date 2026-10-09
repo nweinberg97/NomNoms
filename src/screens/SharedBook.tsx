@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Reader } from '../book/Reader';
+import { printableBook } from '../book/layoutEngine';
 import { Icon, Wordmark } from '../components/Icon';
 import { navigate, useRoute } from '../lib/router';
 import type { Baby, Book, MediaItem, Memory } from '../lib/types';
@@ -52,7 +53,7 @@ export function SharedBook({ token }: { token: string }) {
   }
 
   const chapterId = query.get('chapter');
-  let book = data.book;
+  let book = printableBook(data.book, data.media, new Map(data.memories.map((m) => [m.id, m])));
   if (chapterId) {
     const pages = book.pages.filter((p) => p.chapterId === chapterId);
     if (pages.length) book = { ...book, pages };

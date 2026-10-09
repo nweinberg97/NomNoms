@@ -2,6 +2,7 @@ import { PDFDocument } from 'pdf-lib';
 import type { PageContext } from '../book/BookPageView';
 import type { Book } from '../lib/types';
 import { downloadBlob, rasterizePages } from './offscreen';
+import { printablePages } from '../book/layoutEngine';
 
 const PT_W = 576; // 8in
 const PT_H = 720; // 10in
@@ -13,7 +14,8 @@ const PT_H = 720; // 10in
  * A server-side renderer (vector text, print bleed) can replace this later.
  */
 export async function exportBookPdf(book: Book, ctx: PageContext, onProgress?: (done: number, total: number) => void) {
-  const pages = book.pages;
+  // the printed book never contains videos (they belong to the film)
+  const pages = printablePages(book.pages, ctx.media, ctx.memories);
   const images = await rasterizePages(pages, ctx, { width: 1350, quality: 0.84, onProgress: (d, t) => onProgress?.(d, t + 1) });
   const pdf = await PDFDocument.create();
   pdf.setTitle(`${book.title} — ${book.subtitle}`);

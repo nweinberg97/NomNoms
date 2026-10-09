@@ -299,3 +299,42 @@ export function mergeIntoBook(previous: Book, fresh: Book, memories: Memory[]): 
   }
   return { ...previous, pages, builtFrom: fresh.builtFrom, generatedAt: fresh.generatedAt, updatedAt: nowISO() };
 }
+
+/**
+ * The book as it prints: videos belong to the film, so video pages drop out
+ * and any video on a photo page is removed. Nothing is left as a hole —
+ * a page that loses all its pictures becomes a words page (or goes, if it
+ * had no words), and a chapter with nothing left loses its opener.
+ * The saved book is never changed; this is a view of it.
+ */
+export function printablePages(pages: BookPage[], media: Map<string, MediaItem>, memories: Map<string, Memory>): BookPage[] {
+  const isVideo = (id: string) => media.get(id)?.kind === 'video' || media.get(id)?.kind === 'audio';
+  const out: BookPage[] = [];
+  for (const p of pages) {
+    if (p.layout === 'video') continue;
+    if (p.layout === 'cover' || p.layout === 'chapter' || p.layout === 'closing') {
+      out.push(p.mediaIds.some(isVideo) ? { ...p, mediaIds: p.mediaIds.filter((id) => !isVideo(id)) } : p);
+      continue;
+    }
+    if (!p.mediaIds.some(isVideo)) {
+      out.push(p);
+      continue;
+    }
+    const ids = p.mediaIds.filter((id) => !isVideo(id));
+    const hasWords = p.memoryIds.some((id) => memories.get(id)?.caption || memories.get(id)?.title);
+    if (!ids.length) {
+      if (hasWords && !p.quiet) out.push({ ...p, layout: 'quote', mediaIds: [] });
+      continue;
+    }
+    const n = ids.length;
+    const layout: LayoutType = (LAYOUT_SLOTS[p.layout] ?? 1) <= n ? p.layout
+      : n === 1 ? 'hero-caption' : n === 2 ? 'two-up' : n === 3 ? 'three-grid' : 'four-grid';
+    out.push({ ...p, layout, mediaIds: ids });
+  }
+  // a chapter opener followed directly by another opener (or the end) has nothing in it
+  return out.filter((p, k) => p.layout !== 'chapter' || (out[k + 1] && out[k + 1].layout !== 'chapter' && out[k + 1].layout !== 'closing'));
+}
+
+export function printableBook(book: Book, media: Map<string, MediaItem>, memories: Map<string, Memory>): Book {
+  return { ...book, pages: printablePages(book.pages, media, memories) };
+}

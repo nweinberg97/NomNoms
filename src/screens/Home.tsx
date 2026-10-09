@@ -5,6 +5,7 @@ import { Icon } from '../components/Icon';
 import { MediaImg } from '../components/Media';
 import { MemoryCard } from '../components/MemoryCard';
 import { Shell } from '../components/Shell';
+import { MakeChoices } from './BookScreens';
 import { Empty } from '../components/ui';
 import { navigate } from '../lib/router';
 import { ageLabel, cx, firstName, fmtLong, fmtShort, plural, todayISO } from '../lib/util';
@@ -82,24 +83,15 @@ export function Home() {
             </div>
           </section>
 
-          <section className="book-cta reveal reveal-3">
-            <div>
-              <p className="eyebrow">{book ? 'Your book' : 'Ready when you are'}</p>
-              <h3 className="display">
-                {book
-                  ? pending > 0 ? `${plural(pending, 'new memory', 'new memories')} to add to the book` : `${name}’s book is up to date`
-                  : `Turn ${plural(memories.length, 'memory', 'memories')} into a book`}
-              </h3>
-              <p className="muted">{book ? `${book.pages.length} pages · ${chapters.length} chapters` : 'Chapters, layouts and captions — designed for you in seconds.'}</p>
-            </div>
-            <div className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
-              {book && <button className="btn btn-ghost" onClick={(e) => { e.stopPropagation(); navigate('/read'); }}><Icon name="book" size={17} /> Open book</button>}
-              {(!book || pending > 0) && (
-                <button className="btn btn-primary" onClick={() => navigate('/book/build')} data-testid="build-book">
-                  <Icon name="sparkle" size={17} /> {book ? 'Update my book' : 'Build my book'}
-                </button>
-              )}
-            </div>
+          <section className="home-make reveal reveal-3">
+            {book && pending > 0 && (
+              <button className="update-banner" onClick={() => navigate('/book/build')} data-testid="build-book">
+                <Icon name="sparkle" size={16} />
+                <span><strong>{plural(pending, 'new memory', 'new memories')}</strong> to add to {name}’s book. Your edits stay as they are</span>
+                <Icon name="arrow-right" size={16} />
+              </button>
+            )}
+            <MakeChoices hasBook={!!book} compact />
           </section>
 
           {onThisDay && (

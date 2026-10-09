@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { BookPageView } from '../book/BookPageView';
+import { printablePages } from '../book/layoutEngine';
 import { Icon } from '../components/Icon';
 import { MediaImg } from '../components/Media';
 import { navigate } from '../lib/router';
@@ -60,8 +61,9 @@ export function BuildBook() {
   const finalBook = book ?? (ready ? storeBook : undefined);
 
   if (!baby) return null;
-  const chapterCount = finalBook?.pages.filter((p) => p.layout === 'chapter').length ?? 0;
   const ctx = { memories: new Map(memories.map((m) => [m.id, m])), media, interactive: false };
+  const printed = finalBook ? printablePages(finalBook.pages, media, ctx.memories) : [];
+  const chapterCount = printed.filter((p) => p.layout === 'chapter').length;
 
   return (
     <div className={cx('magic', ready && 'is-ready')}>
@@ -96,11 +98,12 @@ export function BuildBook() {
             <p className="eyebrow">{firstName(baby.name)}’s book is ready</p>
             <h1 className="display">{finalBook?.subtitle ?? 'Your book'}</h1>
             <p className="muted">
-              {finalBook ? `${plural(finalBook.pages.length, 'page')} · ${plural(chapterCount, 'chapter')} · ${plural(memories.length, 'memory', 'memories')}` : ''}
+              {finalBook ? `${plural(printed.length, 'page')} · ${plural(chapterCount, 'chapter')} · ${plural(memories.length, 'memory', 'memories')}` : ''}
             </p>
             <div className="row" style={{ gap: 10, marginTop: 22, flexWrap: 'wrap' }}>
               <button className="btn btn-primary btn-lg" onClick={() => navigate('/read')} data-testid="open-book"><Icon name="book" size={18} /> Open the book</button>
-              <button className="btn btn-ghost btn-lg" onClick={() => navigate('/book/edit')}>Edit pages</button>
+              <button className="btn btn-ghost btn-lg" onClick={() => navigate('/book/edit')}>Edit & style</button>
+              <button className="btn btn-ghost btn-lg" onClick={() => navigate('/film')}><Icon name="film" size={18} /> Make the film</button>
             </div>
           </div>
         </div>
