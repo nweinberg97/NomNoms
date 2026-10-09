@@ -7,6 +7,7 @@ import { match, navigate, useRoute } from './lib/router';
 import { BookHome, ReadScreen } from './screens/BookScreens';
 import { BookEditor } from './screens/BookEditor';
 import { BuildBook } from './screens/BuildBook';
+import { ComingSoon } from './screens/ComingSoon';
 import { Film } from './screens/Film';
 import { Home } from './screens/Home';
 import { Landing } from './screens/Landing';
@@ -52,6 +53,7 @@ function Routes() {
     case '/export': return <ExportScreen />;
     case '/film': return <Film />;
     case '/settings': return <Settings />;
+    case '/coming-soon': return <ComingSoon />;
     case '/home': return <Home />;
     default:
       queueMicrotask(() => navigate('/home', { replace: true }));

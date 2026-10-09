@@ -5,6 +5,7 @@ import { MediaImg } from '../components/Media';
 import { fmtDuration } from '../lib/util';
 import { toast, Spinner } from '../components/ui';
 import { buildDemoSeed } from '../data/seed';
+import { ComingSoonSection } from './ComingSoon';
 import { navigate } from '../lib/router';
 import type { BookPage } from '../lib/types';
 import { authConfig } from '../services/auth/AuthService';
@@ -104,6 +105,8 @@ export function Landing() {
           </div>
         ))}
       </section>
+
+      <div className="landing-soon"><ComingSoonSection /></div>
 
       <footer className="landing-foot">
         <span>You take care of the memories. NomNoms takes care of the book.</span>

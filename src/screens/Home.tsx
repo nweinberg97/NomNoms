@@ -6,6 +6,7 @@ import { MediaImg } from '../components/Media';
 import { MemoryCard } from '../components/MemoryCard';
 import { Shell } from '../components/Shell';
 import { MakeChoices } from './BookScreens';
+import { ComingSoonCard } from './ComingSoon';
 import { Empty } from '../components/ui';
 import { navigate } from '../lib/router';
 import { ageLabel, cx, firstName, fmtLong, fmtShort, plural, todayISO } from '../lib/util';
@@ -137,6 +138,8 @@ export function Home() {
           )}
         </>
       )}
+
+      {memories.length > 0 && <ComingSoonCard />}
 
       <section className="quick-add">
         <p className="eyebrow">Capture something</p>
