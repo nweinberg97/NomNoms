@@ -183,3 +183,11 @@
 .video-card.is-compact .video-play-icon { width: 22px; height: 22px; }
 .bp .video-play { font-size: max(9px, 2cqw); padding: 1.4cqw 3cqw 1.4cqw 1.4cqw; gap: 1.8cqw; }
 .bp .video-play-icon { width: max(18px, 5.5cqw); height: max(18px, 5.5cqw); font-size: max(7px, 1.8cqw); }
+
+/* editor: photos on the page are tappable */
+.bp-photo.is-editable { display: block; width: 100%; padding: 0; border: 0; cursor: pointer; font: inherit; }
+.bp-photo.is-editable::after { content: ''; position: absolute; inset: 0; box-shadow: inset 0 0 0 0 var(--accent); transition: box-shadow .2s; pointer-events: none; }
+.bp-photo.is-editable:hover::after { box-shadow: inset 0 0 0 max(2px, .6cqw) rgba(255, 255, 255, .7); }
+.bp-photo.is-selected::after { box-shadow: inset 0 0 0 max(3px, .9cqw) var(--accent); }
+.bp-photo-badge { position: absolute; top: 2.2cqw; left: 2.2cqw; min-width: max(20px, 5cqw); height: max(20px, 5cqw); padding: 0 1cqw; border-radius: 999px; background: rgba(255, 251, 245, .92); color: var(--ink); font-family: var(--sans); font-size: max(11px, 2.6cqw); font-weight: 600; display: grid; place-items: center; z-index: 2; }
+.bp-photo.is-selected .bp-photo-badge { background: var(--accent); color: #fff; }

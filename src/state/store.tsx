@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { generateBook } from '../book/layoutEngine';
+import { generateBook, mergeIntoBook } from '../book/layoutEngine';
 import { buildDemoSeed } from '../data/seed';
 import type { Account, Baby, Book, MediaItem, Memory, MemoryType, Milestone, Preferences } from '../lib/types';
 import { nowISO, todayISO, uid } from '../lib/util';
@@ -46,7 +46,8 @@ interface Actions {
   deleteMemory(id: string): Promise<void>;
   toggleFavorite(id: string): Promise<void>;
   addMediaToMemory(id: string, files: Blob[]): Promise<void>;
-  buildBook(): Promise<Book>;
+  /** 'update' (default when a book exists) keeps every manual edit and adds new memories; 'fresh' redesigns everything. */
+  buildBook(mode?: 'update' | 'fresh'): Promise<Book>;
   saveBook(book: Book): Promise<void>;
   resetAll(): Promise<void>;
   /** Re-read everything from storage (after a restore). */
@@ -270,10 +271,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (m) await actions.updateMemory(id, { mediaIds: [...m.mediaIds, ...items.map((i) => i.id)] });
     },
 
-    async buildBook() {
+    async buildBook(mode = 'update') {
       const s = stateRef.current;
       if (!s.baby) throw new Error('No baby yet');
-      const { book } = generateBook({ baby: s.baby, memories: [...s.memories].reverse(), media: s.media, previous: s.book });
+      const chron = [...s.memories].reverse();
+      const { book: fresh } = generateBook({ baby: s.baby, memories: chron, media: s.media, previous: s.book });
+      const book = s.book && mode === 'update' ? mergeIntoBook(s.book, fresh, s.memories) : fresh;
       await repo().books.saveBook(book);
       setState((st) => ({ ...st, book }));
       return book;

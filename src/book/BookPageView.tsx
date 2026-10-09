@@ -10,6 +10,11 @@ export interface PageContext {
   pageNumber?: number;
   /** When false (thumbnails, PDF), videos render as stills. */
   interactive?: boolean;
+  /** Editor only: tapping a photo on the page selects that slot. */
+  onPhotoTap?: (mediaId: string, slot: number) => void;
+  selectedSlot?: number;
+  /** Set internally: the page's photo slots, so each photo knows its index. */
+  pageMediaIds?: string[];
 }
 
 /** Scales body text down as it gets longer so every page stays composed. */
@@ -34,6 +39,21 @@ function Caption({ m, align = 'left', showTitle = true }: { m?: Memory; align?: 
 
 function Photo({ id, ctx, className }: { id?: string; ctx: PageContext; className?: string }) {
   const item = id ? ctx.media.get(id) : undefined;
+  const slot = id && ctx.pageMediaIds ? ctx.pageMediaIds.indexOf(id) : -1;
+  if (ctx.onPhotoTap && id && slot >= 0) {
+    return (
+      <button
+        type="button"
+        className={cx('bp-photo is-editable', ctx.selectedSlot === slot && 'is-selected', className)}
+        onClick={(e) => { e.stopPropagation(); ctx.onPhotoTap!(id, slot); }}
+        aria-label={`Photo ${slot + 1}: change, move or remove`}
+        data-testid={`page-photo-${slot}`}
+      >
+        <MediaImg item={item} eager />
+        <span className="bp-photo-badge" aria-hidden>{slot + 1}</span>
+      </button>
+    );
+  }
   return (
     <div className={cx('bp-photo', className)}>
       <MediaImg item={item} eager={!ctx.interactive ? true : undefined} />
@@ -46,6 +66,7 @@ export function BookPageView({ page, ctx, className, onClick }: { page: BookPage
   const m = page.quiet ? undefined : mems[0];
   const ids = page.mediaIds;
   const pn = ctx.pageNumber;
+  ctx = { ...ctx, pageMediaIds: ids };
 
   let body: React.ReactNode = null;
   switch (page.layout) {

@@ -254,3 +254,48 @@ export function toSpreads(pages: BookPage[]): BookPage[][] {
   for (let i = 1; i < pages.length; i += 2) spreads.push(pages.slice(i, i + 2));
   return spreads;
 }
+
+/**
+ * Update an existing book with new memories without undoing the parent's
+ * edits: every existing page keeps its position, layout, photos and text.
+ * Pages for new memories are slotted in at the end of their chapter (new
+ * chapters go in date order). Pages whose memories were all deleted drop out.
+ */
+export function mergeIntoBook(previous: Book, fresh: Book, memories: Memory[]): Book {
+  const alive = new Set(memories.map((m) => m.id));
+  const covered = new Set(previous.pages.flatMap((p) => p.memoryIds));
+
+  // keep existing pages; drop ones that only pointed at deleted memories
+  const kept = previous.pages
+    .map((p) => ({ before: p.memoryIds.length, page: { ...p, memoryIds: p.memoryIds.filter((id) => alive.has(id)) } }))
+    .filter(({ before, page }) => before === 0 || page.memoryIds.length > 0)
+    .map(({ page }) => page);
+
+  // fresh pages that carry only memories the old book never had
+  const additions = fresh.pages.filter(
+    (p) => p.memoryIds.length > 0 && p.memoryIds.every((id) => !covered.has(id)),
+  );
+  if (!additions.length) {
+    return { ...previous, pages: kept, builtFrom: fresh.builtFrom, generatedAt: fresh.generatedAt, updatedAt: nowISO() };
+  }
+
+  const pages = [...kept];
+  const chapterStart = (cid?: string) => fresh.pages.find((p) => p.layout === 'chapter' && p.chapterId === cid);
+  for (const add of additions) {
+    const lastInChapter = pages.map((p, i) => ({ p, i })).filter(({ p }) => p.chapterId && p.chapterId === add.chapterId).pop();
+    if (lastInChapter) {
+      pages.splice(lastInChapter.i + 1, 0, add);
+      continue;
+    }
+    // brand-new chapter: add its opener, placed before the first later chapter (or before the closing page)
+    const opener = chapterStart(add.chapterId);
+    const closingAt = pages.findIndex((p) => p.layout === 'closing');
+    let at = closingAt >= 0 ? closingAt : pages.length;
+    if (opener) {
+      const laterAt = pages.findIndex((p) => p.layout === 'chapter' && (p.chapterId ?? '') > (opener.chapterId ?? ''));
+      if (laterAt >= 0) at = laterAt;
+      pages.splice(at, 0, opener, add);
+    } else pages.splice(at, 0, add);
+  }
+  return { ...previous, pages, builtFrom: fresh.builtFrom, generatedAt: fresh.generatedAt, updatedAt: nowISO() };
+}
