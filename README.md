@@ -194,7 +194,7 @@ No backend, database, Firebase/Supabase, payments, family permissions, social fe
 
 ## Notes
 
-- **Demo media**: the demo family's "photos" and clips are generated abstract light-and-texture images (`scripts/generate-demo-media.py`), so the repo ships no stock photography of real people. Add your own photos and the book uses them.
+- **Demo photos**: the demo family uses real photos from [Unsplash](https://unsplash.com) (free under the Unsplash License), loaded from Unsplash's image CDN and cropped to each page's shape; the mapping and photographer credits live in `src/data/demoPhotos.ts`. Demo videos show as a photo with a play badge (and move gently in the film). If Unsplash can't be reached, the generated stand-ins in `public/demo/` are shown instead.
 - **Fonts**: Lora (display), Inter (interface) and Poppins (Playful book style) are self-hosted under the SIL Open Font License.
 - **Tooling**: plain esbuild instead of a framework CLI keeps the toolchain to one small dependency; React 19 + TypeScript.
 - **Browser support**: current Chrome, Safari, Firefox and Edge. In-app camera needs HTTPS (or localhost). Saving the film as a video needs `MediaRecorder` canvas capture.

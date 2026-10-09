@@ -1,6 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { BookPageView, type PageContext } from '../book/BookPageView';
 import { AppleMark, GoogleMark, Icon, Wordmark } from '../components/Icon';
+import { MediaImg } from '../components/Media';
+import { fmtDuration } from '../lib/util';
 import { toast, Spinner } from '../components/ui';
 import { buildDemoSeed } from '../data/seed';
 import { navigate } from '../lib/router';
@@ -41,7 +43,9 @@ export function Landing() {
       { id: 'p3', layout: 'cover', memoryIds: [], mediaIds: ['m-morning-04'], title: 'Juno', subtitle: 'Our First Year', text: 'September 2025 — September 2026' },
     ];
     const ctx: PageContext = { memories, media, interactive: false };
-    return { pages, ctx };
+    const laugh = byTitle('First laugh');
+    const video = media.get(laugh.mediaIds[0])!;
+    return { pages, ctx, laugh, video };
   }, []);
 
   return (
@@ -77,6 +81,13 @@ export function Landing() {
               <BookPageView page={p} ctx={preview.ctx} />
             </div>
           ))}
+          <figure className="landing-video">
+            <div className="landing-video-frame">
+              <MediaImg item={preview.video} eager />
+              <span className="video-play"><span className="video-play-icon"><Icon name="play" size={12} filled stroke={0} /></span>{fmtDuration(preview.video.duration ?? 0)}</span>
+            </div>
+            <figcaption><strong>{preview.laugh.title}</strong><small>Videos go into the film</small></figcaption>
+          </figure>
         </div>
       </section>
 
@@ -96,6 +107,7 @@ export function Landing() {
 
       <footer className="landing-foot">
         <span>You take care of the memories. NomNoms takes care of the book.</span>
+        <small className="landing-credit">Demo photos from <a href="https://unsplash.com/?utm_source=nomnoms&utm_medium=referral" target="_blank" rel="noreferrer">Unsplash</a></small>
       </footer>
     </div>
   );

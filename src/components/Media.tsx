@@ -4,6 +4,7 @@ import { cx, fmtDuration } from '../lib/util';
 import { MediaService } from '../services/media/MediaService';
 import { useAppOptional } from '../state/store';
 import { Icon } from './Icon';
+import { toast } from './ui';
 
 export function useMediaVersion() {
   return useSyncExternalStore(MediaService.subscribe, MediaService.getVersion);
@@ -37,7 +38,10 @@ interface ImgProps {
 export function MediaImg({ id, item, size = 'full', className, alt = '', style, eager }: ImgProps) {
   const fromStore = useMediaItem(id);
   const it = item ?? fromStore;
-  const url = useMediaUrl(it, size);
+  const primary = useMediaUrl(it, size);
+  const [failed, setFailed] = useState<string>();
+  const fallback = failed && failed === primary ? MediaService.fallbackUrl(it, size) : undefined;
+  const url = fallback ?? primary;
   const [loaded, setLoaded] = useState(false);
   const ref = useRef<HTMLImageElement>(null);
   useEffect(() => {
@@ -56,6 +60,7 @@ export function MediaImg({ id, item, size = 'full', className, alt = '', style, 
       decoding="async"
       draggable={false}
       onLoad={() => setLoaded(true)}
+      onError={() => { if (!fallback && MediaService.fallbackUrl(it, size)) setFailed(primary); }}
       className={cx('media-img', loaded && 'is-loaded', className)}
       style={style}
     />
@@ -71,6 +76,10 @@ export function VideoCard({ item, className, autoFocusPlay, compact }: { item: M
 
   const start = async (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (item.storageProvider === 'demo') {
+      toast('A demo video. In your own book, your videos play right here.', { icon: 'play', ms: 2600 });
+      return;
+    }
     const url = await MediaService.urlFor(item, 'full');
     setSrc(url);
     setPlaying(true);

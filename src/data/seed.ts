@@ -152,7 +152,7 @@ const rows: SeedRow[] = [
     c: 'You found exactly zero eggs and one very old tennis ball, which you would not let go of.',
     m: ['garden-04', 'garden-05', 'garden-06'], loc: "Grandma Ruth's", who: ['Grandma Ruth', 'Grandpa Lou'], tags: ['holiday'] },
   { d: '2026-04-20', t: 'first', title: 'First tooth', ms: 'First tooth',
-    c: 'Bottom left. We found it because you bit Dad.', m: ['morning-01'], who: ['Dad'] },
+    c: 'Bottom left. We found it because you bit Dad.', m: ['tooth-01'], who: ['Dad'] },
   { d: '2026-04-27', t: 'story', title: 'The night you didn\'t sleep',
     c: "The tooth, mostly. We took turns walking the hallway — twenty-two steps each way, we counted. Around four, Sam put on the record Grandpa Lou gave us, very quietly, and you finally went still on his shoulder halfway through the second side. I stood in the doorway and watched you both sway for a long time. — Mom",
     m: ['night-04'], who: ['Mom', 'Dad'] },
@@ -174,7 +174,7 @@ const rows: SeedRow[] = [
   { d: '2026-06-15', t: 'moment', title: "Dad's first Father's Day", c: 'Matching hats. Yours stayed on for nine seconds.', m: ['field-04'], who: ['Dad'] },
   { d: '2026-06-21', t: 'milestone', title: 'Pulling up to stand', ms: 'Pulled up to stand',
     c: 'Using the coffee table, then the couch, then Biscuit, who was very patient about it.',
-    m: ['window-02', 'window-05'], tags: ['biscuit'] },
+    m: ['stand-01', 'stand-02'], tags: ['biscuit'] },
   { d: '2026-06-28', t: 'funny', title: 'Waving at everyone', c: 'Strangers, the mailman, a parked car. Everyone gets a wave.', m: ['field-05'] },
 
   // ── July 2026 ───────────────────────────────────────────────
@@ -196,23 +196,23 @@ const rows: SeedRow[] = [
   { d: '2026-08-16', t: 'funny', title: 'The great spaghetti incident', c: 'We found spaghetti in your hair two days later.', m: ['bokeh-03'], tags: ['food'] },
   { d: '2026-08-22', t: 'story', title: 'Eleven months',
     c: "You have opinions now. About socks (against), about the dog (deeply for), about being put down when you'd rather be carried (strongly against). You laugh at your own jokes. You hand us things and take them back. You're becoming a person so fast we keep catching our breath.",
-    m: ['window-08'] },
+    m: ['eleven-01'] },
   { d: '2026-08-29', t: 'milestone', title: 'First steps', ms: 'First steps',
     c: "Three steps from the couch to Mom. Then you sat down hard and clapped for yourself, and so did we.",
     m: ['clip-13'], loc: 'Living room', who: ['Mom', 'Dad'], fav: true },
 
   // ── September 2026 ──────────────────────────────────────────
   { d: '2026-09-06', t: 'first', title: 'First haircut', ms: 'First haircut',
-    c: 'One curl, kept in an envelope in this book\'s real-life drawer.', m: ['window-09', 'linen-06'] },
+    c: 'One curl, kept in an envelope in this book\'s real-life drawer.', m: ['haircut-01'] },
   { d: '2026-09-14', t: 'milestone', title: 'One whole year', ms: 'First birthday',
     c: "Cake on your face, your hands, your feet, and somehow Biscuit. Everyone you love in one backyard. Happy birthday, Juno.",
-    m: ['bokeh-04', 'bokeh-05', 'bokeh-06', 'field-02'], loc: 'Back garden',
+    m: ['bokeh-04', 'bokeh-05', 'bokeh-06', 'bday-04'], loc: 'Back garden',
     who: ['Mom', 'Dad', 'Grandma Ruth', 'Grandpa Lou', 'Nana Rosa', 'Aunt Priya'], fav: true, tags: ['birthday'] },
   { d: '2026-09-15', t: 'story', title: 'A letter on your first birthday',
     c: "A year ago tonight we brought you home and didn't sleep. Tonight you're asleep in your own room with one sock on, and we're sitting on the couch looking through this book. There's so much we already can't remember, which is why we started writing it down. We hope one day you read this and know: you were so loved, every ordinary day of it. — Mom & Dad",
     m: ['night-05'], who: ['Mom', 'Dad'], fav: true },
   { d: '2026-09-21', t: 'moment', title: 'Autumn again', c: 'A year later, the same leaves.', m: ['autumn-09'] },
-  { d: '2026-09-27', t: 'funny', title: "Stealing Dad's glasses", c: 'Your new favorite game. Dad has not seen clearly in a week.', m: ['morning-03'], who: ['Dad'] },
+  { d: '2026-09-27', t: 'funny', title: "Stealing Dad's glasses", c: 'Your new favorite game. Dad has not seen clearly in a week.', m: ['glasses-01'], who: ['Dad'] },
   { d: '2026-10-02', t: 'moment', title: 'Just a Thursday', m: ['night-06', 'linen-05'] },
 ];
 

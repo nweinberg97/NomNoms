@@ -62,6 +62,13 @@ class MediaServiceImpl {
   }
 
   /** Poster image for a video, or the photo itself. */
+  /** A second URL to try when the first fails (demo photos fall back to bundled images). */
+  fallbackUrl(item: MediaItem | undefined, size: 'full' | 'thumb' = 'full'): string | undefined {
+    if (!item || item.storageProvider !== 'demo') return undefined;
+    const file = item.kind === 'video' ? (item.metadata?.poster as string) : size === 'thumb' ? ((item.metadata?.thumb as string) || item.storageKey) : item.storageKey;
+    return file ? this.demo.localUrl(file) : undefined;
+  }
+
   posterUrl(item: MediaItem | undefined): string | undefined {
     if (!item) return undefined;
     const r = this.peek(item);

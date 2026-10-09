@@ -1,5 +1,6 @@
 import type { MediaItem } from '../../lib/types';
 import type { MediaProvider, StoredObject } from './MediaProvider';
+import { LOCAL_STAND_IN, demoKey, demoPhotoUrl } from '../../data/demoPhotos';
 
 declare global {
   interface Window {
@@ -13,7 +14,15 @@ export class DemoMediaProvider implements MediaProvider {
   readonly id = 'demo' as const;
   readonly label = 'Demo library';
 
+  /** A real photo when the demo has one, otherwise the bundled generated image. */
   url(file: string): string {
+    return demoPhotoUrl(file) ?? this.localUrl(file);
+  }
+
+  /** The bundled generated image (also the fallback when a real photo can't load). */
+  localUrl(file: string): string {
+    const alias = LOCAL_STAND_IN[demoKey(file)];
+    if (alias) file = file.replace(demoKey(file), alias);
     const inline = window.__NN_INLINE_ASSETS__;
     if (inline && inline[file]) return inline[file];
     if (inline) {

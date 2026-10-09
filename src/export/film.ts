@@ -117,7 +117,7 @@ export async function loadAssets(tl: Timeline, onProgress?: (p: number) => void)
   await Promise.all(
     work.map(async (s) => {
       try {
-        if (s.kind === 'video') {
+        if (s.kind === 'video' && s.media.storageProvider !== 'demo') {
           const url = await MediaService.urlFor(s.media, 'full');
           const poster = await MediaService.urlFor(s.media, 'poster');
           const v = document.createElement('video');
@@ -134,8 +134,10 @@ export async function loadAssets(tl: Timeline, onProgress?: (p: number) => void)
           vids.set(s.media.id, v);
           if (poster) imgs.set(s.media.id, await loadImg(poster));
         } else {
+          // demo videos are shown as their photo, with the same slow motion as photos
           const url = s.media.kind === 'video' ? await MediaService.urlFor(s.media, 'poster') : await MediaService.urlFor(s.media, 'full');
-          if (url) imgs.set(s.media.id, await loadImg(url));
+          const alt = MediaService.fallbackUrl(s.media);
+          if (url) imgs.set(s.media.id, await loadImg(url).catch(() => (alt ? loadImg(alt) : Promise.reject())));
         }
       } catch {
         /* a missing asset just renders as paper */
