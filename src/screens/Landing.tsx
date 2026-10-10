@@ -110,6 +110,7 @@ export function Landing() {
 
       <footer className="landing-foot">
         <span>You take care of the memories. NomNoms takes care of the book.</span>
+        <small className="landing-note">Early access: your book and photos are saved privately on this device. Secure cloud sync is on the way, so you’ll be able to pick up your book on any device.</small>
         <small className="landing-credit">Demo photos from <a href="https://unsplash.com/?utm_source=nomnoms&utm_medium=referral" target="_blank" rel="noreferrer">Unsplash</a></small>
       </footer>
     </div>
