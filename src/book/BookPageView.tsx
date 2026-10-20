@@ -18,6 +18,10 @@ export interface PageContext {
   style?: BookStyle;
   /** Set internally: the page's photo slots, so each photo knows its index. */
   pageMediaIds?: string[];
+  /** Extra colour tokens for the page (e.g. a Dumplings occasion). Omitted = none. */
+  vars?: Record<string, string>;
+  /** An extra layer drawn over a page (e.g. occasion motifs on a cover). */
+  decorate?: (page: BookPage) => React.ReactNode;
 }
 
 /** Scales body text down as it gets longer so every page stays composed. */
@@ -264,9 +268,10 @@ export function BookPageView({ page, ctx, className, onClick }: { page: BookPage
       data-layout={page.layout}
       data-shape={resolveStyle(ctx.style).shape}
       data-palette={resolveStyle(ctx.style).palette}
-      style={ctx.style ? styleVars(ctx.style) : undefined}
+      style={ctx.style || ctx.vars ? ({ ...(ctx.style ? styleVars(ctx.style) : {}), ...(ctx.vars ?? {}) } as React.CSSProperties) : undefined}
     >
       {body}
+      {ctx.decorate?.(page)}
       {pn !== undefined && page.layout !== 'cover' && page.layout !== 'full-bleed' && <span className="bp-num">{pn}</span>}
     </div>
   );

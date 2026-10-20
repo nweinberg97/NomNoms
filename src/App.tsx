@@ -8,6 +8,8 @@ import { BookHome, ReadScreen } from './screens/BookScreens';
 import { BookEditor } from './screens/BookEditor';
 import { BuildBook } from './screens/BuildBook';
 import { ComingSoon } from './screens/ComingSoon';
+import { BabyTalesDemo } from './labs/tales/BabyTalesDemo';
+import { DumplingsDemo } from './labs/dumplings/DumplingsDemo';
 import { Film } from './screens/Film';
 import { Home } from './screens/Home';
 import { Landing } from './screens/Landing';
@@ -35,6 +37,10 @@ function Routes() {
 
   const shared = match('/b/:token', path);
   if (shared) return <SharedBook token={shared.token} />;
+
+  // try-it demos: open to everyone, signed in or not; they never save anything
+  if (path === '/labs/baby-tales') return <BabyTalesDemo />;
+  if (path === '/labs/dumplings') return <DumplingsDemo />;
 
   if (!account) return <Landing />;
   if (!baby) return <Onboarding />;

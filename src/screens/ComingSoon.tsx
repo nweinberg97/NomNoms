@@ -34,6 +34,7 @@ export function ComingSoonSection({ heading = true }: { heading?: boolean }) {
           <h3 className="display">NomNoms Baby Tales</h3>
           <p className="cs-one">Turn your little one and their favourite people into storybook characters, starring in adventures made just for them.</p>
           <ul className="cs-chips"><li>Avatars made with Genmoji</li><li>Hats, glasses and costumes</li><li>Printed or digital</li></ul>
+          <button type="button" className="btn btn-primary cs-try" onClick={() => navigate('/labs/baby-tales')} data-testid="try-baby-tales">Try the demo <Icon name="arrow-right" size={16} /></button>
         </div>
       </article>
 
@@ -50,6 +51,7 @@ export function ComingSoonSection({ heading = true }: { heading?: boolean }) {
           <h3 className="display">NomNoms Dumplings</h3>
           <p className="cs-one">Dump your photos from a birthday, holiday or trip, and get back a beautiful little book of that day.</p>
           <ul className="cs-chips"><li>Finds the occasion for you</li><li>A design for every occasion</li><li>Videos go into a mini film</li></ul>
+          <button type="button" className="btn btn-primary cs-try" onClick={() => navigate('/labs/dumplings')} data-testid="try-dumplings">Try the demo <Icon name="arrow-right" size={16} /></button>
         </div>
       </article>
 

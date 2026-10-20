@@ -16,11 +16,13 @@ export class DemoMediaProvider implements MediaProvider {
 
   /** A real photo when the demo has one, otherwise the bundled generated image. */
   url(file: string): string {
+    if (/^(blob|data):/.test(file)) return file; // a photo added in a demo, held in memory only
     return demoPhotoUrl(file) ?? this.localUrl(file);
   }
 
   /** The bundled generated image (also the fallback when a real photo can't load). */
   localUrl(file: string): string {
+    if (/^(blob|data):/.test(file)) return file;
     const alias = LOCAL_STAND_IN[demoKey(file)];
     if (alias) file = file.replace(demoKey(file), alias);
     const inline = window.__NN_INLINE_ASSETS__;
