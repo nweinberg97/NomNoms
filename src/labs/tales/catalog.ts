@@ -66,6 +66,18 @@ export const PLACES: Place[] = [
   { id: 'castle', name: 'A castle', at: 'at the castle', sky: ['#d9d4ef', '#f3f0fa'], ground: '#a9c98a', groundKind: 'grass', horizon: 'hills', props: ['🏰', '🐉', '👑', '🦄'], surprises: ['just a friendly dragon', 'just a crown on a cushion', 'just a unicorn eating grass'], doing: ['wear a crown', 'cross the drawbridge', 'have a royal tea party'], dress: { hat: 'crown' }, imaginary: true },
   { id: 'rain', name: 'A rainy day', at: 'out in the rain', sky: ['#aab8c6', '#d8e0e6'], ground: '#8fa38c', groundKind: 'path', horizon: 'city', props: ['☔', '🌧️', '🐸', '🌈'], surprises: ['just a frog in a puddle', 'just a rainbow after the rain', 'just a worm saying hello'], doing: ['jump in puddles', 'catch raindrops', 'look for rainbows'], dress: { outfit: 'raincoat' } },
   { id: 'bath', name: 'Bath time', at: 'in the bath', sky: ['#dcecef', '#eef6f7'], ground: '#cfe6ea', groundKind: 'floor', horizon: 'wall', props: ['🛁', '🦆', '🫧', '🧽'], surprises: ['just a very surprised duck', 'just a mountain of bubbles', 'just a boat that floats'], doing: ['splash splash splash', 'make a bubble beard', 'sail the little boat'] },
+  { id: 'fair', name: 'The fun fair', at: 'at the fun fair', sky: ['#f9dcc4', '#fbefe3'], ground: '#d9c3a0', groundKind: 'path', horizon: 'hills', props: ['🎡', '🎠', '🍭', '🎪'], surprises: ['just a carousel horse going round and round', 'just cotton candy as big as a cloud', 'just a clown with a squeaky nose'], doing: ['ride the carousel', 'go up on the big wheel', 'share fluffy cotton candy'], dress: { hat: 'capback' } },
+  { id: 'icecream', name: 'The ice cream shop', at: 'at the ice cream shop', sky: ['#fbe3ea', '#fdf4f6'], ground: '#f1d6de', groundKind: 'floor', horizon: 'wall', props: ['🍦', '🍨', '🍒', '🧁'], surprises: ['just a scoop as big as a ball', 'just a cone with rainbow sprinkles', 'just a cherry on top'], doing: ['pick a flavour', 'add the sprinkles', 'lick the drips'] },
+  { id: 'treehouse', name: 'The treehouse', at: 'up in the treehouse', sky: ['#cfe6d6', '#eef6ea'], ground: '#9cc27e', groundKind: 'grass', horizon: 'trees', props: ['🌳', '🪜', '🐦', '🔭'], surprises: ['just a bird’s nest with three eggs', 'just a secret note', 'just a squirrel peeking in'], doing: ['climb up the ladder', 'look through the telescope', 'have a secret club'] },
+  { id: 'island', name: 'Treasure island', at: 'on treasure island', sky: ['#bfe6f4', '#ecf8fb'], ground: '#f0dcb4', groundKind: 'sand', horizon: 'sea', props: ['🏝️', '🦜', '🗺️', '🥥'], surprises: ['just a parrot saying “Ahoy!”', 'just a coconut', 'just a crab guarding a shell'], doing: ['follow the treasure map', 'dig for treasure', 'say “Ahoy, matey!”'], dress: { hat: 'bandana' }, imaginary: true },
+  { id: 'dinoland', name: 'Dinosaur valley', at: 'in dinosaur valley', sky: ['#f3d9b8', '#f7ecd9'], ground: '#9cb86f', groundKind: 'grass', horizon: 'mountains', props: ['🦕', '🦖', '🌋', '🌿'], surprises: ['just a baby dinosaur hatching', 'just giant footprints', 'just a volcano puffing little clouds'], doing: ['stomp like a dinosaur', 'follow the giant footprints', 'say hello to a baby dino'], imaginary: true },
+  { id: 'moon', name: 'The moon', at: 'on the moon', sky: ['#0f1430', '#25295a'], ground: '#cfd3dc', groundKind: 'space', horizon: 'stars', props: ['🌍', '🚀', '⭐', '🛸'], surprises: ['just the Earth far, far away', 'just a crater full of moon dust', 'just a friendly alien waving'], doing: ['bounce very high', 'plant a flag', 'wave at the Earth'], dress: { outfit: 'astronaut' }, night: true, imaginary: true },
+  { id: 'trampoline', name: 'The trampoline park', at: 'at the trampoline park', sky: ['#e5ddf6', '#f4f0fb'], ground: '#5e8fb8', groundKind: 'floor', horizon: 'wall', props: ['🤸', '⭐', '🎈', '🎉'], surprises: ['just a pit full of foam cubes', 'just the highest jump ever', 'just a very bouncy giggle'], doing: ['bounce, bounce, bounce', 'jump into the foam pit', 'try a flip'], dress: { hat: 'headband' } },
+  { id: 'icerink', name: 'The ice rink', at: 'at the ice rink', sky: ['#dceaf4', '#f3f8fb'], ground: '#eef6fb', groundKind: 'snow', horizon: 'trees', props: ['⛸️', '❄️', '🧣', '☕'], surprises: ['just a slippery wobble', 'just a cup of hot chocolate', 'just a spin like a snowflake'], doing: ['glide on the ice', 'hold hands and skate', 'spin round and round'], dress: { outfit: 'puffer', hat: 'earmuffs' } },
+  { id: 'bouncy', name: 'The bouncy castle', at: 'on the bouncy castle', sky: ['#cfe8f4', '#eef6f8'], ground: '#a6cf7f', groundKind: 'grass', horizon: 'hills', props: ['🏰', '🎈', '🎉', '⭐'], surprises: ['just a wobbly wall', 'just a pile of giggling friends', 'just a big bouncy tumble'], doing: ['bounce up to the sky', 'tumble and roll', 'jump with friends'] },
+  { id: 'balloonride', name: 'A hot air balloon', at: 'up in the hot air balloon', sky: ['#a9d3ef', '#f3e6d9'], ground: '#ffffff', groundKind: 'space', horizon: 'clouds', props: ['🎈', '☁️', '🌤️', '🐦'], surprises: ['just a flock of birds flying by', 'just a cloud shaped like a bunny', 'just tiny houses far below'], doing: ['float above the clouds', 'wave to the birds', 'spot their house'] },
+  { id: 'fort', name: 'The pillow fort', at: 'in the pillow fort', sky: ['#3d3a63', '#5b5788'], ground: '#8a7fb0', groundKind: 'floor', horizon: 'wall', props: ['🔦', '🧸', '⭐', '📖'], surprises: ['just a flashlight making shadow puppets', 'just a pile of cosy blankets', 'just a teddy guarding the door'], doing: ['make shadow puppets', 'tell stories by flashlight', 'snuggle under the blankets'], dress: { outfit: 'pajamas' }, night: true },
+  { id: 'field', name: 'The sports field', at: 'at the sports field', sky: ['#cfe6f1', '#eef6f8'], ground: '#7fb069', groundKind: 'grass', horizon: 'trees', props: ['⚽', '🥅', '🏆', '📣'], surprises: ['just a goal!', 'just a high five', 'just a shiny trophy'], doing: ['kick the ball', 'run really fast', 'score a goal'], dress: { outfit: 'jersey', hat: 'headband' } },
 ];
 
 export interface Thing { e: string; n: string }
@@ -179,13 +191,20 @@ export const ROLE_LABEL: Record<Role, string> = {
 /** The kinds of story the generator can tell. */
 export const STORY_TYPES = [
   { id: 'lost', name: 'Lost something', blurb: 'Where’s the sock? Is it at the zoo? No!' },
+  { id: 'water', name: 'Splash day', blurb: 'Pool, water slide, splash!' },
+  { id: 'treasure', name: 'Treasure hunt', blurb: 'X marks the spot!' },
+  { id: 'dinos', name: 'Dinosaur day', blurb: 'Stomp, stomp, ROAR!' },
   { id: 'animals', name: 'Meet the animals', blurb: 'Hello lion! Roar!' },
+  { id: 'hero', name: 'Superhero day', blurb: 'To the rescue!' },
+  { id: 'fair', name: 'The fun fair', blurb: 'Round and round we go' },
+  { id: 'space', name: 'Rocket ride', blurb: '3, 2, 1… blast off!' },
+  { id: 'feelings', name: 'Big feelings', blurb: 'Happy, silly, shy, proud' },
+  { id: 'adventure', name: 'Big day out', blurb: 'So many places in one day' },
   { id: 'foods', name: 'Try new foods', blurb: 'Banana? Yum! Broccoli? Hmm…' },
   { id: 'hats', name: 'Funny hats', blurb: 'A new hat in every place' },
-  { id: 'bedtime', name: 'Bedtime', blurb: 'Goodnight beach, goodnight moon' },
   { id: 'hide', name: 'Hide and seek', blurb: 'Where’s Dad hiding?' },
-  { id: 'adventure', name: 'Big day out', blurb: 'So many places in one day' },
   { id: 'counting', name: 'Counting', blurb: 'One sun, two ducks, three…' },
   { id: 'colours', name: 'Colours', blurb: 'Red apple, yellow banana' },
+  { id: 'bedtime', name: 'Bedtime', blurb: 'Goodnight beach, goodnight moon' },
 ] as const;
 export type StoryType = (typeof STORY_TYPES)[number]['id'];

@@ -7,8 +7,8 @@ import { catchGenmoji, pastedImage } from '../genmoji';
 import { DemoNote, LabsHeader } from '../LabsHeader';
 import { NAMES, PET_NAMES, PLACES, ROLE_LABEL, STORY_TYPES, type Place, type Role, type StoryType } from './catalog';
 import {
-  EXPRESSIONS, EXTRAS, EYE_COLOURS, FACE_VIEWBOX, GLASSES, HAIR_COLOURS, HAIR_STYLES, HATS, OUTFITS, SKIN_TONES,
-  characterSvg, isPet, type Expression, type HairStyle, type Kind, type Look,
+  EXPRESSIONS, EXTRAS, EYE_COLOURS, FACE_VIEWBOX, FACIAL, GLASSES, HAIR_COLOURS, HAIR_STYLES, HATS, OUTFITS, PERSONALITIES, SKIN_TONES, WEAR_BOX,
+  characterSvg, exprOf, isPet, type Expression, type Facial, type HairStyle, type Kind, type Look, type Personality, type WearSlot,
 } from './character';
 import { DrawPad, type DrawMode } from './DrawPad';
 import { SAMPLE_PHOTOS, samplePhotoUrl, traitsFromPhoto } from './fromPhoto';
@@ -32,30 +32,31 @@ const mk = (role: Role, name: string, call: string, look: Partial<Look>, id = `p
 
 function sampleCast(heroName: string): Person[] {
   return [
-    mk('baby', heroName, heroName, { kind: 'baby', skin: '#f6d2b7', hair: '#7a5236', hairStyle: 'tuft', eyes: '#4a7fb5', outfit: 'overalls' }, 'star'),
-    mk('parent', 'Rachel', 'Mom', { kind: 'adult', skin: '#d39a6e', hair: '#1f1a17', hairStyle: 'bob', lashes: true, expression: 'smile', outfit: 'cardigan' }, 'mom'),
-    mk('parent', 'Mark', 'Dad', { kind: 'adult', skin: '#efc19f', hair: '#3b2a20', hairStyle: 'short', beard: true, glasses: 'round', outfit: 'hoodie' }, 'dad'),
-    mk('sibling', 'Ryan', 'Ryan', { kind: 'kid', skin: '#efc19f', hair: '#7a5236', hairStyle: 'short', eyes: '#4a7fb5', outfit: 'dino' }, 'bro'),
-    mk('friend', 'Kylie', 'Kylie', { kind: 'kid', skin: '#a06b46', hair: '#1f1a17', hairStyle: 'curly', lashes: true, outfit: 'party' }, 'friend'),
-    mk('grandparent', 'John', 'Grandpa', { kind: 'elder', skin: '#f6d2b7', hair: '#c9c3bb', hairStyle: 'sides', glasses: 'round', expression: 'smile', outfit: 'cardigan' }, 'gramps'),
-    mk('pet', 'Biscuit', 'Biscuit', { kind: 'dog', hair: '#c08b52', outfit: 'none' }, 'pet'),
+    mk('baby', heroName, heroName, { kind: 'baby', skin: '#f6d2b7', hair: '#7a5236', hairStyle: 'tuft', eyes: '#4a7fb5', outfit: 'overalls', personality: 'sunny' }, 'star'),
+    mk('parent', 'Rachel', 'Mom', { kind: 'adult', skin: '#d39a6e', hair: '#1f1a17', hairStyle: 'curtain', lashes: true, outfit: 'cardigan', personality: 'calm' }, 'mom'),
+    mk('parent', 'Mark', 'Dad', { kind: 'adult', skin: '#efc19f', hair: '#3b2a20', hairStyle: 'sidepart', glasses: 'round', outfit: 'denim', personality: 'cheeky' }, 'dad'),
+    mk('sibling', 'Ryan', 'Ryan', { kind: 'kid', skin: '#efc19f', hair: '#7a5236', hairStyle: 'messy', eyes: '#4a7fb5', outfit: 'stripes', hat: 'capback', personality: 'silly' }, 'bro'),
+    mk('friend', 'Kylie', 'Kylie', { kind: 'kid', skin: '#a06b46', hair: '#1f1a17', hairStyle: 'puff', lashes: true, outfit: 'sweater', personality: 'excited' }, 'friend'),
+    mk('grandparent', 'John', 'Grandpa', { kind: 'elder', skin: '#f6d2b7', hair: '#c9c3bb', hairStyle: 'sides', glasses: 'round', outfit: 'cardigan', personality: 'proud' }, 'gramps'),
+    mk('pet', 'Biscuit', 'Biscuit', { kind: 'dog', hair: '#c08b52', outfit: 'none', personality: 'excited' }, 'pet'),
   ];
 }
 
 /** People and pets that can be added to the cast. */
 const ADDABLE: { label: string; make: () => Person }[] = [
-  { label: 'Sister', make: () => mk('sibling', 'Zoe', 'Zoe', { kind: 'kid', skin: '#efc19f', hair: '#3b2a20', hairStyle: 'pigtails', lashes: true, outfit: 'dress' }) },
-  { label: 'Brother', make: () => mk('sibling', 'Leo', 'Leo', { kind: 'kid', skin: '#efc19f', hair: '#5a3b26', hairStyle: 'short', outfit: 'tee' }) },
-  { label: 'Cousin', make: () => mk('relative', 'Mila', 'Mila', { kind: 'kid', skin: '#bd8259', hair: '#1f1a17', hairStyle: 'braids', lashes: true, outfit: 'overalls' }) },
-  { label: 'Friend', make: () => mk('friend', 'Theo', 'Theo', { kind: 'kid', skin: '#fbe2cf', hair: '#e0bd78', hairStyle: 'short', freckles: true, outfit: 'raincoat' }) },
-  { label: 'Grandma', make: () => mk('grandparent', 'Ruth', 'Grandma', { kind: 'elder', skin: '#f6d2b7', hair: '#f3f0ea', hairStyle: 'bun', glasses: 'round', expression: 'smile', lashes: true, outfit: 'cardigan' }) },
-  { label: 'Grandpa', make: () => mk('grandparent', 'Lou', 'Grandpa', { kind: 'elder', skin: '#865637', hair: '#c9c3bb', hairStyle: 'sides', beard: true, expression: 'smile', outfit: 'cardigan' }) },
-  { label: 'Aunt', make: () => mk('relative', 'Priya', 'Auntie Priya', { kind: 'adult', skin: '#bd8259', hair: '#1f1a17', hairStyle: 'long', lashes: true, expression: 'smile', outfit: 'dress' }) },
-  { label: 'Uncle', make: () => mk('relative', 'Sam', 'Uncle Sam', { kind: 'adult', skin: '#6b4329', hair: '#1f1a17', hairStyle: 'buzz', beard: true, expression: 'smile', outfit: 'tee' }) },
-  { label: 'Teacher', make: () => mk('teacher', 'Ms. Ana', 'Ms. Ana', { kind: 'adult', skin: '#e4ad86', hair: '#9c6a3f', hairStyle: 'ponytail', glasses: 'round', lashes: true, expression: 'smile', outfit: 'cardigan' }) },
-  { label: 'Dog', make: () => mk('pet', 'Pepper', 'Pepper', { kind: 'dog', hair: '#3b2a20', outfit: 'none' }) },
-  { label: 'Cat', make: () => mk('pet', 'Mochi', 'Mochi', { kind: 'cat', hair: '#d97a4a', outfit: 'none' }) },
-  { label: 'Bunny', make: () => mk('pet', 'Bean', 'Bean', { kind: 'bunny', hair: '#c9c3bb', outfit: 'none' }) },
+  { label: 'Sister', make: () => mk('sibling', 'Zoe', 'Zoe', { kind: 'kid', skin: '#efc19f', hair: '#3b2a20', hairStyle: 'spacebuns', lashes: true, outfit: 'tutu', personality: 'cheeky' }) },
+  { label: 'Brother', make: () => mk('sibling', 'Leo', 'Leo', { kind: 'kid', skin: '#efc19f', hair: '#5a3b26', hairStyle: 'quiff', outfit: 'jersey', personality: 'brave' }) },
+  { label: 'Cousin', make: () => mk('relative', 'Mila', 'Mila', { kind: 'kid', skin: '#bd8259', hair: '#1f1a17', hairStyle: 'braids', lashes: true, outfit: 'overalls', personality: 'curious' }) },
+  { label: 'Friend', make: () => mk('friend', 'Theo', 'Theo', { kind: 'kid', skin: '#fbe2cf', hair: '#e0bd78', hairStyle: 'messy', freckles: true, outfit: 'raincoat', personality: 'shy' }) },
+  { label: 'Grandma', make: () => mk('grandparent', 'Ruth', 'Grandma', { kind: 'elder', skin: '#f6d2b7', hair: '#f3f0ea', hairStyle: 'bun', glasses: 'round', lashes: true, outfit: 'cardigan', personality: 'calm' }) },
+  { label: 'Grandpa', make: () => mk('grandparent', 'Lou', 'Grandpa', { kind: 'elder', skin: '#865637', hair: '#c9c3bb', hairStyle: 'sides', facial: 'moustache', outfit: 'sweater', personality: 'silly' }) },
+  { label: 'Aunt', make: () => mk('relative', 'Priya', 'Auntie Priya', { kind: 'adult', skin: '#bd8259', hair: '#1f1a17', hairStyle: 'longcurly', lashes: true, outfit: 'dress', personality: 'dreamy' }) },
+  { label: 'Uncle', make: () => mk('relative', 'Sam', 'Uncle Sam', { kind: 'adult', skin: '#6b4329', hair: '#1f1a17', hairStyle: 'topknot', facial: 'trim', outfit: 'puffer', personality: 'sunny' }) },
+  { label: 'Teacher', make: () => mk('teacher', 'Ms. Ana', 'Ms. Ana', { kind: 'adult', skin: '#e4ad86', hair: '#9c6a3f', hairStyle: 'halfup', glasses: 'cateye', lashes: true, outfit: 'cardigan', personality: 'calm' }) },
+  { label: 'Baby', make: () => mk('sibling', 'Bea', 'Bea', { kind: 'baby', skin: '#865637', hair: '#1f1a17', hairStyle: 'coils', outfit: 'pajamas', personality: 'sleepy' }) },
+  { label: 'Dog', make: () => mk('pet', 'Pepper', 'Pepper', { kind: 'dog', hair: '#3b2a20', outfit: 'none', personality: 'silly' }) },
+  { label: 'Cat', make: () => mk('pet', 'Mochi', 'Mochi', { kind: 'cat', hair: '#d97a4a', outfit: 'none', personality: 'dreamy' }) },
+  { label: 'Bunny', make: () => mk('pet', 'Bean', 'Bean', { kind: 'bunny', hair: '#c9c3bb', outfit: 'none', personality: 'shy' }) },
 ];
 
 type WardrobeTab = 'hat' | 'glasses' | 'outfit' | 'extra';
@@ -64,6 +65,8 @@ const WARDROBE: Record<WardrobeTab, [string, Record<string, string>]> = {
 };
 const KINDS: { kind: Kind; label: string }[] = [{ kind: 'baby', label: 'Baby' }, { kind: 'kid', label: 'Kid' }, { kind: 'adult', label: 'Grown-up' }, { kind: 'elder', label: 'Grandparent' }];
 const PETS: { kind: Kind; label: string }[] = [{ kind: 'dog', label: 'Dog' }, { kind: 'cat', label: 'Cat' }, { kind: 'bunny', label: 'Bunny' }];
+const FACIALS = Object.keys(FACIAL) as Facial[];
+interface DrawnWear { id: string; slot: WearSlot; name: string; image: string }
 const usesCall = (r: Role) => r === 'parent' || r === 'grandparent' || r === 'relative' || r === 'teacher';
 
 function placeFromDrawing(id: string, name: string, image: string): DrawnPlace {
@@ -94,6 +97,7 @@ export function BabyTalesDemo() {
   const [status, setStatus] = useState<string>();
   const [adding, setAdding] = useState(false);
   const [pad, setPad] = useState<{ mode: DrawMode; redraw?: string } | null>(null);
+  const [wardrobe, setWardrobe] = useState<DrawnWear[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
   const genRef = useRef<HTMLDivElement>(null);
   const members = cast.map((p) => p.member);
@@ -153,7 +157,13 @@ export function BabyTalesDemo() {
     setSel(Math.max(0, pi - 1));
   };
   const onDrawn = (image: string, name: string) => {
-    if (pad?.mode === 'place') {
+    if (pad && pad.mode !== 'place' && pad.mode !== 'character') {
+      const slot = pad.mode;
+      setWardrobe((w) => [...w, { id: `wear-${Date.now()}`, slot, name, image }]);
+      update({ look: { [slot]: 'drawn', worn: { ...person.look.worn, [slot]: image } } as Partial<Look> });
+      setTab(slot);
+      toast(`${person.member.call || person.member.name} is wearing “${name}”`, { icon: 'sparkle', ms: 1800 });
+    } else if (pad?.mode === 'place') {
       const id = `draw-${Date.now()}`;
       setDrawn((ds) => [...ds, placeFromDrawing(id, name, image)]);
       setPlaces((ps) => [...ps, id]);
@@ -179,7 +189,7 @@ export function BabyTalesDemo() {
     if (p && who.member.role === 'baby' && !l.drawing) {
       const place = PLACES.find((x) => x.id === p.place);
       // dress for the place, without undoing anything chosen by hand
-      if (dressUp && place?.dress) {
+      if (dressUp && place?.dress && !p.outfit) {
         const d = place.dress;
         l = {
           ...l,
@@ -189,6 +199,12 @@ export function BabyTalesDemo() {
         };
       }
       if (p.hat) l = { ...l, hat: p.hat };
+      if (p.outfit) l = { ...l, outfit: p.outfit };
+      if (p.mood) l = { ...l, expression: p.mood };
+    } else if (p?.mood && ['laugh', 'starry', 'wow', 'proud', 'sleepy'].includes(p.mood) && !l.drawing) {
+      // friends join in with the big moments, each in their own way
+      const react = p.mood === 'sleepy' ? 'sleepy' : l.personality ? PERSONALITIES[l.personality].react : 'laugh';
+      l = { ...l, expression: react };
     }
     return l;
   };
@@ -206,6 +222,12 @@ export function BabyTalesDemo() {
   const toggle = (id: string) => setPlaces((ps) => (ps.includes(id) ? ps.filter((x) => x !== id) : [...ps, id]));
   const pet = isPet(person.look.kind);
   const drawing = !!person.look.drawing;
+  /** A faint picture of the character, cropped to where a drawn hat, outfit or toy will go. */
+  const guideFor = (mode?: DrawMode) => {
+    if (!mode || mode === 'place' || mode === 'character' || drawing) return undefined;
+    const [x, y, w, h] = WEAR_BOX[mode];
+    return characterSvg({ ...person.look, [mode]: 'none', expression: undefined }, { viewBox: `${x} ${y} ${w} ${h}` });
+  };
 
   return (
     <div className="lab bt">
@@ -231,6 +253,9 @@ export function BabyTalesDemo() {
             ))}
             <button type="button" className="bt-member is-add" onClick={() => setAdding((a) => !a)} aria-expanded={adding} data-testid="cast-add">
               <span className="bt-face"><Icon name="plus" size={24} /></span><span className="bt-member-name">Add</span><small>someone</small>
+            </button>
+            <button type="button" className="bt-member is-add" onClick={() => setPad({ mode: 'character' })} data-testid="cast-draw">
+              <span className="bt-face"><Icon name="pen" size={22} /></span><span className="bt-member-name">Draw</span><small>a character</small>
             </button>
           </div>
           {adding && (
@@ -264,6 +289,19 @@ export function BabyTalesDemo() {
                   </button>
                   {pi > 0 && <label className="lab-switch"><input type="checkbox" checked={person.member.inStory} onChange={(e) => update({ member: { inStory: e.target.checked } })} /> In the story</label>}
                   {pi > 0 && <button type="button" className="btn btn-danger-ghost btn-sm" onClick={remove} data-testid="cast-remove"><Icon name="x" size={14} /> Remove</button>}
+                </div>
+              </div>
+
+              <div className="lab-card" data-testid="personality-card">
+                <h3>Personality</h3>
+                <p className="lab-sub">Sets {person.member.name || 'their'}{person.member.name ? '’s' : ''} face, how they move and how they react in the story.</p>
+                <div className="bt-pers">
+                  {(Object.keys(PERSONALITIES) as Personality[]).map((k) => (
+                    <button key={k} type="button" className="bt-per" aria-pressed={person.look.personality === k} onClick={() => update({ look: { personality: k, expression: undefined } })} data-testid={`pers-${k}`}>
+                      {!pet && !drawing && <span dangerouslySetInnerHTML={{ __html: characterSvg({ ...person.look, personality: k, expression: undefined, face: undefined, hat: 'none', glasses: 'none' }, { viewBox: '24 30 152 128' }) }} />}
+                      <strong>{PERSONALITIES[k].label}</strong><small>{PERSONALITIES[k].blurb}</small>
+                    </button>
+                  ))}
                 </div>
               </div>
 
@@ -353,15 +391,27 @@ export function BabyTalesDemo() {
                       </div>
                       <p className="lab-sub">Eyes</p>
                       <div className="bt-swatches">{EYE_COLOURS.map((c) => <button key={c} type="button" className="bt-swatch" style={{ background: c }} aria-pressed={person.look.eyes === c} aria-label={`Eye colour ${c}`} onClick={() => update({ look: { eyes: c } })} />)}</div>
-                      <p className="lab-sub">Expression</p>
-                      <div className="lab-chips">
-                        {(Object.keys(EXPRESSIONS) as Expression[]).map((x) => <button key={x} type="button" className="lab-chip" aria-pressed={(person.look.expression ?? (['baby', 'kid'].includes(person.look.kind) ? 'grin' : 'smile')) === x} onClick={() => update({ look: { expression: x } })}>{EXPRESSIONS[x]}</button>)}
+                      <p className="lab-sub">Face <small>· in the story it changes with what happens</small></p>
+                      <div className="bt-hairs">
+                        {(Object.keys(EXPRESSIONS) as Expression[]).map((x) => (
+                          <button key={x} type="button" className="bt-hair" aria-pressed={exprOf(person.look) === x} onClick={() => update({ look: { expression: x } })} data-testid={`face-${x}`}>
+                            <span dangerouslySetInnerHTML={{ __html: characterSvg({ ...person.look, expression: x, hat: 'none', glasses: 'none' }, { viewBox: '24 30 152 128' }) }} />
+                            <small>{EXPRESSIONS[x]}</small>
+                          </button>
+                        ))}
                       </div>
                       <div className="lab-chips">
                         <button type="button" className="lab-chip" aria-pressed={!!person.look.freckles} onClick={() => update({ look: { freckles: !person.look.freckles } })}>Freckles</button>
                         <button type="button" className="lab-chip" aria-pressed={!!person.look.lashes} onClick={() => update({ look: { lashes: !person.look.lashes } })}>Lashes</button>
-                        {(person.look.kind === 'adult' || person.look.kind === 'elder') && <button type="button" className="lab-chip" aria-pressed={!!person.look.beard} onClick={() => update({ look: { beard: !person.look.beard } })}>Beard</button>}
                       </div>
+                      {(person.look.kind === 'adult' || person.look.kind === 'elder') && (
+                        <>
+                          <p className="lab-sub">Facial hair</p>
+                          <div className="lab-chips">
+                            {FACIALS.map((f) => <button key={f} type="button" className="lab-chip" aria-pressed={(person.look.facial ?? (person.look.beard ? 'trim' : 'none')) === f} onClick={() => update({ look: { facial: f, beard: undefined } })} data-testid={`facial-${f}`}>{FACIAL[f]}</button>)}
+                          </div>
+                        </>
+                      )}
                     </>
                   )}
                 </div>
@@ -373,6 +423,15 @@ export function BabyTalesDemo() {
                     {(Object.keys(WARDROBE) as WardrobeTab[]).map((k) => <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => setTab(k)} data-testid={`tab-${k}`}>{WARDROBE[k][0]}</button>)}
                   </div>
                   <div className="bt-tiles">
+                    <button type="button" className="bt-tile is-draw" onClick={() => setPad({ mode: tab })} data-testid={`draw-${tab}`}>
+                      <span><Icon name="pen" size={22} /></span><small>Draw your own</small>
+                    </button>
+                    {wardrobe.filter((w) => w.slot === tab).map((w) => (
+                      <button key={w.id} type="button" className="bt-tile" aria-pressed={person.look[tab] === 'drawn' && person.look.worn?.[tab] === w.image} onClick={() => update({ look: { [tab]: 'drawn', worn: { ...person.look.worn, [tab]: w.image } } as Partial<Look> })} data-testid="wear-drawn">
+                        <span dangerouslySetInnerHTML={{ __html: characterSvg({ ...person.look, [tab]: 'drawn', worn: { ...person.look.worn, [tab]: w.image } }) }} />
+                        <small>{w.name}</small>
+                      </button>
+                    ))}
                     {Object.entries(WARDROBE[tab][1]).map(([v, label]) => (
                       <button key={v} type="button" className="bt-tile" aria-pressed={person.look[tab] === v} onClick={() => update({ look: { [tab]: v } as Partial<Look> })} data-testid={`wear-${v}`}>
                         <span dangerouslySetInnerHTML={{ __html: characterSvg({ ...person.look, [tab]: v }) }} />
@@ -425,6 +484,7 @@ export function BabyTalesDemo() {
                   <>
                     <small>The Adventures of {cast[0].member.name}</small>
                     <input className="bt-title" value={fill(story.title, members)} onChange={(e) => setStory((s) => ({ ...s, title: tokenize(e.target.value, members) }))} aria-label="Story title" data-testid="story-title" />
+                    {cast[0].look.personality && <p className="bt-tagline">{PERSONALITIES[cast[0].look.personality].line.replace(/\{H\}/g, cast[0].member.call || cast[0].member.name)}</p>}
                     <p className="bt-by">A NomNoms Baby Tale starring {members.filter((m) => m.inStory || m.role === 'baby').map((m) => m.call).join(', ')}</p>
                   </>
                 ) : (
@@ -479,7 +539,7 @@ export function BabyTalesDemo() {
 
         <p className="lab-fine">A demo of a coming NomNoms feature. Characters and scenes are previews. Sample photos from <a href="https://unsplash.com/?utm_source=nomnoms&utm_medium=referral" target="_blank" rel="noreferrer">Unsplash</a>. Genmoji works on Apple devices with Apple Intelligence.</p>
       </main>
-      <DrawPad open={!!pad} mode={pad?.mode ?? 'character'} onClose={() => setPad(null)} onDone={onDrawn} />
+      <DrawPad open={!!pad} mode={pad?.mode ?? 'character'} guide={guideFor(pad?.mode)} onClose={() => setPad(null)} onDone={onDrawn} />
     </div>
   );
 }

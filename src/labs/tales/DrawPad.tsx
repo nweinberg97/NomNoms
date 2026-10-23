@@ -10,11 +10,20 @@ import { cx } from '../../lib/util';
  * this page's memory.
  */
 
-export type DrawMode = 'place' | 'character';
+export type DrawMode = 'place' | 'character' | 'hat' | 'glasses' | 'outfit' | 'extra';
+const SIZE: Record<DrawMode, [number, number]> = { place: [800, 600], character: [600, 750], hat: [800, 500], glasses: [720, 300], outfit: [700, 600], extra: [450, 875] };
+const TITLE: Record<DrawMode, string> = { place: 'Draw a place', character: 'Draw a character', hat: 'Draw a hat', glasses: 'Draw glasses', outfit: 'Draw an outfit', extra: 'Draw something to hold' };
+const DEFAULT_NAME: Record<DrawMode, string> = { place: 'Our special place', character: 'My drawing', hat: 'My hat', glasses: 'My glasses', outfit: 'My outfit', extra: 'My thing' };
+const HINT: Record<DrawMode, string> = {
+  place: 'Draw anywhere: Grandma’s house, a magic forest, the moon…',
+  character: 'Draw someone or something to star in the story',
+  hat: 'Draw a hat on their head', glasses: 'Draw glasses over their eyes', outfit: 'Draw clothes over their body', extra: 'Draw something for them to hold',
+};
 const COLOURS = ['#2a201c', '#e86f5b', '#f2a33a', '#f2c14e', '#7fb069', '#3f9c8f', '#5e8fb8', '#8e6bb8', '#ef9fb6', '#a8744a', '#ffffff', '#9aa3ab'];
 const SIZES = [4, 10, 22];
 
-export function DrawPad({ open, mode, onClose, onDone }: { open: boolean; mode: DrawMode; onClose: () => void; onDone: (image: string, name: string) => void }) {
+/** `guide` is a faint picture of the character under the canvas, so wardrobe drawings land in the right spot. */
+export function DrawPad({ open, mode, guide, onClose, onDone }: { open: boolean; mode: DrawMode; guide?: string; onClose: () => void; onDone: (image: string, name: string) => void }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const file = useRef<HTMLInputElement>(null);
   const [colour, setColour] = useState(COLOURS[1]);
@@ -24,7 +33,8 @@ export function DrawPad({ open, mode, onClose, onDone }: { open: boolean; mode: 
   const [blank, setBlank] = useState(true);
   const history = useRef<ImageData[]>([]);
   const drawing = useRef<{ x: number; y: number } | null>(null);
-  const W = mode === 'place' ? 800 : 600, H = mode === 'place' ? 600 : 750;
+  const [W, H] = SIZE[mode];
+  const wear = mode !== 'place' && mode !== 'character';
 
   const ctx = () => canvas.current!.getContext('2d', { willReadFrequently: true })!;
   const reset = () => {
@@ -36,7 +46,7 @@ export function DrawPad({ open, mode, onClose, onDone }: { open: boolean; mode: 
   };
   useEffect(() => {
     if (!open) return;
-    setName(mode === 'place' ? 'Our special place' : 'My drawing');
+    setName(DEFAULT_NAME[mode]);
     setErase(false);
     requestAnimationFrame(reset);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -91,7 +101,7 @@ export function DrawPad({ open, mode, onClose, onDone }: { open: boolean; mode: 
     const w = img.naturalWidth * k, h = img.naturalHeight * k;
     c.drawImage(img, (W - w) / 2, (H - h) / 2, w, h);
     URL.revokeObjectURL(url);
-    if (mode === 'character') {
+    if (mode !== 'place') {
       const d = c.getImageData(0, 0, W, H);
       for (let i = 0; i < d.data.length; i += 4) {
         const r = d.data[i], g = d.data[i + 1], b = d.data[i + 2];
@@ -118,15 +128,16 @@ export function DrawPad({ open, mode, onClose, onDone }: { open: boolean; mode: 
         out = t;
       }
     }
-    onDone(out.toDataURL('image/png'), name.trim() || (mode === 'place' ? 'Our special place' : 'My drawing'));
+    onDone(out.toDataURL('image/png'), name.trim() || DEFAULT_NAME[mode]);
   };
 
   return (
-    <Sheet open={open} onClose={onClose} title={mode === 'place' ? 'Draw a place' : 'Draw a character'} wide>
+    <Sheet open={open} onClose={onClose} title={TITLE[mode]} wide>
       <div className="sheet-body dpad">
-        <div className={cx('dpad-board', mode === 'character' && 'is-clear')} style={{ aspectRatio: `${W} / ${H}` }}>
+        <div className={cx('dpad-board', mode !== 'place' && 'is-clear', wear && 'is-wear')} style={{ aspectRatio: `${W} / ${H}`, width: `min(100%, calc(62vh * ${(W / H).toFixed(3)}))` }}>
+          {wear && guide && <div className="dpad-guide" aria-hidden="true" dangerouslySetInnerHTML={{ __html: guide }} />}
           <canvas ref={canvas} width={W} height={H} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} onPointerLeave={up} aria-label="Drawing area" data-testid="draw-canvas" />
-          {blank && <p className="dpad-hint">{mode === 'place' ? 'Draw anywhere: Grandma’s house, a magic forest, the moon…' : 'Draw someone or something to star in the story'}</p>}
+          {blank && <p className="dpad-hint">{HINT[mode]}</p>}
         </div>
         <div className="dpad-tools">
           <div className="dpad-colours" role="radiogroup" aria-label="Colour">
@@ -140,10 +151,10 @@ export function DrawPad({ open, mode, onClose, onDone }: { open: boolean; mode: 
             <button type="button" className="lab-chip" onClick={() => file.current?.click()} data-testid="draw-upload"><Icon name="image" size={14} /> Upload a drawing</button>
             <input ref={file} type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void upload(f); }} />
           </div>
-          <label className="field"><span>{mode === 'place' ? 'Name this place' : 'Name this character'}</span><input value={name} onChange={(e) => setName(e.target.value)} data-testid="draw-name" /></label>
-          <p className="lab-hint">{mode === 'character' ? 'Uploading a photo of a paper drawing? The white paper is removed so just the character is left.' : 'Your drawing becomes the background for any page you choose.'}</p>
+          <label className="field"><span>{mode === 'place' ? 'Name this place' : mode === 'character' ? 'Name this character' : 'Name it'}</span><input value={name} onChange={(e) => setName(e.target.value)} data-testid="draw-name" /></label>
+          <p className="lab-hint">{mode === 'place' ? 'Your drawing becomes the background for any page you choose.' : mode === 'character' ? 'Uploading a photo of a paper drawing? The white paper is removed so just the character is left.' : 'Anyone in the story can wear it. Uploading a paper drawing? The white paper is removed.'}</p>
           <div className="lab-row">
-            <button type="button" className="btn btn-primary" onClick={done} disabled={blank} data-testid="draw-done">{mode === 'place' ? 'Use this place' : 'Add to the story'}</button>
+            <button type="button" className="btn btn-primary" onClick={done} disabled={blank} data-testid="draw-done">{mode === 'place' ? 'Use this place' : mode === 'character' ? 'Add to the story' : 'Put it on'}</button>
             <button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button>
           </div>
         </div>

@@ -1,3 +1,4 @@
+import type { Expression } from './character';
 import { ANIMALS, COLOURS, COUNTABLES, FOODS, LOST, LOVES, NUMBER_WORDS, PLACES, YUCKS, type Place, type Role, type StoryType } from './catalog';
 
 /**
@@ -32,6 +33,10 @@ export interface StoryPage {
   focus?: { e: string; count?: number; faded?: boolean };
   /** The star's hat on this page (Funny hats story). */
   hat?: string;
+  /** The star's outfit on this page (dinosaur suit, superhero cape…). */
+  outfit?: string;
+  /** How the star feels on this page; friends react to the big moments. */
+  mood?: Expression;
   /** Set when the words were changed by hand. */
   edited?: boolean;
 }
@@ -71,6 +76,7 @@ const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 const tok = (c?: CastMember) => (c ? `{@${c.id}}` : 'someone');
 
 export const HAT_WORDS: Record<string, string> = {
+  capback: 'a backwards cap', headphones: 'big headphones', beret: 'a beret', propeller: 'a propeller cap', catears: 'cat ears',
   party: 'a party hat', pirate: 'a pirate hat', crown: 'a golden crown', sunhat: 'a big sun hat', beanie: 'a cosy beanie',
   bunny: 'bunny ears', cowboy: 'a cowboy hat', chef: 'a chef’s hat', flowers: 'a flower crown', wizard: 'a wizard hat', bucket: 'a bucket hat',
 };
@@ -82,9 +88,41 @@ const PREFERRED: Partial<Record<StoryType, string[]>> = {
   foods: ['kitchen', 'picnic', 'bakery', 'store', 'park', 'beach', 'party', 'farm'],
   bedtime: ['beach', 'park', 'zoo', 'farm', 'garden', 'lake', 'snow', 'space'],
   hide: ['home', 'garden', 'park', 'library', 'kitchen', 'playground', 'store'],
+  water: ['waterslide', 'pool', 'splashpad', 'beach', 'lake'],
+  treasure: ['island', 'beach', 'boat', 'forest', 'treehouse', 'jungle'],
+  dinos: ['dinoland', 'museum', 'jungle', 'forest'],
+  fair: ['fair', 'icecream', 'bouncy', 'trampoline'],
+  hero: ['park', 'playground', 'city', 'garden', 'farm', 'field'],
+  space: ['moon', 'space', 'balloonride', 'airplane'],
+  feelings: ['park', 'playground', 'pool', 'party', 'fair', 'beach', 'trampoline'],
 };
 
-export function generateStory(type: StoryType, cast: CastMember[], opts: { seed: number; places?: string[]; extraPlaces?: Place[] }): Story {
+const TREASURES = ['shiny shells and big hugs', 'golden cookies', 'sparkly stickers', 'chocolate coins', 'funny hats for everyone', 'bubbles and balloons'];
+const DINOS = [
+  { e: '🦖', n: 'a T-rex who just wants a hug' }, { e: '🦕', n: 'a long-necked dinosaur munching leaves from the very top of a tree' },
+  { e: '🥚', n: 'a dinosaur egg going crack, crack… hatch!' }, { e: '🦕', n: 'a baby dinosaur who wants to play tag' },
+  { e: '🦖', n: 'a dinosaur learning to dance' }, { e: '🦴', n: 'a dinosaur bone as big as a slide' },
+];
+const RESCUES = [
+  { e: '🐱', p: 'a kitten is stuck up a tree', fix: 'gives it a gentle hand down' }, { e: '🎈', p: 'a balloon is floating away', fix: 'jumps up and catches it' },
+  { e: '🦆', p: 'the ducks are hungry', fix: 'shares some peas' }, { e: '🧱', p: 'a block tower falls down', fix: 'builds it up again, even taller' },
+  { e: '🤗', p: 'a friend is feeling sad', fix: 'gives the biggest hug' }, { e: '🌷', p: 'the flowers are thirsty', fix: 'waters every single one' },
+  { e: '🧸', p: 'a teddy is lost', fix: 'finds it under a bush' }, { e: '⚽', p: 'a ball rolls into the pond', fix: 'fishes it out with a big stick' },
+];
+const FAIR = [
+  { e: '🎠', t: '{H} rides the carousel. Up and down, round and round!' }, { e: '🎡', t: 'Up, up, up on the big wheel! {H} can see everything.' },
+  { e: '🍭', t: '{H} and {X} share cotton candy. It’s like eating a cloud!' }, { e: '🎯', t: '{H} throws a ball… and wins a prize!' },
+  { e: '🎪', t: 'In the big tent, the clowns honk their horns. Honk honk!' }, { e: '🚗', t: 'Beep beep! {H} and {X} ride the bumper cars.' },
+];
+const FEELINGS: { mood: Expression; word: string; why: string }[] = [
+  { mood: 'grin', word: 'happy', why: '{H} and {X} {doing}' }, { mood: 'wow', word: 'surprised', why: '{H} sees {surprise}' },
+  { mood: 'silly', word: 'silly', why: '{H} makes the funniest face' }, { mood: 'shy', word: 'a little shy', why: '{H} meets someone new' },
+  { mood: 'proud', word: 'proud', why: '{H} does it all alone' }, { mood: 'starry', word: 'excited', why: '{H} sees a rainbow' },
+  { mood: 'worried', word: 'a little worried', why: 'a loud noise goes BOOM' }, { mood: 'sleepy', word: 'sleepy', why: '{H} yawns a great big yawn' },
+];
+const SPLASH = ['Splash!', 'Whoosh!', 'Sploosh!', 'Wheee!', 'Splish splash!'];
+
+export function generateStory(type: StoryType, cast: CastMember[], opts: { seed: number; places?: string[]; extraPlaces?: Place[]; heroLine?: string }): Story {
   const r = rng(opts.seed);
   const place = (id: string): Place => opts.extraPlaces?.find((p) => p.id === id) ?? PLACES.find((p) => p.id === id) ?? PLACES[0];
   const hero = cast.find((c) => c.role === 'baby') ?? cast[0];
@@ -217,7 +255,99 @@ export function generateStory(type: StoryType, cast: CastMember[], opts: { seed:
       add({ place: 'home', text: `Red, yellow, blue, green… So many colours, ${H}!`, cast: [hero.id, ...others.slice(0, 2).map((c) => c.id)], focus: { e: '🌈' } });
       break;
     }
+    case 'water': {
+      title = `${H}’s Splash Day`;
+      add({ place: 'home', text: `It’s hot, hot, hot! ${H} grabs a towel. It’s a splash day!`, cast: [hero.id, companion(0).id], focus: { e: '☀️' }, mood: 'starry' });
+      stops.forEach((s, i) => {
+        const p = place(s);
+        add({ place: s, text: `${cap(p.at)}, ${H} and ${tok(companion(i))} ${r.pick(p.doing)}. ${r.pick(SPLASH)}`, cast: [hero.id, companion(i).id], focus: { e: r.pick(p.props) }, outfit: 'swimsuit', mood: i % 2 ? 'starry' : 'laugh' });
+      });
+      add({ place: 'home', text: `Wrapped in a big fluffy towel, ${H} is warm and sleepy. What a splash day!`, cast: [hero.id, ...others.slice(0, 2).map((c) => c.id)], focus: { e: '🛁' }, mood: 'sleepy' });
+      break;
+    }
+    case 'treasure': {
+      title = `${H} and the Treasure Map`;
+      add({ place: 'home', text: `${H} finds an old map with a big red X. It’s a treasure hunt!`, cast: [hero.id, companion(0).id], focus: { e: '🗺️' }, mood: 'wow', hat: 'bandana' });
+      stops.slice(0, 3).forEach((s, i) => {
+        const p = place(s);
+        add({ place: s, text: `Is the treasure ${p.at}? Not here! Just ${r.pick(p.surprises)}.`, cast: [hero.id, companion(i + 1).id], focus: { e: r.pick(p.props) }, mood: i === 0 ? 'brave' : i === 1 ? 'worried' : 'brave', hat: 'bandana' });
+      });
+      const last = stops[3];
+      add({ place: last, text: `X marks the spot ${at(last)}! Dig, dig, dig… Treasure! A chest full of ${r.pick(TREASURES)}!`, cast: [hero.id, ...others.slice(0, 2).map((c) => c.id)], focus: { e: '💎' }, mood: 'starry', hat: 'bandana' });
+      add({ place: 'home', text: `Brave ${H} shares the treasure with everyone. Ahoy!`, cast: [hero.id, ...others.slice(0, 2).map((c) => c.id)], focus: { e: '🏴‍☠️' }, mood: 'proud', hat: 'bandana' });
+      break;
+    }
+    case 'dinos': {
+      title = `${H} and the Dinosaurs`;
+      const dinos = r.shuffle(DINOS);
+      add({ place: 'home', text: `${H} puts on a dinosaur suit. Stomp, stomp, ROAR!`, cast: [hero.id, companion(0).id], focus: { e: '🦖' }, outfit: 'dino', mood: 'laugh' });
+      stops.forEach((s, i) => {
+        add({ place: s, text: `${cap(at(s))}, ${H} finds ${dinos[i].n}${/[!?.]$/.test(dinos[i].n) ? '' : '.'} ${r.pick(['Stomp, stomp!', 'ROAR!', 'Wow!', 'Hello, dino!'])}`, cast: [hero.id, companion(i).id], focus: { e: dinos[i].e }, outfit: 'dino', mood: (['wow', 'laugh', 'starry', 'brave'] as Expression[])[i % 4] });
+      });
+      add({ place: 'bedtime', text: `Goodnight, dinosaurs! ${H} stomps all the way to bed. Roar… zzz.`, cast: [hero.id], focus: { e: '🦕' }, outfit: 'dino', mood: 'sleepy' });
+      break;
+    }
+    case 'fair': {
+      title = `${H} at the Fun Fair`;
+      const rides = r.shuffle(FAIR).slice(0, 4);
+      const spots = chosen.length ? stops : ['fair', 'fair', 'fair', 'fair'];
+      add({ place: 'fair', text: `Music! Lights! ${H} and ${tok(companion(0))} are at the fun fair!`, cast: [hero.id, companion(0).id], focus: { e: '🎡' }, mood: 'starry' });
+      rides.forEach((ride, i) => {
+        const X = companion(i + 1);
+        add({ place: spots[i], text: ride.t.replace(/\{H\}/g, H).replace(/\{X\}/g, tok(X)), cast: [hero.id, X.id], focus: { e: ride.e }, mood: (['laugh', 'wow', 'grin', 'proud'] as Expression[])[i % 4] });
+      });
+      add({ place: 'home', text: `What a day! ${H} hugs the new teddy all the way home.`, cast: [hero.id, ...others.slice(0, 2).map((c) => c.id)], focus: { e: '🧸' }, mood: 'sleepy' });
+      break;
+    }
+    case 'hero': {
+      title = `Super ${H} Saves the Day`;
+      const jobs = r.shuffle(RESCUES);
+      add({ place: 'home', text: `${H} puts on a cape. Today, ${H} is a superhero!`, cast: [hero.id, companion(0).id], focus: { e: '⚡' }, outfit: 'hero', mood: 'brave' });
+      stops.forEach((s, i) => {
+        const j = jobs[i];
+        add({ place: s, text: `${cap(at(s))}, ${j.p}! Super ${H} ${j.fix}.`, cast: [hero.id, companion(i).id], focus: { e: j.e }, outfit: 'hero', mood: i % 2 ? 'proud' : 'brave' });
+      });
+      add({ place: 'home', text: `Super ${H} saves the day! Now it’s time for a super snack.`, cast: [hero.id, ...others.slice(0, 2).map((c) => c.id)], focus: { e: '🍪' }, outfit: 'hero', mood: 'proud' });
+      break;
+    }
+    case 'space': {
+      title = `${H}’s Rocket Ride`;
+      const sky = chosen.length ? stops : ['space', 'moon', 'space', 'moon'];
+      add({ place: 'home', text: `${H} builds a rocket out of a big cardboard box. 3, 2, 1… blast off!`, cast: [hero.id, companion(0).id], focus: { e: '🚀' }, mood: 'starry' });
+      sky.forEach((s, i) => {
+        const p = place(s);
+        add({ place: s, text: `${cap(p.at)}, ${H} and ${tok(companion(i))} ${r.pick(p.doing)}. ${r.pick(['Whoa!', 'Zoom!', 'So high!', 'Beep boop!'])}`, cast: [hero.id, companion(i).id], focus: { e: r.pick(p.props) }, outfit: 'astronaut', mood: (['wow', 'laugh', 'starry', 'dreamy'] as Expression[])[i % 4] });
+      });
+      add({ place: 'bedtime', text: `Back home, ${H} looks up at the stars. Goodnight, moon. See you tomorrow!`, cast: [hero.id], focus: { e: '🌙' }, mood: 'dreamy' });
+      break;
+    }
+    case 'feelings': {
+      title = `How Does ${H} Feel?`;
+      const fs = r.shuffle(FEELINGS).slice(0, 5);
+      const where = [...stops, r.pick(pool)];
+      fs.forEach((f, i) => {
+        const s = where[i];
+        const p = place(s);
+        const why = f.why.replace(/\{H\}/g, H).replace('{X}', tok(companion(i))).replace('{doing}', r.pick(p.doing)).replace('{surprise}', r.pick(p.surprises).replace(/^just /, ''));
+        add({ place: s, text: `${cap(p.at)}, ${why}. ${H} feels ${f.word}!`, cast: [hero.id, companion(i).id], focus: { e: r.pick(p.props) }, mood: f.mood });
+      });
+      add({ place: 'home', text: `Happy, silly, sleepy or shy… however ${H} feels, ${H} is loved.`, cast: [hero.id, ...others.slice(0, 2).map((c) => c.id)], focus: { e: '💛' }, mood: 'grin' });
+      break;
+    }
   }
+  // moods for the classic stories
+  if (['lost', 'hide'].includes(type) && pages.length) {
+    pages[0].mood ??= 'worried';
+    pages.slice(1, -1).forEach((p) => (p.mood ??= 'wow'));
+    pages[pages.length - 1].mood ??= 'laugh';
+  }
+  if (type === 'foods') pages.forEach((p) => (p.mood ??= /Yuck|no thank|Bleh|Maybe|funny face/.test(p.text) ? 'silly' : 'grin'));
+  if (type === 'hats') pages.forEach((p, i) => (p.mood ??= i % 2 ? 'proud' : 'laugh'));
+  if (type === 'bedtime' || type === 'adventure') pages[pages.length - 1].mood ??= 'sleepy';
+  if (type === 'animals') pages.forEach((p, i) => (p.mood ??= i % 2 ? 'wow' : 'laugh'));
+  if (type === 'counting' || type === 'colours') pages[pages.length - 1].mood ??= 'proud';
+  // the star's personality, in their own words, on the first page
+  if (opts.heroLine && pages[0]) pages[0].text += ` ${opts.heroLine.replace(/\{H\}/g, H)}`;
   return { type, seed: opts.seed, title, pages };
 }
 
