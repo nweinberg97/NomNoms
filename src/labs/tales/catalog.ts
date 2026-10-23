@@ -171,9 +171,9 @@ export const NAMES = [
 ];
 export const PET_NAMES = ['Biscuit', 'Pepper', 'Mochi', 'Waffles', 'Maple', 'Bean', 'Noodle', 'Pickles', 'Olive', 'Ziggy', 'Bao', 'Teddy'];
 
-export type Role = 'baby' | 'parent' | 'sibling' | 'friend' | 'grandparent' | 'pet';
+export type Role = 'baby' | 'parent' | 'sibling' | 'friend' | 'grandparent' | 'relative' | 'teacher' | 'pet';
 export const ROLE_LABEL: Record<Role, string> = {
-  baby: 'The star', parent: 'Parent', sibling: 'Brother or sister', friend: 'Friend', grandparent: 'Grandparent', pet: 'Pet',
+  baby: 'The star', parent: 'Parent', sibling: 'Brother or sister', friend: 'Friend', grandparent: 'Grandparent', relative: 'Family', teacher: 'Teacher', pet: 'Pet',
 };
 
 /** The kinds of story the generator can tell. */

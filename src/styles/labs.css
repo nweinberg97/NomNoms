@@ -147,3 +147,51 @@
 
 /* coming soon: try-it buttons */
 .cs-try { align-self: flex-start; margin-top: 4px; }
+
+/* ── Baby Tales: cast adding, photo result, hair picker, Genmoji steps ── */
+.bt-member.is-add .bt-face { border: 2px dashed var(--line-2); background: var(--paper); color: var(--ink-3); }
+.bt-adder .lab-chips { gap: 8px; }
+.lab-chip.is-accent { background: var(--accent-soft); border-color: transparent; color: var(--accent-ink); display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
+.lab-chip.is-drawn { display: inline-flex; align-items: center; gap: 6px; padding-left: 4px; }
+.lab-chip.is-drawn img { width: 26px; height: 20px; object-fit: cover; border-radius: 6px; }
+.lab-chip .icon, .lab-chip svg { vertical-align: -2px; }
+.bt-result { display: grid; grid-template-columns: auto auto auto minmax(0, 1fr); align-items: center; gap: 10px; padding: 12px; border-radius: 16px; background: #eef6ef; border: 1px solid #cfe5d4; color: var(--ink-2); animation: fadeIn .4s both; }
+.bt-result-photo, .bt-result-char { width: 58px; height: 58px; border-radius: 50%; overflow: hidden; background: var(--paper-2); display: grid; place-items: center; }
+.bt-result-photo img { width: 100%; height: 100%; object-fit: cover; }
+.bt-result-char svg { width: 100%; height: 100%; }
+.bt-result-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.bt-result-text strong { font-size: 14px; color: var(--ink); }
+.bt-result-text small { font-size: 12px; color: var(--ink-3); }
+.bt-matched { display: flex; flex-wrap: wrap; gap: 4px; }
+.bt-matched span { font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: #fff; color: #3f7d55; border: 1px solid #cfe5d4; }
+@media (max-width: 480px) { .bt-result { grid-template-columns: auto auto auto; } .bt-result-text { grid-column: 1 / -1; } }
+.bt-hairs { display: grid; grid-template-columns: repeat(auto-fill, minmax(66px, 1fr)); gap: 8px; }
+.bt-hair { font: inherit; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px 2px 6px; border-radius: 14px; border: 1.5px solid var(--line); background: var(--paper); cursor: pointer; color: var(--ink-2); }
+.bt-hair span { width: 54px; height: 54px; display: block; }
+.bt-hair span svg { width: 100%; height: 100%; }
+.bt-hair small { font-size: 11px; }
+.bt-hair[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--ink); font-weight: 600; }
+.bt-genmoji { border: 1px solid var(--line); border-radius: 16px; padding: 10px 14px; background: var(--paper); }
+.bt-genmoji summary { cursor: pointer; display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; font-weight: 600; font-size: 14px; color: var(--ink); list-style: none; }
+.bt-genmoji summary::-webkit-details-marker { display: none; }
+.bt-genmoji summary::before { content: '＋'; color: var(--accent); }
+.bt-genmoji[open] summary::before { content: '－'; }
+.bt-genmoji summary small { font-weight: 400; font-size: 12px; color: var(--ink-3); }
+.bt-genmoji ol { margin: 10px 0; padding-left: 20px; font-size: 13.5px; color: var(--ink-2); display: flex; flex-direction: column; gap: 4px; }
+.bt-genmoji kbd { font-family: var(--sans); font-size: 11.5px; padding: 1px 6px; border-radius: 6px; border: 1px solid var(--line); background: var(--card); }
+.bt-genmoji .bt-genbox { margin-top: 8px; }
+
+/* ── drawing pad ── */
+.dpad { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+.dpad-board { position: relative; width: 100%; max-height: 62vh; margin: 0 auto; border-radius: 14px; overflow: hidden; background: #fff; border: 1px solid var(--line); box-shadow: var(--shadow-sm); }
+.dpad-board.is-clear { background-color: #fff; background-image: linear-gradient(45deg, #f1ece4 25%, transparent 25%), linear-gradient(-45deg, #f1ece4 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #f1ece4 75%), linear-gradient(-45deg, transparent 75%, #f1ece4 75%); background-size: 24px 24px; background-position: 0 0, 0 12px, 12px -12px, -12px 0; }
+.dpad-board canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
+.dpad-hint { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); text-align: center; color: var(--ink-3); font-size: 14px; pointer-events: none; padding: 0 20px; }
+.dpad-tools { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.dpad-colours { display: flex; flex-wrap: wrap; gap: 8px; }
+.dpad-colour { width: 32px; height: 32px; border-radius: 50%; border: 0; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .14); cursor: pointer; outline: 2px solid transparent; outline-offset: 2px; }
+.dpad-colour[aria-pressed="true"] { outline-color: var(--ink); }
+.dpad-size { width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--line); background: var(--paper); display: grid; place-items: center; cursor: pointer; }
+.dpad-size i { display: block; border-radius: 50%; background: var(--ink); }
+.dpad-size[aria-pressed="true"] { border-color: var(--ink); box-shadow: 0 0 0 2px var(--ink) inset; }
+@media (min-width: 900px) { .dpad { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); align-items: start; } }

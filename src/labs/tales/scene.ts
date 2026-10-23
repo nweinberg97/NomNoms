@@ -1,5 +1,5 @@
 import { PLACES, type Place } from './catalog';
-import { characterMarkup, type Look } from './character';
+import { characterMarkup, isPet, type Look } from './character';
 import { rng } from './generator';
 
 /**
@@ -56,8 +56,13 @@ export function backdrop(p: Place, seed: number): string {
 export interface SceneCharacter { look: Look; size?: 'small' | 'normal' }
 
 /** A full story picture. `chars[0]` is the star (drawn on the left). */
+/** A place drawn or uploaded by the family, used as a backdrop. */
+export type DrawnPlace = Place & { image: string };
+
 export function sceneSvg(opts: {
   placeId: string;
+  /** A drawn place to use instead of the built-in ones. */
+  drawn?: DrawnPlace;
   seed: number;
   chars: SceneCharacter[];
   focus?: { e: string; count?: number; faded?: boolean };
@@ -65,13 +70,15 @@ export function sceneSvg(opts: {
   label?: string;
 }): string {
   const p = PLACES.find((x) => x.id === opts.placeId) ?? PLACES[0];
-  let s = backdrop(p, opts.seed);
+  let s = opts.drawn
+    ? `<rect width="400" height="300" fill="#fbf7f0"/><image href="${opts.drawn.image.replace(/"/g, '&quot;')}" x="0" y="0" width="400" height="300" preserveAspectRatio="xMidYMid slice"/>`
+    : backdrop(p, opts.seed);
   const slots = opts.chars.length >= 3
     ? [{ x: 10, w: 132 }, { x: 140, w: 124 }, { x: 262, w: 124 }]
     : [{ x: 36, w: 156 }, { x: 214, w: 150 }];
   opts.chars.slice(0, slots.length).forEach((c, i) => {
     const slot = slots[i];
-    const small = c.size === 'small' || c.look.kind === 'dog';
+    const small = c.size === 'small' || isPet(c.look.kind);
     const w = small ? slot.w * 0.78 : slot.w;
     const h = w * 1.25;
     const x = slot.x + (slot.w - w) / 2;

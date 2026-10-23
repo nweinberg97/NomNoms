@@ -68,7 +68,6 @@ export function rng(seed: number) {
 }
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-const place = (id: string): Place => PLACES.find((p) => p.id === id) ?? PLACES[0];
 const tok = (c?: CastMember) => (c ? `{@${c.id}}` : 'someone');
 
 export const HAT_WORDS: Record<string, string> = {
@@ -85,8 +84,9 @@ const PREFERRED: Partial<Record<StoryType, string[]>> = {
   hide: ['home', 'garden', 'park', 'library', 'kitchen', 'playground', 'store'],
 };
 
-export function generateStory(type: StoryType, cast: CastMember[], opts: { seed: number; places?: string[] }): Story {
+export function generateStory(type: StoryType, cast: CastMember[], opts: { seed: number; places?: string[]; extraPlaces?: Place[] }): Story {
   const r = rng(opts.seed);
+  const place = (id: string): Place => opts.extraPlaces?.find((p) => p.id === id) ?? PLACES.find((p) => p.id === id) ?? PLACES[0];
   const hero = cast.find((c) => c.role === 'baby') ?? cast[0];
   const others = cast.filter((c) => c.id !== hero.id && c.inStory);
   const people = others.filter((c) => c.role !== 'pet');
@@ -95,7 +95,7 @@ export function generateStory(type: StoryType, cast: CastMember[], opts: { seed:
   const companions = r.shuffle(others.length ? others : [hero]);
   const companion = (i: number) => companions[i % companions.length];
 
-  const chosen = (opts.places ?? []).filter((id) => PLACES.some((p) => p.id === id));
+  const chosen = (opts.places ?? []).filter((id) => PLACES.some((p) => p.id === id) || opts.extraPlaces?.some((p) => p.id === id));
   const pool = chosen.length ? chosen : (PREFERRED[type] ?? PLACES.filter((p) => !p.imaginary && !p.night && p.id !== 'home').map((p) => p.id));
   // the chosen places come first; if fewer than four were chosen, fill in with fitting others
   const fallback = PREFERRED[type] ?? PLACES.filter((p) => !p.imaginary && !p.night && p.id !== 'home').map((p) => p.id);
@@ -222,8 +222,8 @@ export function generateStory(type: StoryType, cast: CastMember[], opts: { seed:
 }
 
 /** A fresh version of one page, keeping its place and the story's pattern. */
-export function regeneratePage(story: Story, index: number, cast: CastMember[], seed: number): StoryPage {
-  const again = generateStory(story.type, cast, { seed, places: [story.pages[index].place] });
+export function regeneratePage(story: Story, index: number, cast: CastMember[], seed: number, extraPlaces?: Place[]): StoryPage {
+  const again = generateStory(story.type, cast, { seed, places: [story.pages[index].place], extraPlaces });
   const candidate = again.pages[Math.min(index, again.pages.length - 1)];
   return { ...candidate, id: story.pages[index].id, place: story.pages[index].place };
 }

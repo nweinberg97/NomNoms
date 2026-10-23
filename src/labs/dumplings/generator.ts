@@ -41,6 +41,8 @@ export function samplePhotosFor(o: Occasion, seed: number, count = 11): MediaIte
   const add = (k: string) => { if (DEMO_PHOTOS[k] && !keys.includes(k)) keys.push(k); };
   o.photos.forEach((tag, i) => r.shuffle(TAGS[tag] ?? []).slice(0, i === 0 ? 7 : 4).forEach(add));
   r.shuffle(TAGS.smile).forEach((k) => keys.length < count && add(k));
+  // a big book: keep going with everything else
+  if (keys.length < count) r.shuffle(Object.values(TAGS).flat()).forEach((k) => keys.length < count && add(k));
   return keys.slice(0, count).map(demoPhoto);
 }
 
@@ -63,7 +65,16 @@ export interface DumplingInput {
   date: string;
   photos: MediaItem[];
   seed: number;
+  /** How many photos share a page: fewer per page means more pages. */
+  density?: Density;
 }
+
+export type Density = 'roomy' | 'balanced' | 'compact';
+export const RHYTHMS: Record<Density, number[]> = {
+  roomy: [1, 1, 2, 1, 2, 1, 1, 2, 1, 3],
+  balanced: [1, 2, 3, 1, 4, 2, 1, 3],
+  compact: [3, 4, 2, 4, 3, 4, 2],
+};
 
 export function fillWords(s: string, i: DumplingInput) {
   return s.replace(/\{name\}/g, i.name || 'Baby').replace(/\{place\}/g, i.place || 'the trip').replace(/\{year\}/g, i.date.slice(0, 4));
@@ -104,9 +115,9 @@ export function buildDumpling(input: DumplingInput): { book: Book; memories: Mem
   const per = sections.length ? Math.ceil(rest.length / sections.length) : rest.length;
   const groups = sections.length ? sections.map((_, i) => rest.slice(i * per, (i + 1) * per)) : [rest];
 
-  const rhythm = [1, 2, 3, 1, 4, 2, 1, 3];
+  const rhythm = RHYTHMS[input.density ?? 'balanced'];
   const singles: LayoutType[] = ['hero-caption', 'split', 'full-bleed'];
-  let si = Math.floor(r.next() * 3), ri = Math.floor(r.next() * rhythm.length), quoteDone = false;
+  let si = Math.floor(r.next() * 3), ri = Math.floor(r.next() * rhythm.length), sinceQuote = -4;
 
   groups.forEach((group, g) => {
     let queue = [...group];
@@ -124,10 +135,11 @@ export function buildDumpling(input: DumplingInput): { book: Book; memories: Mem
       else layout = k === 2 ? 'two-up' : k === 3 ? 'three-grid' : 'four-grid';
       const m = memory(take.map((p) => p.id), k === 1 && layout !== 'full-bleed');
       pages.push({ id: pid(), layout, chapterId: sections.length ? `s${g}` : undefined, memoryIds: [m.id], mediaIds: take.map((p) => p.id) });
-      if (!quoteDone && pages.length >= 5 && li < lines.length) {
+      // a words-only page now and then, from the occasion's lines
+      if (++sinceQuote >= 9 && li < lines.length && queue.length > 2) {
         const q = memory([], true);
         pages.push({ id: pid(), layout: 'quote', memoryIds: [q.id], mediaIds: [] });
-        quoteDone = true;
+        sinceQuote = 0;
       }
     }
   });
@@ -141,4 +153,29 @@ export function buildDumpling(input: DumplingInput): { book: Book; memories: Mem
     style: { palette: 'paper', type: o.type, shape: 'square' }, updatedAt: now,
   };
   return { book, memories };
+}
+
+/** Pages for photos added after the book was made: placed before the last page, nothing else changes. */
+export function appendPhotos(book: Book, memories: Memory[], photos: MediaItem[], input: DumplingInput): { book: Book; memories: Memory[] } {
+  const r = rng(input.seed + book.pages.length * 13 + photos.length);
+  const now = new Date().toISOString();
+  const captions = r.shuffle([...input.occasion.captions.map((c) => fillWords(c, input)), ...GENERAL_CAPTIONS]);
+  const rhythm = RHYTHMS[input.density ?? 'balanced'];
+  const singles: LayoutType[] = ['hero-caption', 'split', 'full-bleed'];
+  const added: BookPage[] = [];
+  const mems: Memory[] = [];
+  let queue = [...photos], i = 0;
+  while (queue.length) {
+    const k = Math.min(rhythm[i % rhythm.length], queue.length);
+    const take = queue.slice(0, k);
+    queue = queue.slice(k);
+    const layout: LayoutType = k === 1 ? (wide(take[0]) ? 'full-bleed' : singles[i % 3]) : k === 2 ? 'two-up' : k === 3 ? 'three-grid' : 'four-grid';
+    const m: Memory = { id: `dm-add-${Date.now()}-${i}`, babyId: 'demo', type: 'moment', title: captions[i % captions.length], date: input.date, mediaIds: take.map((p) => p.id), people: [], tags: [], favorite: false, createdAt: now, updatedAt: now };
+    mems.push(m);
+    added.push({ id: `dp-add-${Date.now()}-${i}`, layout, memoryIds: [m.id], mediaIds: take.map((p) => p.id) });
+    i++;
+  }
+  const pages = [...book.pages];
+  pages.splice(Math.max(1, pages.length - 1), 0, ...added);
+  return { book: { ...book, pages }, memories: [...memories, ...mems] };
 }
