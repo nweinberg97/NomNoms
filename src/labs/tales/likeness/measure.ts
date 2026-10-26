@@ -48,6 +48,8 @@ export interface FaceInput {
   rotation?: { yaw: number; pitch: number; roll: number };
   /** How many faces were found in the photo. */
   faces: number;
+  /** The age model's estimate, in years, when it ran. */
+  age?: number;
 }
 export interface PixelInput {
   raster: Raster;
@@ -67,6 +69,8 @@ export interface Measurements {
   bangs: Measurement<boolean>;
   facialHair: Measurement<{ moustache: number; chin: number; jaw: number }>;
   glasses: Measurement<boolean>;
+  /** Baby, kid, grown-up or grandparent: a best guess the parent confirms with a tap. */
+  ageGroup: Measurement<'baby' | 'kid' | 'adult' | 'elder'>;
   warnings: string[];
   /** Points and regions in image pixels, for drawing the debug overlay. */
   debug: {
@@ -154,7 +158,7 @@ export function measure(face: FaceInput | null, px: PixelInput): Measurements {
   const allMissing = (why: string): Measurements => ({
     quality: { score: face?.score ?? 0, faces: face?.faces ?? 0, iodPx: 0, roll: 0, mouthOpen: 0, smile: 0 },
     shape: Object.fromEntries(SHAPE_KEYS.map((k) => [k, missing(why)])) as Record<ShapeKey, Measurement>,
-    skin: missing(why), eyes: missing(why), hair: missing(why), hairLength: missing(why), hairVolume: missing(why), hairTexture: missing(why), bangs: missing(why), facialHair: missing(why), glasses: missing(why),
+    skin: missing(why), eyes: missing(why), hair: missing(why), hairLength: missing(why), hairVolume: missing(why), hairTexture: missing(why), bangs: missing(why), facialHair: missing(why), glasses: missing(why), ageGroup: missing(why),
     warnings: [why], debug: { oval: [], eyes: [], skinPatches: [], irises: [], regions: [] },
   });
   if (!face || !face.mesh || face.mesh.length < 468) return allMissing('No face was found in this photo.');
@@ -472,6 +476,7 @@ export function measure(face: FaceInput | null, px: PixelInput): Measurements {
     quality: { score: round(face.score, 3), faces: face.faces, iodPx: round(iodPx, 1), yaw: yaw === undefined ? undefined : round(yaw, 3), pitch: pitch === undefined ? undefined : round(pitch, 3), roll: round(f.angle, 3), mouthOpen: round(mouthOpen, 3), smile: round(smile, 3), brightness: skinLab ? round(skinLab[0], 1) : undefined },
     shape, skin, eyes, hair, hairLength, hairVolume, hairTexture, bangs, facialHair,
     glasses: missing('Glasses aren’t detected; choose them in the wardrobe.'),
+    ageGroup: ageGroupOf(face.age, hairLab, sizeConf),
     warnings,
     debug: {
       oval: FACE_OVAL.map((i) => pt(i)),
@@ -494,3 +499,18 @@ export function measure(face: FaceInput | null, px: PixelInput): Measurements {
   };
 }
 
+/**
+ * Age group from the age model. On adult test photos it reads 10–15 years young
+ * (a 42-year-old as 29, a 79-year-old as 69), so the cut-offs sit low. It has
+ * not been checked on children's photos (none are used for testing), so it is
+ * always a best guess with a one-tap correction.
+ */
+export const AGE_CUTS = { baby: 3.5, kid: 14, elder: 58 } as const;
+function ageGroupOf(age: number | undefined, hairLab: number[] | null, sizeConf: number): Measurement<'baby' | 'kid' | 'adult' | 'elder'> {
+  if (age === undefined || !Number.isFinite(age)) return missing('The age model didn’t run.');
+  const grey = !!hairLab && hairLab[0] > 62 && Math.hypot(hairLab[1], hairLab[2]) < 12;
+  const value = age < AGE_CUTS.baby ? 'baby' : age < AGE_CUTS.kid ? 'kid' : age >= AGE_CUTS.elder || (grey && age >= 40) ? 'elder' : 'adult';
+  // near a cut-off, say so
+  const near = Math.min(...[AGE_CUTS.baby, AGE_CUTS.kid, AGE_CUTS.elder].map((c) => Math.abs(age - c)));
+  return { status: 'inferred', value, confidence: round(Math.min(0.8, 0.4 + near / 20) * sizeConf, 2), raw: round(age, 1), why: grey && value === 'elder' && age < AGE_CUTS.elder ? 'Grey or white hair' : 'Age is a best guess from the face' };
+}

@@ -17,13 +17,15 @@ import { SHAPE_KEYS, type HairLength, type HairTexture, type Measurement, type M
 
 export type Source = 'measured' | 'inferred' | 'parent';
 export interface Trait<T> { value: T; source: Source; confidence: number; basis?: string }
-export type IdentityKey = 'skin' | 'hair' | 'eyes' | 'hairStyle' | 'facial' | 'shape';
-export const IDENTITY_KEYS: IdentityKey[] = ['skin', 'hair', 'eyes', 'hairStyle', 'facial', 'shape'];
+export type IdentityKey = 'skin' | 'hair' | 'eyes' | 'hairStyle' | 'facial' | 'shape' | 'kind';
+export const IDENTITY_KEYS: IdentityKey[] = ['skin', 'hair', 'eyes', 'hairStyle', 'facial', 'shape', 'kind'];
 
 export interface CharacterDNA {
   version: 1;
-  /** Always the parent's choice: NomNoms doesn't guess anyone's age. */
+  /** Baby, kid, grown-up or grandparent: from the photo unless the parent chose it. */
   kind: Kind;
+  /** What the photo suggested, kept so the parent can see and change it. */
+  ageGroup?: Trait<Kind>;
   skin?: Trait<string>;
   hair?: Trait<string>;
   eyes?: Trait<string>;
@@ -81,8 +83,13 @@ function pickFacial(kind: Kind, m: Measurement<{ moustache: number; chin: number
   return { value: f, source: 'inferred', confidence: v.confidence, basis: `dark pixels: moustache ${t}, chin ${c}, jaw ${j}` };
 }
 
+/** The age group to draw: the parent's choice if they made one, else the photo's guess, else the current one. */
+export const kindFor = (m: Measurements, current: Kind, chosenByParent: boolean): Kind =>
+  chosenByParent || isPetKind(current) || m.ageGroup.status === 'missing' || !m.ageGroup.value ? current : m.ageGroup.value;
+const isPetKind = (k: Kind) => !['baby', 'kid', 'adult', 'elder'].includes(k);
+
 /** Turn photo measurements into DNA. Parent-chosen traits in `keep` are carried over untouched. */
-export function buildDNA(m: Measurements, kind: Kind, keep: Partial<Pick<CharacterDNA, IdentityKey>> = {}): CharacterDNA {
+export function buildDNA(m: Measurements, kind: Kind, keep: Partial<Pick<CharacterDNA, Exclude<IdentityKey, 'kind'>>> = {}): CharacterDNA {
   const shape: CharacterDNA['shape'] = {};
   for (const k of SHAPE_KEYS) { const t = trait(m.shape[k]); if (t) shape[k] = t; }
   const hairDetail: CharacterDNA['hairDetail'] = {};
@@ -92,6 +99,8 @@ export function buildDNA(m: Measurements, kind: Kind, keep: Partial<Pick<Charact
   if (vol) hairDetail.volume = vol;
   if (bangs) hairDetail.bangs = bangs;
   const dna: CharacterDNA = { version: 1, kind, shape, hairDetail, warnings: [...m.warnings] };
+  const age = trait(m.ageGroup);
+  if (age) dna.ageGroup = age;
   const skin = trait(m.skin), hair = trait(m.hair), eyes = trait(m.eyes);
   if (skin) dna.skin = skin;
   if (hair) dna.hair = hair;
@@ -100,7 +109,7 @@ export function buildDNA(m: Measurements, kind: Kind, keep: Partial<Pick<Charact
   if (style) dna.hairStyle = style;
   const facial = pickFacial(kind, m.facialHair);
   if (facial) dna.facial = facial;
-  for (const k of IDENTITY_KEYS) if (keep[k] !== undefined) (dna as unknown as Record<string, unknown>)[k] = keep[k];
+  for (const k of IDENTITY_KEYS) if (k !== 'kind' && keep[k] !== undefined) (dna as unknown as Record<string, unknown>)[k] = keep[k];
   return dna;
 }
 
@@ -110,7 +119,7 @@ export function buildDNA(m: Measurements, kind: Kind, keep: Partial<Pick<Charact
  * Traits the DNA doesn't have leave the look's current value in place.
  */
 export function applyDNA(look: Look, dna: CharacterDNA): Look {
-  const next: Look = { ...look };
+  const next: Look = { ...look, kind: dna.kind };
   if (dna.skin) next.skin = dna.skin.source === 'parent' ? dna.skin.value : tame(dna.skin.value, SKIN_TONES, 0.35);
   if (dna.hair) next.hair = dna.hair.source === 'parent' ? dna.hair.value : tame(dna.hair.value, HAIR_COLOURS, 0.4);
   if (dna.eyes) next.eyes = dna.eyes.source === 'parent' ? dna.eyes.value : tame(dna.eyes.value, EYE_COLOURS, 0.5);
@@ -124,8 +133,8 @@ export function applyDNA(look: Look, dna: CharacterDNA): Look {
 }
 
 /** A trait a parent chose by hand, for `buildDNA(…, keep)`. */
-export function parentTraits(look: Look, keys: IdentityKey[]): Partial<Pick<CharacterDNA, IdentityKey>> {
-  const out: Partial<Pick<CharacterDNA, IdentityKey>> = {};
+export function parentTraits(look: Look, keys: IdentityKey[]): Partial<Pick<CharacterDNA, Exclude<IdentityKey, 'kind'>>> {
+  const out: Partial<Pick<CharacterDNA, Exclude<IdentityKey, 'kind'>>> = {};
   const p = <T,>(value: T): Trait<T> => ({ value, source: 'parent', confidence: 1 });
   for (const k of keys) {
     if (k === 'skin') out.skin = p(look.skin);

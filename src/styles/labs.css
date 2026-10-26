@@ -306,3 +306,18 @@
 .lab-card.is-dropping { outline: 2px dashed var(--accent, #b5532b); outline-offset: 3px; background: #fff7ef; }
 .bt-drop-hint { display: block; font-size: 10.5px; opacity: .7; }
 @media (hover: none) { .bt-drop-hint { display: none; } }
+
+/* photo → character: the obvious way in */
+.bt-photohero { display: grid; grid-template-columns: auto 1fr; gap: 12px 14px; align-items: center; margin: 4px 0 16px; padding: 16px; border-radius: 18px;
+  background: linear-gradient(135deg, #fff4ea, #fdebe0); border: 1.5px dashed #e3b9a0; }
+.bt-photohero.is-dropping { border-style: solid; border-color: var(--accent, #b5532b); background: #fff0e4; }
+.bt-photohero-icon { width: 52px; height: 52px; border-radius: 16px; display: grid; place-items: center; background: var(--accent, #b5532b); color: #fff; }
+.bt-photohero-text strong { display: block; font-size: 17px; margin-bottom: 2px; }
+.bt-photohero-text span { font-size: 13.5px; color: var(--ink-2, #5e544c); line-height: 1.4; }
+.bt-photohero-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.bt-photohero-actions .btn-primary { min-height: 44px; }
+@media (min-width: 760px) { .bt-photohero { grid-template-columns: auto 1fr auto; } .bt-photohero-actions { grid-column: auto; flex-direction: column; align-items: stretch; } }
+.bt-member.is-photo .bt-face { background: #fdebe0; color: var(--accent, #b5532b); }
+.bt-kindpick { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 6px 0; font-size: 12.5px; }
+.bt-kindpick > span { color: var(--ink-3, #7a6f66); }
+.bt-kindpick .lab-chip[aria-checked="true"] { background: var(--ink, #2a201c); color: #fff; border-color: var(--ink, #2a201c); }

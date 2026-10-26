@@ -1,7 +1,7 @@
 import type { Raster } from '../assets/pipeline';
 import { decodePhoto, rasterToCanvas, wipe } from '../assets/browser';
 import { measure, type FaceInput, type Measurements } from './measure';
-import { applyDNA, buildDNA, parentTraits, type CharacterDNA, type IdentityKey } from './dna';
+import { applyDNA, buildDNA, kindFor, parentTraits, type CharacterDNA, type IdentityKey } from './dna';
 import type { Look } from '../character';
 
 /**
@@ -38,7 +38,7 @@ export function loadReader(): Promise<HumanLike> {
         backend: 'webgl', modelBasePath: `${base}models/`, cacheModels: false, debug: false, async: true, warmup: 'none', cacheSensitivity: 0, filter: { enabled: false },
         face: {
           enabled: true, detector: { rotation: true, maxDetected: 4, minConfidence: 0.4, return: false }, mesh: { enabled: true }, iris: { enabled: true },
-          description: { enabled: false }, emotion: { enabled: false }, antispoof: { enabled: false }, liveness: { enabled: false }, attention: { enabled: false },
+          description: { enabled: true }, emotion: { enabled: false }, antispoof: { enabled: false }, liveness: { enabled: false }, attention: { enabled: false },
         },
         body: { enabled: false }, hand: { enabled: false }, object: { enabled: false }, gesture: { enabled: false },
         segmentation: { enabled: true, modelPath: 'selfie.json', mode: 'alpha' },
@@ -76,7 +76,7 @@ export async function readFace(raster: Raster, opts: { keepForDebug?: boolean } 
       const big = faces.reduce((a: any, b: any) => (b.box[2] * b.box[3] > a.box[2] * a.box[3] ? b : a));
       box = big.box;
       mesh = big.mesh;
-      face = { mesh: big.mesh, score: big.faceScore ?? big.score ?? 0, rotation: big.rotation?.angle, faces: faces.length };
+      face = { mesh: big.mesh, score: big.faceScore ?? big.score ?? 0, rotation: big.rotation?.angle, faces: faces.length, age: typeof big.age === 'number' ? big.age : undefined };
     }
     try {
       const t = await human.segmentation(canvas);
@@ -113,6 +113,6 @@ export async function openPhoto(src: Blob | string): Promise<Raster> {
 export async function likenessFromPhoto(src: Blob | string, look: Look, chosen: IdentityKey[]): Promise<{ dna: CharacterDNA; look: Look; measurements: Measurements }> {
   const raster = await openPhoto(src);
   const { measurements } = await readFace(raster);
-  const dna = buildDNA(measurements, look.kind, parentTraits(look, chosen));
+  const dna = buildDNA(measurements, kindFor(measurements, look.kind, chosen.includes('kind')), parentTraits(look, chosen));
   return { dna, look: applyDNA(look, dna), measurements };
 }

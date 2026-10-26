@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { makeRaster, type Raster } from '../assets/pipeline';
 import { characterMarkup, type Look } from '../character';
-import { applyDNA, buildDNA, parentTraits, parseDNA, serializeDNA } from '../likeness/dna';
+import { applyDNA, buildDNA, kindFor, parentTraits, parseDNA, serializeDNA } from '../likeness/dna';
 import { FACE_OVAL, measure, SHAPE_KEYS, type FaceInput } from '../likeness/measure';
 import astronaut from './fixtures/astronaut.landmarks.json';
 import grace from './fixtures/grace.landmarks.json';
@@ -182,4 +182,30 @@ test('characters without photo proportions draw exactly as before', () => {
   assert.ok(!svg.includes('translate(100 112) scale'), 'no nose transform');
   const shaped = characterMarkup({ ...LOOK, shape: { eyeGap: 1 } });
   assert.match(shaped, /<path d="M43 9\d/, 'shaped heads are a path');
+});
+
+test('the photo picks baby, kid, grown-up or grandparent, and a parent can override it', () => {
+  const at = (age?: number) => measure({ ...faceOf(grace), age }, paint(grace));
+  assert.equal(at(1.5).ageGroup.value, 'baby');
+  assert.equal(at(8).ageGroup.value, 'kid');
+  assert.equal(at(29).ageGroup.value, 'adult', 'the astronaut portrait reads 29');
+  assert.equal(at(69).ageGroup.value, 'elder', 'the Grace Hopper portrait reads 69');
+  assert.equal(at(undefined).ageGroup.status, 'missing', 'no age model, no guess');
+  for (const a of [1.5, 8, 29, 69]) assert.equal(at(a).ageGroup.status, 'inferred', 'always a best guess');
+  // a grown-up photo on the baby star makes a grown-up, not the person as a baby
+  assert.equal(kindFor(at(29), 'baby', false), 'adult');
+  assert.equal(kindFor(at(29), 'baby', true), 'baby', 'a parent’s choice wins');
+  assert.equal(kindFor(at(undefined), 'kid', false), 'kid', 'no guess keeps what was there');
+  assert.equal(kindFor(at(29), 'dog', false), 'dog', 'pets stay pets');
+});
+
+test('the age group shapes the whole character, not just its size', () => {
+  const m = measure({ ...faceOf(grace), age: 69 }, paint(grace));
+  const grown = applyDNA({ ...LOOK, kind: 'baby' }, buildDNA(m, kindFor(m, 'baby', false)));
+  assert.equal(grown.kind, 'elder');
+  assert.notEqual(grown.hairStyle, 'tuft');
+  const baby = applyDNA(LOOK, buildDNA(m, 'baby'));
+  assert.equal(baby.kind, 'baby');
+  assert.ok(['tuft', 'curly'].includes(baby.hairStyle), `baby hair: ${baby.hairStyle}`);
+  assert.equal(buildDNA(m, 'kid').facial, undefined, 'no facial hair for kids');
 });

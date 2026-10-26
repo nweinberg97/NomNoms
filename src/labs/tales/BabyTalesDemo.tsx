@@ -14,6 +14,8 @@ import {
 import { DrawPad, type DrawMode } from './DrawPad';
 import { SAMPLE_PHOTOS, samplePhotoUrl } from './fromPhoto';
 import { likenessFromPhoto } from './likeness/detect';
+import { applyDNA, buildDNA, parentTraits } from './likeness/dna';
+import type { Measurements } from './likeness/measure';
 import { describeDNA, type IdentityKey } from './likeness/dna';
 import { SHAPE_KEYS, type ShapeKey } from './likeness/measure';
 import { fill, generateStory, regeneratePage, tokenize, type CastMember, type Story, type StoryPage } from './generator';
@@ -117,12 +119,16 @@ export function BabyTalesDemo() {
   const [result, setResult] = useState<{ who: string; from: string; matched: { label: string; sure: boolean }[]; notes: string[]; kept: IdentityKey[] } | null>(null);
   /** Identity traits a parent set by hand, per person: a new photo never overwrites these. */
   const [chosen, setChosen] = useState<Record<string, IdentityKey[]>>({});
-  const [dropping, setDropping] = useState(false);
+  const [dropping, setDropping] = useState<'new' | 'current' | false>(false);
+  /** The last photo reading per person (numbers only, no pixels), so the age group can be changed with a tap. */
+  const [readings, setReadings] = useState<Record<string, Measurements>>({});
   const [status, setStatus] = useState<string>();
   const [adding, setAdding] = useState(false);
   const [pad, setPad] = useState<{ mode: DrawMode; redraw?: string } | null>(null);
   const [wardrobe, setWardrobe] = useState<DrawnWear[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
+  const newFileRef = useRef<HTMLInputElement>(null);
+  const studioRef = useRef<HTMLDivElement>(null);
   const genRef = useRef<HTMLDivElement>(null);
   const members = cast.map((p) => p.member);
   const membership = cast.map((p) => `${p.member.id}:${p.member.inStory}`).join();
@@ -180,25 +186,49 @@ export function BabyTalesDemo() {
     const id = person.member.id;
     setChosen((c) => ({ ...c, [id]: [...new Set([...(c[id] ?? []), key])] }));
   };
-  const fromPhoto = async (src: string | Blob, label: string, from: string) => {
+  /**
+   * Photo → character. `target` is the selected person, or 'new' to add someone.
+   * The photo decides baby / kid / grown-up / grandparent unless a parent chose it.
+   */
+  const fromPhoto = async (src: string | Blob, label: string, from: string, target: 'current' | 'new' = 'current') => {
     setBusy(label);
-    setStatus('Reading the face on this device…');
+    setStatus('Reading the face on this device… (the first time takes a moment)');
     setResult(null);
-    const id = person.member.id, kept = chosen[id] ?? [];
+    const fresh = target === 'new' ? mk('relative', 'Someone new', 'Someone new', { kind: 'adult', hairStyle: 'short', outfit: 'tee', personality: 'sunny' }) : null;
+    const who = fresh ?? person;
+    const id = who.member.id, kept = fresh ? [] : chosen[id] ?? [];
     try {
-      const r = await likenessFromPhoto(src, person.look, kept);
+      const r = await likenessFromPhoto(src, who.look, kept);
       const m = r.measurements;
       const found = m.skin.status !== 'missing' || SHAPE_KEYS.some((k) => m.shape[k].status !== 'missing');
       if (!found) { setStatus(`${m.warnings[0] ?? 'No face was found.'} Nothing was changed.`); return; }
-      setCast((cs) => cs.map((p) => (p.member.id === id ? { ...p, look: { ...r.look, face: undefined } } : p)));
-      setResult({ who: person.member.name, from, matched: describeDNA(r.dna), notes: r.dna.warnings, kept });
-      setStatus(undefined);
+      const look = { ...r.look, face: undefined };
+      if (fresh) {
+        const role: Role = look.kind === 'elder' ? 'grandparent' : look.kind === 'adult' ? 'relative' : look.kind === 'baby' ? 'sibling' : 'friend';
+        setSel(cast.length);
+        setCast((cs) => [...cs, { member: { ...fresh.member, role }, look }]);
+        setTimeout(() => studioRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
+      } else setCast((cs) => cs.map((p) => (p.member.id === id ? { ...p, look } : p)));
+      setReadings((rs) => ({ ...rs, [id]: m }));
+      setResult({ who: fresh ? 'Someone new' : who.member.name, from, matched: describeDNA(r.dna), notes: r.dna.warnings, kept });
+      setStatus(fresh ? 'Added! Give them a name below.' : undefined);
     } catch (e) {
       setStatus((e as Error).message);
     } finally {
       setBusy(undefined);
     }
   };
+  /** Change the age group after a photo: redraw from the same reading, and remember the parent chose it. */
+  const setKind = (kind: Kind) => {
+    const m = readings[person.member.id];
+    const kept = [...new Set([...(chosen[person.member.id] ?? []), 'kind' as const])];
+    setChosen((c) => ({ ...c, [person.member.id]: kept }));
+    if (!m) { update({ look: { kind } }); return; }
+    const dna = buildDNA(m, kind, parentTraits(person.look, kept));
+    update({ look: applyDNA(person.look, dna) });
+    setResult((r) => (r ? { ...r, matched: describeDNA(dna) } : r));
+  };
+  const photoFile = (e: React.DragEvent) => [...e.dataTransfer.files].find((x) => x.type.startsWith('image/') || /\.(heic|heif|jpe?g|png|webp)$/i.test(x.name));
   const onGenmoji = async () => {
     if (!genRef.current) return;
     const g = await catchGenmoji(genRef.current);
@@ -341,6 +371,27 @@ export function BabyTalesDemo() {
         {/* ── 2. the cast ─────────────────────────────── */}
         <section className="lab-section" aria-labelledby="bt-cast">
           <div className="lab-h"><span className="lab-n">2</span><h2 id="bt-cast" className="display">Who’s in the story</h2></div>
+          <div className={cx('bt-photohero', dropping === 'new' && 'is-dropping')} {...{ [OWN_DROP_ATTR]: '' }} data-testid="photo-hero"
+            onDragOver={(e) => { if (![...e.dataTransfer.types].includes('Files')) return; e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; setDropping('new'); }}
+            onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDropping(false); }}
+            onDrop={(e) => { e.preventDefault(); setDropping(false); const f = photoFile(e); if (f && !busy) void fromPhoto(f, 'new', '', 'new'); else if (!f) setStatus('That isn’t a photo. Drop a JPEG or PNG.'); }}>
+            <span className="bt-photohero-icon"><Icon name="camera" size={26} /></span>
+            <div className="bt-photohero-text">
+              <strong>Turn a photo into a character</strong>
+              <span>Add a photo of anyone in the family. NomNoms finds the face, works out if they’re a baby, kid or grown-up, and draws them. The photo stays on this device and isn’t kept.</span>
+            </div>
+            <div className="bt-photohero-actions">
+              <button type="button" className="btn btn-primary" onClick={() => newFileRef.current?.click()} disabled={!!busy} data-testid="photo-new">
+                {busy === 'new' ? 'Reading the face…' : <><Icon name="plus" size={16} /> Add someone from a photo</>}
+              </button>
+              {!isPet(person.look.kind) && !person.look.drawing && (
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => { fileRef.current?.click(); }} disabled={!!busy} data-testid="photo-current">Use a photo for {person.member.name || 'them'}</button>
+              )}
+              <small className="bt-drop-hint">or drop a photo here</small>
+            </div>
+            <input ref={newFileRef} type="file" accept="image/*" hidden data-testid="photo-new-file" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void fromPhoto(f, 'new', '', 'new'); }} />
+          </div>
+          {status && busy !== undefined && <p className="lab-status" role="status">{status}</p>}
           <div className="bt-cast" role="group" aria-label="Cast">
             {cast.map((p, i) => (
               <button key={p.member.id} type="button" className={cx('bt-member', !p.member.inStory && 'is-out')} aria-pressed={i === pi} onClick={() => choose(i)} data-testid={`cast-${p.member.id}`}>
@@ -349,6 +400,9 @@ export function BabyTalesDemo() {
                 <small>{usesCall(p.member.role) ? p.member.call : p.look.drawing ? 'Drawn' : ROLE_LABEL[p.member.role]}</small>
               </button>
             ))}
+            <button type="button" className="bt-member is-add is-photo" onClick={() => newFileRef.current?.click()} disabled={!!busy} data-testid="cast-photo">
+              <span className="bt-face"><Icon name="camera" size={22} /></span><span className="bt-member-name">Photo</span><small>add from a photo</small>
+            </button>
             <button type="button" className="bt-member is-add" onClick={() => setAdding((a) => !a)} aria-expanded={adding} data-testid="cast-add">
               <span className="bt-face"><Icon name="plus" size={24} /></span><span className="bt-member-name">Add</span><small>someone</small>
             </button>
@@ -360,13 +414,14 @@ export function BabyTalesDemo() {
             <div className="lab-card bt-adder" data-testid="cast-adder">
               <h3>Add to the story</h3>
               <div className="lab-chips">
+                <button type="button" className="lab-chip is-accent" onClick={() => { setAdding(false); newFileRef.current?.click(); }} data-testid="add-photo"><Icon name="camera" size={14} /> From a photo</button>
                 {ADDABLE.map((a) => <button key={a.label} type="button" className="lab-chip" onClick={() => add(a.make)} data-testid={`add-${a.label}`}>{a.label}</button>)}
                 <button type="button" className="lab-chip is-accent" onClick={() => { setAdding(false); setPad({ mode: 'character' }); }} data-testid="add-drawing"><Icon name="pen" size={14} /> Draw a character</button>
               </div>
             </div>
           )}
 
-          <div className="bt-studio">
+          <div className="bt-studio" ref={studioRef}>
             <div className="bt-stage" dangerouslySetInnerHTML={{ __html: characterSvg(person.look, { animated: true, style: mode, label: `${person.member.name}’s character` }) }} />
 
             <div className="bt-panel">
@@ -410,8 +465,8 @@ export function BabyTalesDemo() {
                   <div className="lab-row"><button type="button" className="btn btn-ghost btn-sm" onClick={() => setPad({ mode: 'character', redraw: person.member.id })}><Icon name="pen" size={15} /> Draw again</button></div>
                 </div>
               ) : !pet ? (
-                <div className={cx('lab-card', dropping && 'is-dropping')} {...{ [OWN_DROP_ATTR]: '' }} data-testid="photo-card"
-                  onDragOver={(e) => { if (![...e.dataTransfer.types].includes('Files')) return; e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; setDropping(true); }}
+                <div className={cx('lab-card', dropping === 'current' && 'is-dropping')} {...{ [OWN_DROP_ATTR]: '' }} data-testid="photo-card"
+                  onDragOver={(e) => { if (![...e.dataTransfer.types].includes('Files')) return; e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; setDropping('current'); }}
                   onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDropping(false); }}
                   onDrop={(e) => { e.preventDefault(); setDropping(false); const f = [...e.dataTransfer.files].find((x) => x.type.startsWith('image/') || /\.(heic|heif|jpe?g|png|webp)$/i.test(x.name)); if (f && !busy) void fromPhoto(f, 'own', ''); else if (!f) setStatus('That isn’t a photo. Drop a JPEG or PNG.'); }}>
                   <h3>Make {person.member.name || 'them'} from a photo</h3>
@@ -435,6 +490,12 @@ export function BabyTalesDemo() {
                       <span className="bt-result-char" dangerouslySetInnerHTML={{ __html: characterSvg(person.look, { style: mode, viewBox: fitViewBox(FACE_VIEWBOX, person.look, mode) }) }} />
                       <div className="bt-result-text">
                         <strong>{result.who}, from the photo</strong>
+                        {readings[person.member.id] && !isPet(person.look.kind) && (
+                          <div className="bt-kindpick" role="radiogroup" aria-label="Looks like">
+                            <span>Looks like</span>
+                            {KINDS.map((k) => <button key={k.kind} type="button" role="radio" aria-checked={person.look.kind === k.kind} className="lab-chip" onClick={() => setKind(k.kind)} data-testid={`kind-${k.kind}`}>{k.label}</button>)}
+                          </div>
+                        )}
                         <div className="bt-matched">{result.matched.map((m) => <span key={m.label} className={m.sure ? '' : 'is-guess'} title={m.sure ? 'Read from the photo' : 'A best guess; check it'}>{m.sure ? '' : '~ '}{m.label}</span>)}</div>
                         {result.kept.length > 0 && <small>Kept your own choice of {result.kept.map((k) => (k === 'hairStyle' ? 'hairstyle' : k === 'shape' ? 'face shape' : k)).join(', ')}.</small>}
                         {result.notes.length > 0 && <ul className="bt-notes">{result.notes.slice(0, 3).map((n) => <li key={n}>{n}</li>)}</ul>}
@@ -478,7 +539,7 @@ export function BabyTalesDemo() {
                     </>
                   ) : (
                     <>
-                      {pi > 0 && <div className="lab-chips">{KINDS.map((k) => <button key={k.kind} type="button" className="lab-chip" aria-pressed={person.look.kind === k.kind} onClick={() => update({ look: { kind: k.kind } })}>{k.label}</button>)}</div>}
+                      {pi > 0 && <div className="lab-chips">{KINDS.map((k) => <button key={k.kind} type="button" className="lab-chip" aria-pressed={person.look.kind === k.kind} onClick={() => setKind(k.kind)}>{k.label}</button>)}</div>}
                       <p className="lab-sub">Skin</p>
                       <div className="bt-swatches">{SKIN_TONES.map((c) => <button key={c} type="button" className="bt-swatch" style={{ background: c }} aria-pressed={person.look.skin === c} aria-label={`Skin tone ${c}`} onClick={() => pick('skin', { skin: c })} />)}</div>
                       <p className="lab-sub">Hair colour</p>
