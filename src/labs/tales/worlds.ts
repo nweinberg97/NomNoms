@@ -29,9 +29,9 @@ export interface World {
 
 export const WORLDS: Record<WorldId, World> = {
   everyday: { id: 'everyday', name: 'Everyday', feeling: 'Home, the park, the zoo', blurb: 'Real places and everyday adventures.', places: [] },
-  fairytale: { id: 'fairytale', name: 'Classic Fairytale', feeling: 'Wonder, warmth and kindness', blurb: 'Graceful costumes, a hilltop castle, an enchanted wood and soft golden light.', places: ['hillcastle', 'enchanted'], story: 'fairytale' },
-  adventure: { id: 'adventure', name: 'Adventure Story', feeling: 'Courage, curiosity and discovery', blurb: 'Explorer kit, a jungle trail, a mountain pass and bright open air.', places: ['jungle', 'peaks'], story: 'expedition' },
-  mythic: { id: 'mythic', name: 'Mythic Hero', feeling: 'Bold, brave and legendary', blurb: 'Heroic armour, a temple in the clouds, a starlit summit and dramatic light.', places: ['skytemple', 'starpeak'], story: 'legend' },
+  fairytale: { id: 'fairytale', name: 'Classic Fairytale', feeling: 'Drawn like a vintage storybook film', blurb: 'Slender, graceful characters with delicate faces, fine ink lines and painted colour; a hilltop castle and an enchanted wood.', places: ['hillcastle', 'enchanted'], story: 'fairytale' },
+  adventure: { id: 'adventure', name: 'Adventure Story', feeling: 'Drawn like a modern 3D adventure film', blurb: 'Sturdy, expressive characters with big glossy eyes and rich 3D shading; a jungle trail and a mountain pass.', places: ['jungle', 'peaks'], story: 'expedition' },
+  mythic: { id: 'mythic', name: 'Mythic Hero', feeling: 'Drawn bold and graphic, like an epic', blurb: 'Tall heroic characters with strong angular faces, bold lines and dramatic light; a temple in the clouds and a starlit summit.', places: ['skytemple', 'starpeak'], story: 'legend' },
 };
 export const WORLD_IDS: WorldId[] = ['everyday', 'fairytale', 'adventure', 'mythic'];
 

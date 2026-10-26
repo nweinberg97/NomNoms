@@ -606,6 +606,7 @@ export function BabyTalesDemo() {
             {/* ── the cast ─────────────────────────────── */}
             <section className="lab-section" aria-labelledby="bt-cast">
               <div className="lab-h"><h2 id="bt-cast" className="display">Who’s in it</h2></div>
+              {world !== 'everyday' && <p className="lab-sub" data-testid="world-style-note">In {WORLDS[world].name}, everyone is drawn in its own style: {WORLDS[world].feeling.toLowerCase()}.</p>}
               <div className={cx('bt-cast', dropping === 'new' && 'is-dropping')} role="group" aria-label="Cast" {...{ [OWN_DROP_ATTR]: '' }}
                 onDragOver={(e) => { if (![...e.dataTransfer.types].includes('Files')) return; e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; setDropping('new'); }}
                 onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDropping(false); }}
