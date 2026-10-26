@@ -11,6 +11,10 @@ function mediaFiles(dt: DataTransfer | null): File[] {
   return [...(dt?.files ?? [])].filter((f) => f.type.startsWith('image/') || f.type.startsWith('video/') || /\.(heic|heif|jpe?g|png|webp|gif|mov|mp4|m4v)$/i.test(f.name));
 }
 
+/** An element that handles its own drops (e.g. a demo's photo picker). The page-wide drop leaves those alone. */
+export const OWN_DROP_ATTR = 'data-own-drop';
+const ownsDrop = (e: DragEvent) => !!(e.target as Element | null)?.closest?.(`[${OWN_DROP_ATTR}]`);
+
 /**
  * Drag photos or videos from anywhere — the Photos app (iCloud Photos on a
  * Mac), Finder, the desktop — and drop them on NomNoms. Outside the editor a
@@ -21,8 +25,22 @@ export function DropZone() {
   const { path } = useRoute();
   const [over, setOver] = useState(false);
 
+  // the try-it demos never add to the baby book: a stray drop there does nothing
+  // (and doesn't open the photo in place of the app); their own drop targets still work
   useEffect(() => {
-    if (!baby) return;
+    if (!path.startsWith('/labs')) return;
+    const block = (e: DragEvent) => {
+      if (![...(e.dataTransfer?.types ?? [])].includes('Files') || ownsDrop(e)) return;
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'none';
+    };
+    window.addEventListener('dragover', block);
+    window.addEventListener('drop', block);
+    return () => { window.removeEventListener('dragover', block); window.removeEventListener('drop', block); };
+  }, [path]);
+
+  useEffect(() => {
+    if (!baby || path.startsWith('/labs')) return;
     let depth = 0;
     const hasFiles = (e: DragEvent) => [...(e.dataTransfer?.types ?? [])].includes('Files');
     const enter = (e: DragEvent) => {
@@ -42,7 +60,7 @@ export function DropZone() {
       if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
     };
     const drop = (e: DragEvent) => {
-      if (!hasFiles(e)) return;
+      if (!hasFiles(e) || ownsDrop(e)) return;
       e.preventDefault();
       depth = 0;
       setOver(false);

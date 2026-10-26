@@ -1,3 +1,4 @@
+import { LikenessDebug } from './labs/tales/likeness/LikenessDebug';
 import React, { useEffect } from 'react';
 import { AddSheet } from './components/AddSheet';
 import { DropZone } from './components/DropZone';
@@ -41,6 +42,8 @@ function Routes() {
   // try-it demos: open to everyone, signed in or not; they never save anything
   if (path === '/labs/baby-tales') return <BabyTalesDemo />;
   if (path === '/labs/dumplings') return <DumplingsDemo />;
+  // developer diagnostics for photo → character; not linked anywhere
+  if (path === '/labs/likeness-debug') return <LikenessDebug />;
 
   if (!account) return <Landing />;
   if (!baby) return <Onboarding />;

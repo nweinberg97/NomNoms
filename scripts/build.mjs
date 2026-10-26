@@ -80,7 +80,7 @@ const common = {
   bundle: true,
   jsx: 'automatic',
   target: ['es2020', 'safari15'],
-  define: { __NN_ENV__: JSON.stringify(publicEnv), 'process.env.NODE_ENV': JSON.stringify(DEV ? 'development' : 'production') },
+  define: { __NN_ENV__: JSON.stringify(publicEnv), __NN_VENDOR__: JSON.stringify(SINGLE ? 'public/vendor/' : 'vendor/'), 'process.env.NODE_ENV': JSON.stringify(DEV ? 'development' : 'production') },
   loader: { '.woff': 'file', '.svg': 'file' },
   logLevel: 'info',
 };

@@ -5,13 +5,17 @@ import { cx, firstName } from '../../lib/util';
 import { useAppOptional } from '../../state/store';
 import { catchGenmoji, pastedImage } from '../genmoji';
 import { DemoNote, LabsHeader } from '../LabsHeader';
+import { OWN_DROP_ATTR } from '../../components/DropZone';
 import { NAMES, PET_NAMES, PLACES, ROLE_LABEL, STORY_TYPES, type Place, type Role, type StoryType } from './catalog';
 import {
   EXPRESSIONS, EXTRAS, EYE_COLOURS, FACE_VIEWBOX, fitViewBox, FACIAL, GLASSES, HAIR_COLOURS, HAIR_STYLES, HATS, OUTFITS, PERSONALITIES, SKIN_TONES, WEAR_BOX,
   characterSvg, exprOf, isPet, type Expression, type Facial, type HairStyle, type Kind, type Look, type Personality, type WearSlot,
 } from './character';
 import { DrawPad, type DrawMode } from './DrawPad';
-import { SAMPLE_PHOTOS, samplePhotoUrl, traitsFromPhoto } from './fromPhoto';
+import { SAMPLE_PHOTOS, samplePhotoUrl } from './fromPhoto';
+import { likenessFromPhoto } from './likeness/detect';
+import { describeDNA, type IdentityKey } from './likeness/dna';
+import { SHAPE_KEYS, type ShapeKey } from './likeness/measure';
 import { fill, generateStory, regeneratePage, tokenize, type CastMember, type Story, type StoryPage } from './generator';
 import { sceneSvg, type DrawnPlace, type SceneThing } from './scene';
 import { STYLE_MODES, STYLES, type StyleMode } from './styles';
@@ -73,6 +77,11 @@ const WARDROBE: Record<WardrobeTab, [string, Record<string, string>]> = {
 const KINDS: { kind: Kind; label: string }[] = [{ kind: 'baby', label: 'Baby' }, { kind: 'kid', label: 'Kid' }, { kind: 'adult', label: 'Grown-up' }, { kind: 'elder', label: 'Grandparent' }];
 const PETS: { kind: Kind; label: string }[] = [{ kind: 'dog', label: 'Dog' }, { kind: 'cat', label: 'Cat' }, { kind: 'bunny', label: 'Bunny' }];
 const FACIALS = Object.keys(FACIAL) as Facial[];
+const SHAPE_LABELS: Record<ShapeKey, [string, string, string]> = {
+  faceWidth: ['Face width', 'Narrow', 'Wide'], faceLength: ['Face length', 'Short', 'Long'], jaw: ['Jaw', 'Pointed', 'Square'],
+  eyeSize: ['Eye size', 'Small', 'Big'], eyeGap: ['Eye spacing', 'Close', 'Apart'], nose: ['Nose', 'Narrow', 'Wide'],
+  mouth: ['Mouth', 'Small', 'Wide'], browHeight: ['Brows', 'Low', 'High'], browWeight: ['Brow weight', 'Light', 'Bold'],
+};
 interface DrawnWear { id: string; slot: WearSlot; name: string; image: string }
 const usesCall = (r: Role) => r === 'parent' || r === 'grandparent' || r === 'relative' || r === 'teacher';
 
@@ -105,7 +114,10 @@ export function BabyTalesDemo() {
   const [view, setView] = useState(0); // 0 = cover, then pages
   const [tab, setTab] = useState<WardrobeTab>('hat');
   const [busy, setBusy] = useState<string>();
-  const [result, setResult] = useState<{ who: string; from: string; matched: string[] } | null>(null);
+  const [result, setResult] = useState<{ who: string; from: string; matched: { label: string; sure: boolean }[]; notes: string[]; kept: IdentityKey[] } | null>(null);
+  /** Identity traits a parent set by hand, per person: a new photo never overwrites these. */
+  const [chosen, setChosen] = useState<Record<string, IdentityKey[]>>({});
+  const [dropping, setDropping] = useState(false);
   const [status, setStatus] = useState<string>();
   const [adding, setAdding] = useState(false);
   const [pad, setPad] = useState<{ mode: DrawMode; redraw?: string } | null>(null);
@@ -162,18 +174,28 @@ export function BabyTalesDemo() {
   const choose = (i: number) => { setSel(i); setStatus(undefined); setResult(null); };
 
   /* ── faces ─────────────────────────────────────────── */
-  const fromPhoto = async (src: string, label: string, from: string, revoke?: boolean) => {
+  /** A hand-picked identity trait: change it and remember the parent chose it. */
+  const pick = (key: IdentityKey, look: Partial<Look>) => {
+    update({ look });
+    const id = person.member.id;
+    setChosen((c) => ({ ...c, [id]: [...new Set([...(c[id] ?? []), key])] }));
+  };
+  const fromPhoto = async (src: string | Blob, label: string, from: string) => {
     setBusy(label);
-    setStatus(undefined);
+    setStatus('Reading the face on this device…');
     setResult(null);
+    const id = person.member.id, kept = chosen[id] ?? [];
     try {
-      const t = await traitsFromPhoto(src, person.look.kind);
-      update({ look: { skin: t.skin, hair: t.hair ?? person.look.hair, hairStyle: t.hairStyle, face: undefined, drawing: undefined } });
-      setResult({ who: person.member.name, from, matched: t.matched });
+      const r = await likenessFromPhoto(src, person.look, kept);
+      const m = r.measurements;
+      const found = m.skin.status !== 'missing' || SHAPE_KEYS.some((k) => m.shape[k].status !== 'missing');
+      if (!found) { setStatus(`${m.warnings[0] ?? 'No face was found.'} Nothing was changed.`); return; }
+      setCast((cs) => cs.map((p) => (p.member.id === id ? { ...p, look: { ...r.look, face: undefined } } : p)));
+      setResult({ who: person.member.name, from, matched: describeDNA(r.dna), notes: r.dna.warnings, kept });
+      setStatus(undefined);
     } catch (e) {
       setStatus((e as Error).message);
     } finally {
-      if (revoke) URL.revokeObjectURL(src);
       setBusy(undefined);
     }
   };
@@ -388,9 +410,12 @@ export function BabyTalesDemo() {
                   <div className="lab-row"><button type="button" className="btn btn-ghost btn-sm" onClick={() => setPad({ mode: 'character', redraw: person.member.id })}><Icon name="pen" size={15} /> Draw again</button></div>
                 </div>
               ) : !pet ? (
-                <div className="lab-card">
+                <div className={cx('lab-card', dropping && 'is-dropping')} {...{ [OWN_DROP_ATTR]: '' }} data-testid="photo-card"
+                  onDragOver={(e) => { if (![...e.dataTransfer.types].includes('Files')) return; e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; setDropping(true); }}
+                  onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDropping(false); }}
+                  onDrop={(e) => { e.preventDefault(); setDropping(false); const f = [...e.dataTransfer.files].find((x) => x.type.startsWith('image/') || /\.(heic|heif|jpe?g|png|webp)$/i.test(x.name)); if (f && !busy) void fromPhoto(f, 'own', ''); else if (!f) setStatus('That isn’t a photo. Drop a JPEG or PNG.'); }}>
                   <h3>Make {person.member.name || 'them'} from a photo</h3>
-                  <p className="lab-sub">Pick a sample or use your own. NomNoms reads skin tone, hair colour, length and curls on this device, then lets the photo go.</p>
+                  <p className="lab-sub">Pick a sample or use your own. NomNoms finds the face on this device and reads skin, hair, eyes and face shape. The photo is never uploaded or saved.</p>
                   <div className="bt-photos">
                     {(SAMPLE_PHOTOS[person.member.role] ?? SAMPLE_PHOTOS.friend).map((s) => (
                       <button key={s.path} type="button" className="bt-photo" onClick={() => fromPhoto(samplePhotoUrl(s.path), s.path, samplePhotoUrl(s.path, 160))} disabled={!!busy} aria-label={`Sample photo by ${s.by}`} data-testid="sample-photo">
@@ -399,9 +424,9 @@ export function BabyTalesDemo() {
                       </button>
                     ))}
                     <button type="button" className="bt-photo is-own" onClick={() => fileRef.current?.click()} disabled={!!busy} data-testid="own-photo">
-                      <Icon name="camera" size={20} /><span>Your photo</span>
+                      <Icon name="camera" size={20} /><span>Your photo</span><small className="bt-drop-hint">or drop one here</small>
                     </button>
-                    <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void fromPhoto(URL.createObjectURL(f), 'own', '', true); }} />
+                    <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void fromPhoto(f, 'own', ''); }} />
                   </div>
                   {result && (
                     <div className="bt-result" role="status" data-testid="photo-result">
@@ -410,8 +435,10 @@ export function BabyTalesDemo() {
                       <span className="bt-result-char" dangerouslySetInnerHTML={{ __html: characterSvg(person.look, { style: mode, viewBox: fitViewBox(FACE_VIEWBOX, person.look, mode) }) }} />
                       <div className="bt-result-text">
                         <strong>{result.who}, from the photo</strong>
-                        <div className="bt-matched">{result.matched.map((m) => <span key={m}>{m}</span>)}</div>
-                        <small>{result.from ? 'Not quite right? Adjust the look below.' : 'Your photo wasn’t kept. Adjust the look below if you like.'}</small>
+                        <div className="bt-matched">{result.matched.map((m) => <span key={m.label} className={m.sure ? '' : 'is-guess'} title={m.sure ? 'Read from the photo' : 'A best guess; check it'}>{m.sure ? '' : '~ '}{m.label}</span>)}</div>
+                        {result.kept.length > 0 && <small>Kept your own choice of {result.kept.map((k) => (k === 'hairStyle' ? 'hairstyle' : k === 'shape' ? 'face shape' : k)).join(', ')}.</small>}
+                        {result.notes.length > 0 && <ul className="bt-notes">{result.notes.slice(0, 3).map((n) => <li key={n}>{n}</li>)}</ul>}
+                        <small>{result.from ? '~ means a best guess. Not quite right? Adjust below.' : 'Your photo wasn’t kept. ~ means a best guess; adjust below if you like.'}</small>
                       </div>
                     </div>
                   )}
@@ -453,20 +480,32 @@ export function BabyTalesDemo() {
                     <>
                       {pi > 0 && <div className="lab-chips">{KINDS.map((k) => <button key={k.kind} type="button" className="lab-chip" aria-pressed={person.look.kind === k.kind} onClick={() => update({ look: { kind: k.kind } })}>{k.label}</button>)}</div>}
                       <p className="lab-sub">Skin</p>
-                      <div className="bt-swatches">{SKIN_TONES.map((c) => <button key={c} type="button" className="bt-swatch" style={{ background: c }} aria-pressed={person.look.skin === c} aria-label={`Skin tone ${c}`} onClick={() => update({ look: { skin: c } })} />)}</div>
+                      <div className="bt-swatches">{SKIN_TONES.map((c) => <button key={c} type="button" className="bt-swatch" style={{ background: c }} aria-pressed={person.look.skin === c} aria-label={`Skin tone ${c}`} onClick={() => pick('skin', { skin: c })} />)}</div>
                       <p className="lab-sub">Hair colour</p>
-                      <div className="bt-swatches">{HAIR_COLOURS.map((c) => <button key={c} type="button" className="bt-swatch" style={{ background: c }} aria-pressed={person.look.hair === c} aria-label={`Hair colour ${c}`} onClick={() => update({ look: { hair: c } })} />)}</div>
+                      <div className="bt-swatches">{HAIR_COLOURS.map((c) => <button key={c} type="button" className="bt-swatch" style={{ background: c }} aria-pressed={person.look.hair === c} aria-label={`Hair colour ${c}`} onClick={() => pick('hair', { hair: c })} />)}</div>
                       <p className="lab-sub">Hair</p>
                       <div className="bt-hairs">
                         {(Object.keys(HAIR_STYLES) as HairStyle[]).map((h) => (
-                          <button key={h} type="button" className="bt-hair" aria-pressed={person.look.hairStyle === h} onClick={() => update({ look: { hairStyle: h } })} data-testid={`hair-${h}`}>
+                          <button key={h} type="button" className="bt-hair" aria-pressed={person.look.hairStyle === h} onClick={() => pick('hairStyle', { hairStyle: h })} data-testid={`hair-${h}`}>
                             <span dangerouslySetInnerHTML={{ __html: characterSvg({ ...person.look, hairStyle: h, hat: 'none', glasses: 'none' }, { style: mode, viewBox: fitViewBox('10 -10 180 180', person.look, mode) }) }} />
                             <small>{HAIR_STYLES[h]}</small>
                           </button>
                         ))}
                       </div>
                       <p className="lab-sub">Eyes</p>
-                      <div className="bt-swatches">{EYE_COLOURS.map((c) => <button key={c} type="button" className="bt-swatch" style={{ background: c }} aria-pressed={person.look.eyes === c} aria-label={`Eye colour ${c}`} onClick={() => update({ look: { eyes: c } })} />)}</div>
+                      <div className="bt-swatches">{EYE_COLOURS.map((c) => <button key={c} type="button" className="bt-swatch" style={{ background: c }} aria-pressed={person.look.eyes === c} aria-label={`Eye colour ${c}`} onClick={() => pick('eyes', { eyes: c })} />)}</div>
+                      <details className="bt-shape" open={!!person.look.shape}>
+                        <summary>Face shape {person.look.shape ? <small>· from the photo, adjust to taste</small> : <small>· make them look more like themselves</small>}</summary>
+                        {SHAPE_KEYS.map((k) => (
+                          <label key={k} className="bt-shape-row">
+                            <span>{SHAPE_LABELS[k][0]}</span>
+                            <small>{SHAPE_LABELS[k][1]}</small>
+                            <input type="range" min={-100} max={100} step={5} value={Math.round((person.look.shape?.[k] ?? 0) * 100)} onChange={(e) => pick('shape', { shape: { ...person.look.shape, [k]: +e.target.value / 100 } })} data-testid={`shape-${k}`} />
+                            <small>{SHAPE_LABELS[k][2]}</small>
+                          </label>
+                        ))}
+                        {person.look.shape && <button type="button" className="btn btn-ghost btn-sm" onClick={() => { update({ look: { shape: undefined } }); setChosen((c) => ({ ...c, [person.member.id]: (c[person.member.id] ?? []).filter((x) => x !== 'shape') })); }}>Average face</button>}
+                      </details>
                       <p className="lab-sub">Face <small>· in the story it changes with what happens</small></p>
                       <div className="bt-hairs">
                         {(Object.keys(EXPRESSIONS) as Expression[]).map((x) => (
@@ -484,7 +523,7 @@ export function BabyTalesDemo() {
                         <>
                           <p className="lab-sub">Facial hair</p>
                           <div className="lab-chips">
-                            {FACIALS.map((f) => <button key={f} type="button" className="lab-chip" aria-pressed={(person.look.facial ?? (person.look.beard ? 'trim' : 'none')) === f} onClick={() => update({ look: { facial: f, beard: undefined } })} data-testid={`facial-${f}`}>{FACIAL[f]}</button>)}
+                            {FACIALS.map((f) => <button key={f} type="button" className="lab-chip" aria-pressed={(person.look.facial ?? (person.look.beard ? 'trim' : 'none')) === f} onClick={() => pick('facial', { facial: f, beard: undefined })} data-testid={`facial-${f}`}>{FACIAL[f]}</button>)}
                           </div>
                         </>
                       )}

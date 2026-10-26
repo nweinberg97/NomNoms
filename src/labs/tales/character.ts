@@ -47,7 +47,19 @@ export interface Look {
   glassesY?: number;
   /** A drawing used as the whole character. */
   drawing?: string;
+  /**
+   * Face proportions read from a photo, each −1…1 away from an average face
+   * (see likeness/measure.ts). Missing keys mean "average". Identity only:
+   * expressions and looks change around these, never these themselves.
+   */
+  shape?: Partial<Record<'faceWidth' | 'faceLength' | 'jaw' | 'eyeSize' | 'eyeGap' | 'nose' | 'mouth' | 'browHeight' | 'browWeight', number>>;
 }
+
+/** A face proportion, clamped, and softened for babies and kids, whose storybook proportions lead. */
+export const shapeOf = (l: Look, k: keyof NonNullable<Look['shape']>) =>
+  Math.max(-1, Math.min(1, l.shape?.[k] ?? 0)) * (l.kind === 'baby' ? 0.5 : l.kind === 'kid' ? 0.75 : 1);
+/** How far each proportion may move the drawing at ±1. Art-directed: enough to recognise, never a caricature. */
+export const SHAPE_RANGE = { faceWidth: 0.07, faceLength: 0.06, jaw: 0.14, eyeSize: 0.14, eyeGap: 5, nose: 0.3, mouth: 0.16, browHeight: 4, browWeight: 0.4 } as const;
 
 export const SKIN_TONES = ['#fbe2cf', '#f6d2b7', '#efc19f', '#e4ad86', '#d39a6e', '#bd8259', '#a06b46', '#865637', '#6b4329', '#52321f'];
 export const HAIR_COLOURS = ['#1f1a17', '#3b2a20', '#5a3b26', '#7a5236', '#9c6a3f', '#c08b52', '#e0bd78', '#f0d9a4', '#b5532b', '#d97a4a', '#c9c3bb', '#f3f0ea'];
@@ -177,6 +189,8 @@ function eye(id: string, cx: number, cy: number, l: Look, side: -1 | 1) {
   const size = l.kind === 'baby' ? [13, 14, 11] : l.kind === 'kid' ? [12.5, 13, 10] : l.kind === 'adult' ? [11.5, 11, 8.6] : [10.5, 9.5, 7.6];
   const big = ex === 'wow' || ex === 'starry' || ex === 'worried' || (ex === 'silly' && side === 1);
   let [w, h, r] = big ? [size[0] + 1, size[1] + 2, size[2] + 0.6] : size;
+  const es = 1 + SHAPE_RANGE.eyeSize * shapeOf(l, 'eyeSize');
+  w *= es; h *= es; r *= es;
   if (MODE === 'inked' && (l.kind === 'adult' || l.kind === 'elder') && !big) { h *= 0.84; w *= 1.06; }
   if (MODE === 'gouache') {
     // picture-book bean eyes: a soft dark oval, a dot of light, no whites
@@ -251,12 +265,14 @@ function brows(l: Look) {
   const ex = exprOf(l);
   const c = l.kind === 'baby' ? shade(l.hair, 0.15) : shade(l.hair, -0.25);
   const [lift, inner] = BROWS[ex] ?? [0, 0];
-  const w = (l.kind === 'baby' ? 2.4 : 4) * (MODE === 'inked' ? 1.3 : 1);
+  const w = (l.kind === 'baby' ? 2.4 : 4) * (MODE === 'inked' ? 1.3 : 1) * (1 + SHAPE_RANGE.browWeight * shapeOf(l, 'browWeight'));
   const o = l.kind === 'baby' ? 0.6 : 1;
-  const left = ex === 'wink' ? lift - 5 : ex === 'silly' ? lift + 4 : lift;
-  const right = ex === 'wink' ? lift + 2 : lift;
-  return `<path d="M66 ${82 + left} Q77 ${75 + left} 89 ${80 + left + inner}" stroke="${c}" stroke-width="${w}" fill="none" stroke-linecap="round" opacity="${o}"/>
-    <path d="M111 ${80 + right + inner} Q123 ${75 + right} 134 ${82 + right}" stroke="${c}" stroke-width="${w}" fill="none" stroke-linecap="round" opacity="${o}"/>`;
+  const up = -SHAPE_RANGE.browHeight * shapeOf(l, 'browHeight');
+  const left = (ex === 'wink' ? lift - 5 : ex === 'silly' ? lift + 4 : lift) + up;
+  const right = (ex === 'wink' ? lift + 2 : lift) + up;
+  const g = SHAPE_RANGE.eyeGap * shapeOf(l, 'eyeGap');
+  return `<path d="M${66 - g} ${82 + left} Q${77 - g} ${75 + left} ${89 - g} ${80 + left + inner}" stroke="${c}" stroke-width="${w}" fill="none" stroke-linecap="round" opacity="${o}"/>
+    <path d="M${111 + g} ${80 + right + inner} Q${123 + g} ${75 + right} ${134 + g} ${82 + right}" stroke="${c}" stroke-width="${w}" fill="none" stroke-linecap="round" opacity="${o}"/>`;
 }
 
 function mouth(id: string, l: Look) {
@@ -426,22 +442,38 @@ function humanFace(id: string, l: Look) {
   const narrow = l.kind === 'adult' || l.kind === 'elder';
   const rosy = ['shy', 'proud', 'starry', 'laugh'].includes(exprOf(l));
   const blush = [66, 134].map((x) => `<ellipse cx="${x}" cy="118" rx="${rosy ? 16 : 13}" ry="${rosy ? 11 : 9}" fill="url(#bl${id})"/>${rosy ? `<ellipse cx="${x}" cy="118" rx="11" ry="7" fill="url(#bl${id})"/>` : ''}`).join('');
+  // the head: an ellipse, or (with photo proportions) the same ellipse with its width, length and jaw adjusted
+  const rx0 = narrow ? 57 : 60, ry0 = narrow ? 60 : 57;
+  const rx = rx0 * (1 + SHAPE_RANGE.faceWidth * shapeOf(l, 'faceWidth'));
+  const ry = ry0 * (1 + SHAPE_RANGE.faceLength * shapeOf(l, 'faceLength'));
+  const cy = 94 - ry0 + ry; // keep the top of the head where the hair sits
+  const jaw = 1 + SHAPE_RANGE.jaw * shapeOf(l, 'jaw');
+  const k = 0.5523;
+  const head = l.shape
+    ? `<path d="M${100 - rx} ${cy} C${100 - rx} ${cy - ry * k} ${100 - rx * k} ${cy - ry} 100 ${cy - ry} C${100 + rx * k} ${cy - ry} ${100 + rx} ${cy - ry * k} ${100 + rx} ${cy} C${100 + rx} ${cy + ry * k} ${100 + rx * k * jaw} ${cy + ry} 100 ${cy + ry} C${100 - rx * k * jaw} ${cy + ry} ${100 - rx} ${cy + ry * k} ${100 - rx} ${cy} Z" fill="${skin}"/>`
+    : `<ellipse cx="100" cy="94" rx="${rx0}" ry="${ry0}" fill="${skin}"/>`;
+  const ear = rx - rx0;
+  const gap = SHAPE_RANGE.eyeGap * shapeOf(l, 'eyeGap');
+  const nose = 1 + SHAPE_RANGE.nose * shapeOf(l, 'nose');
+  const mw = 1 + SHAPE_RANGE.mouth * shapeOf(l, 'mouth');
+  const around = (x: number, y: number, sx: number, sy: number, inner: string) =>
+    sx === 1 && sy === 1 ? inner : `<g transform="translate(${x} ${y}) scale(${+sx.toFixed(3)} ${+sy.toFixed(3)}) translate(${-x} ${-y})">${inner}</g>`;
   return `${back}
     <path d="M88 136 L112 136 L110 156 L90 156 Z" fill="${shade(l.skin, -0.12)}"/>
-    <circle cx="41" cy="104" r="11.5" fill="${skin}"/><circle cx="159" cy="104" r="11.5" fill="${skin}"/>
-    <path d="M43 98 q-5 6 0 12 M157 98 q5 6 0 12" stroke="${shade(l.skin, -0.25)}" stroke-width="2" fill="none" opacity=".5"/>
-    <ellipse cx="100" cy="94" rx="${narrow ? 57 : 60}" ry="${narrow ? 60 : 57}" fill="${skin}"/>
+    <circle cx="${41 - ear}" cy="104" r="11.5" fill="${skin}"/><circle cx="${159 + ear}" cy="104" r="11.5" fill="${skin}"/>
+    <path d="M${43 - ear} 98 q-5 6 0 12 M${157 + ear} 98 q5 6 0 12" stroke="${shade(l.skin, -0.25)}" stroke-width="2" fill="none" opacity=".5"/>
+    ${head}
     <ellipse cx="100" cy="148" rx="30" ry="6" fill="#000" opacity=".05"/>
     ${blush}${fr}
-    <g class="bt-eyes">${eye(id, 78, 101, l, -1)}${eye(id, 122, 101, l, 1)}</g>
+    <g class="bt-eyes">${eye(id, 78 - gap, 101, l, -1)}${eye(id, 122 + gap, 101, l, 1)}</g>
     ${brows(l)}
-    ${MODE === 'inked' && (l.kind === 'adult' || l.kind === 'elder')
+    ${around(100, 112, nose, 1 + (nose - 1) * 0.35, MODE === 'inked' && (l.kind === 'adult' || l.kind === 'elder')
       ? `<path d="M101 98 Q105 110 101 116 Q98 117 96 115" stroke="${shade(l.skin, -0.42)}" stroke-width="2.2" fill="none" stroke-linecap="round"/>`
       : MODE === 'gouache' ? `<ellipse cx="100" cy="114" rx="3.2" ry="2.2" fill="${shade(l.skin, -0.18)}"/>`
       : MODE === 'wondercut' ? `<circle cx="100" cy="114" r="3" fill="${shade(l.skin, -0.14)}"/>`
-      : `<path d="M96.5 114 Q100 118 103.5 114" stroke="${shade(l.skin, -0.32)}" stroke-width="2.4" fill="none" stroke-linecap="round"/>`}
+      : `<path d="M96.5 114 Q100 118 103.5 114" stroke="${shade(l.skin, -0.32)}" stroke-width="2.4" fill="none" stroke-linecap="round"/>`)}
     ${facialHair(id, l)}
-    ${mouth(id, l)}
+    ${around(100, 128, mw, 1, mouth(id, l))}
     ${front}
     <ellipse cx="80" cy="64" rx="22" ry="9" fill="#fff" opacity=".12" transform="rotate(-16 80 64)"/>
     ${flair(l)}`;

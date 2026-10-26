@@ -1,0 +1,8 @@
+Face reader used by NomNoms Baby Tales (runs entirely in the browser).
+
+human.esm.js — @vladmandic/human 3.3.6, MIT License (LICENSE-human.txt),
+  https://github.com/vladmandic/human. Bundles TensorFlow.js (Apache License 2.0).
+models/blazeface, facemesh, iris, selfie — from vladmandic/human and
+  vladmandic/human-models; originally Google MediaPipe models, Apache License 2.0.
+
+Photos given to these models are processed on the device and never uploaded.
