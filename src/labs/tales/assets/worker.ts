@@ -2,6 +2,7 @@
 import { trimObject } from './meta';
 import { buildBase } from './pipeline';
 import { vectorizeAssetSteps } from './vector';
+import { cutOut } from './cutout';
 import type { MakeRequest } from './make';
 
 /**
@@ -10,7 +11,12 @@ import type { MakeRequest } from './make';
  * pixels it is sent, keeps nothing, and sends back outlines and colours.
  */
 const ctx = self as unknown as DedicatedWorkerGlobalScope;
-ctx.onmessage = (e: MessageEvent<MakeRequest & { id: number }>) => {
+ctx.onmessage = (e: MessageEvent<(MakeRequest & { id: number; type?: undefined }) | { id: number; type: 'cut'; raster: MakeRequest['raster']; keep: number }>) => {
+  if (e.data.type === 'cut') {
+    const { id, raster, keep } = e.data;
+    try { ctx.postMessage({ id, mask: cutOut(raster, { keep }) }); } catch (err) { ctx.postMessage({ id, error: (err as Error).message }); }
+    return;
+  }
   const { id, raster, kind, mask, horizon, seed, colours, detail } = e.data;
   try {
     let base = buildBase(raster, kind, { mask, horizon, seed, colours });

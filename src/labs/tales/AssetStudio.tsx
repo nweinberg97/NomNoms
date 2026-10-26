@@ -7,10 +7,10 @@ import { STYLE_MODES, STYLES, type StyleMode } from './styles';
 import { sceneSvg } from './scene';
 import { decodePhoto, findThingsToHide, rasterToCanvas, rasterToUrl, resize, wipe, detectors } from './assets/browser';
 import { makeMeta, type StoredAsset } from './assets/meta';
-import { brushMask, cropRaster, hideRegions, maskCoverage, rotate90, subjectMask, MAX_SIDE, type AssetKind, type Raster, type Rect } from './assets/pipeline';
+import { brushMask, cropRaster, hideRegions, maskCoverage, rotate90, MAX_SIDE, type AssetKind, type Raster, type Rect } from './assets/pipeline';
 import { assetArtUrl } from './assets/browser';
 import { DETAILS, type VectorStage } from './assets/vector';
-import { makeAsset } from './assets/make';
+import { cutOutAsync, makeAsset } from './assets/make';
 import { DrawingMagic } from './DrawingMagic';
 
 /**
@@ -70,7 +70,7 @@ export function AssetStudio({ open, kind: startKind, mode: startMode, star, onCl
   // start fresh every time the studio opens; wipe everything when it closes
   const reset = () => {
     wipe(photo); wipe(work.current);
-    setStep('pick'); setPhoto(null); setCrop(null); setHides([]); setAutoFound(0); setLooked(false); setTool('frame');
+    setStep('pick'); setPhoto(null); setCrop(null); setHides([]); setAutoFound(0); setLooked(false); setTool('frame'); setKeep(0);
     setMask(null); setMaskEdited(false); setResult(null); setConfirm(false); setError(undefined); setName(''); setHorizon(null); setSeed(7);
   };
   useEffect(() => { if (open) { setKind(startKind); setMode(startMode); setHeight(startKind === 'object' ? 0.35 : 1); } else reset(); }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -83,7 +83,7 @@ export function AssetStudio({ open, kind: startKind, mode: startMode, star, onCl
       setPhoto(p);
       setCrop({ x: 0, y: 0, w: p.w, h: p.h });
       setStep('adjust');
-      setTool('frame');
+      setTool(kind === 'object' ? 'edge' : 'frame');
       const found = await findThingsToHide(p);
       setLooked(found.looked);
       setHides(found.rects);
@@ -96,6 +96,10 @@ export function AssetStudio({ open, kind: startKind, mode: startMode, star, onCl
   /* the working copy: framed, with hidden areas filled in, at the working size */
   const work = useRef<Raster | null>(null);
   const [workVersion, setWorkVersion] = useState(0);
+  const workVersionRef = useRef(0); workVersionRef.current = workVersion;
+  const cutting = useRef(false);
+  const [finding, setFinding] = useState(false);
+  const [keep, setKeep] = useState(0);
   useEffect(() => {
     if (!photo || !crop) return;
     const local = hides
@@ -112,8 +116,12 @@ export function AssetStudio({ open, kind: startKind, mode: startMode, star, onCl
 
   // a thing's boundary is found automatically as soon as its edge step opens
   useEffect(() => {
-    if (kind === 'object' && tool === 'edge' && work.current && !mask) setMask(subjectMask(work.current));
-  }, [kind, tool, workVersion, mask]);
+    if (kind !== 'object' || !work.current || mask || cutting.current) return;
+    // find the thing as soon as there's a picture, so the parent sees what will be kept
+    const r = work.current, ver = workVersion;
+    cutting.current = true; setFinding(true);
+    cutOutAsync(r, keep).then((m) => { if (ver === workVersionRef.current) setMask(m); }).finally(() => { cutting.current = false; setFinding(false); });
+  }, [kind, workVersion, mask, keep]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── drawing the adjust canvas ───────────────────────── */
   useEffect(() => {
@@ -199,7 +207,7 @@ export function AssetStudio({ open, kind: startKind, mode: startMode, star, onCl
     setTimeout(async () => {
       try {
         const w = work.current!;
-        const m = kind === 'object' ? mask ?? subjectMask(w) : undefined;
+        const m = kind === 'object' ? mask ?? (await cutOutAsync(w, keep)) : undefined;
         if (m && maskCoverage(m) < 0.01) throw new Error('No thing was found in the middle of the photo. Use “Fix the edge” to paint it in.');
         // the heavy work runs in a background worker; the animation follows its stages
         const base = await makeAsset({ raster: w, kind, mask: m, horizon: horizon ?? undefined, seed: nextSeed, colours: 12 + (nextSeed % 3) * 2, detail: DETAILS[(((nextSeed - 7) % 3) + 3) % 3] }, setStage);
@@ -287,7 +295,11 @@ export function AssetStudio({ open, kind: startKind, mode: startMode, star, onCl
             )}
             {tool === 'edge' && (
               <div className="ast-tools">
-                <p className="lab-hint">The dimmed part will be cut away. Paint to fix it.</p>
+                <p className="lab-hint">{finding ? 'Finding the thing in your photo…' : 'The dimmed part will be cut away. Missing a bit? Tap “Keep more”, or paint it back.'}</p>
+                <div className="lab-row">
+                  <button type="button" className="lab-chip" disabled={finding || keep <= -1} onClick={() => { setKeep((k) => Math.max(-1, k - 0.5)); setMask(null); setMaskEdited(false); }} data-testid="ast-keep-less">Keep less</button>
+                  <button type="button" className="lab-chip" disabled={finding || keep >= 1} onClick={() => { setKeep((k) => Math.min(1, k + 0.5)); setMask(null); setMaskEdited(false); }} data-testid="ast-keep-more">Keep more</button>
+                </div>
                 <div className="lab-row">
                   <button type="button" className="lab-chip" aria-pressed={brush === 1} onClick={() => setBrush(1)} data-testid="ast-brush-keep">Keep</button>
                   <button type="button" className="lab-chip" aria-pressed={brush === 0} onClick={() => setBrush(0)} data-testid="ast-brush-remove">Cut away</button>

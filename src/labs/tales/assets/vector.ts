@@ -43,7 +43,7 @@ export interface VectorArt {
 type Lab = [number, number, number];
 
 /* ── 2. superpixels ──────────────────────────────────────────── */
-function slic(lab: Float32Array, w: number, h: number, count: number, compact: number, valid?: Uint8Array): Int32Array {
+export function slic(lab: Float32Array, w: number, h: number, count: number, compact: number, valid?: Uint8Array): Int32Array {
   const n = w * h;
   const S = Math.max(4, Math.round(Math.sqrt(n / count)));
   const cs: number[][] = []; // l, a, b, x, y
@@ -91,7 +91,7 @@ function slic(lab: Float32Array, w: number, h: number, count: number, compact: n
 }
 
 /** Give every connected piece its own label (−1 stays −1). */
-function connected(label: Int32Array, w: number, h: number): Int32Array {
+export function connected(label: Int32Array, w: number, h: number): Int32Array {
   const out = new Int32Array(label.length).fill(-1);
   let next = 0;
   const stack: number[] = [];
