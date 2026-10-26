@@ -178,6 +178,32 @@ function eye(id: string, cx: number, cy: number, l: Look, side: -1 | 1) {
   const big = ex === 'wow' || ex === 'starry' || ex === 'worried' || (ex === 'silly' && side === 1);
   let [w, h, r] = big ? [size[0] + 1, size[1] + 2, size[2] + 0.6] : size;
   if (MODE === 'inked' && (l.kind === 'adult' || l.kind === 'elder') && !big) { h *= 0.84; w *= 1.06; }
+  if (MODE === 'gouache') {
+    // picture-book bean eyes: a soft dark oval, a dot of light, no whites
+    const [px, py] = ex === 'shy' ? [-2, 2] : ex === 'dreamy' ? [1.5, -3] : [0, 0];
+    const k = big ? 1.15 : 1;
+    if (ex === 'sleepy') return `<path d="M${cx - w * 0.7} ${cy} Q${cx} ${cy + 5} ${cx + w * 0.7} ${cy}" stroke="${shade(l.eyes ?? EYE_COLOURS[0], -0.6)}" stroke-width="3.4" fill="none" stroke-linecap="round"/>`;
+    let g = `<ellipse cx="${cx + px}" cy="${cy + 2 + py}" rx="${w * 0.42 * k}" ry="${h * 0.62 * k}" fill="${shade(l.eyes ?? EYE_COLOURS[0], -0.6)}"/><circle cx="${cx + px - w * 0.14}" cy="${cy + py - h * 0.12}" r="${w * 0.16}" fill="#fff" opacity=".9"/>`;
+    if (ex === 'starry') g += sparkle(cx + px, cy + py, w * 0.36, '#fff');
+    if (ex === 'brave') g += `<path d="M${cx - w * 0.6} ${cy - h * 0.5} L${cx + w * 0.6} ${cy - h * 0.5 + side * -3}" stroke="url(#sk${id})" stroke-width="${h * 0.5}"/>`;
+    return g + (l.lashes ? `<path d="M${cx + side * w * 0.42} ${cy - h * 0.45} l${side * 5} -4" stroke="${INK}" stroke-width="2.6" stroke-linecap="round"/>` : '');
+  }
+  if (MODE === 'inked' && (l.kind === 'adult' || l.kind === 'elder' || l.kind === 'kid') && !['sleepy'].includes(ex)) {
+    // hand-drawn almond eyes: white, a large iris, a heavy upper lid that sweeps out
+    const ew = w * 1.12, eh = h * (l.kind === 'kid' ? 0.95 : 0.78) * (big ? 1.2 : 1);
+    const [gx2, gy2] = ex === 'shy' ? [-2.5, 2] : ex === 'dreamy' ? [1.5, -2.5] : [0, 0];
+    const clip2 = `ea${id}${side}`;
+    const inner = cx - side * ew, outer = cx + side * ew;
+    const almond = `M${inner} ${cy + 1} Q${cx - side * ew * 0.2} ${cy - eh * 1.25} ${outer} ${cy - eh * 0.25} Q${cx + side * ew * 0.3} ${cy + eh * 1.05} ${inner} ${cy + 1} Z`;
+    const ir = Math.min(ew, eh) * 0.82;
+    const lidDrop = ex === 'brave' ? eh * 0.5 : ex === 'dreamy' ? eh * 0.6 : 0;
+    return `<clipPath id="${clip2}"><path d="${almond}"/></clipPath><path d="${almond}" fill="#fff"/>
+      <g clip-path="url(#${clip2})"><circle cx="${cx + gx2}" cy="${cy + gy2}" r="${ir}" fill="url(#ir${id})"/><circle cx="${cx + gx2}" cy="${cy + gy2}" r="${ir * 0.45}" fill="#120d0b"/><circle cx="${cx + gx2 - ir * 0.32}" cy="${cy + gy2 - ir * 0.38}" r="${ir * 0.28}" fill="#fff"/>
+      ${lidDrop ? `<rect x="${cx - ew - 2}" y="${cy - eh * 1.4}" width="${ew * 2 + 4}" height="${eh * 0.4 + lidDrop + eh}" fill="url(#sk${id})"/>` : ''}</g>
+      <path d="M${inner} ${cy + 1} Q${cx - side * ew * 0.2} ${cy - eh * 1.25 + lidDrop} ${outer + side * 3} ${cy - eh * 0.45}" stroke="${INK}" stroke-width="4.2" fill="none" stroke-linecap="round"/>
+      <path d="M${cx - side * ew * 0.1} ${cy + eh * 0.85} Q${cx + side * ew * 0.45} ${cy + eh * 0.7} ${outer - side * 1} ${cy + eh * 0.05}" stroke="${shade(l.skin, -0.4)}" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+      ${l.lashes ? `<path d="M${outer + side * 2} ${cy - eh * 0.4} l${side * 6} -5 M${outer - side * 2} ${cy - eh * 0.75} l${side * 4} -6" stroke="${INK}" stroke-width="2.6" stroke-linecap="round"/>` : ''}`;
+  }
   if (MODE === 'wondercut') {
     // cut paper: a solid dark oval with one punched-out highlight
     const [px, py] = ex === 'shy' ? [-2, 2] : ex === 'dreamy' ? [1.5, -3] : [0, 0];
@@ -409,7 +435,11 @@ function humanFace(id: string, l: Look) {
     ${blush}${fr}
     <g class="bt-eyes">${eye(id, 78, 101, l, -1)}${eye(id, 122, 101, l, 1)}</g>
     ${brows(l)}
-    <path d="M96.5 114 Q100 118 103.5 114" stroke="${shade(l.skin, -0.32)}" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+    ${MODE === 'inked' && (l.kind === 'adult' || l.kind === 'elder')
+      ? `<path d="M101 98 Q105 110 101 116 Q98 117 96 115" stroke="${shade(l.skin, -0.42)}" stroke-width="2.2" fill="none" stroke-linecap="round"/>`
+      : MODE === 'gouache' ? `<ellipse cx="100" cy="114" rx="3.2" ry="2.2" fill="${shade(l.skin, -0.18)}"/>`
+      : MODE === 'wondercut' ? `<circle cx="100" cy="114" r="3" fill="${shade(l.skin, -0.14)}"/>`
+      : `<path d="M96.5 114 Q100 118 103.5 114" stroke="${shade(l.skin, -0.32)}" stroke-width="2.4" fill="none" stroke-linecap="round"/>`}
     ${facialHair(id, l)}
     ${mouth(id, l)}
     ${front}
@@ -681,14 +711,44 @@ export function characterMarkup(l: Look, opts: { animated?: boolean; style?: Sty
   const shadow = MODE === 'wondercut'
     ? `<ellipse cx="102" cy="258" rx="54" ry="5" fill="${STYLES.wondercut.palette.shadow}" opacity=".22"/>`
     : `<ellipse cx="100" cy="257" rx="56" ry="6.5" fill="#000" opacity="${MODE === 'inked' ? 0.14 : 0.09}"/>`;
+  const pr = pet ? { head: 1, body: 1, slim: 1 } : PROPORTIONS[MODE][l.kind as 'baby' | 'kid' | 'adult' | 'elder'];
+  const bodyT = `translate(100 ${FEET}) scale(${pr.slim} ${pr.body}) translate(-100 -${FEET})`;
+  const lift = FEET - (FEET - BODY_TOP) * pr.body - BODY_TOP; // how far the body's top moved up
+  const headT = `translate(0 ${lift.toFixed(1)}) translate(100 ${CHIN}) scale(${pr.head}) translate(-100 -${CHIN})`;
   return finish(`<g class="${cls}">
     ${defs(id, l, l.skin, l.hair)}
     ${shadow}
-    <g class="bt-body">${pet ? petBody(id, l) : humanBody(id, l)}${l.outfit === 'drawn' ? wornImage(l, 'outfit') : ''}
-      <g class="bt-head" transform="translate(0 ${dy}) translate(100 94) scale(${s}) translate(-100 -94)">${head}${rim}${headpiece(l)}${glasses(l)}${hat(l)}</g>
-      ${extra(l)}
+    <g class="bt-body"><g transform="${bodyT}">${pet ? petBody(id, l) : humanBody(id, l)}${l.outfit === 'drawn' ? wornImage(l, 'outfit') : ''}${extra(l)}</g>
+      <g transform="${headT}"><g class="bt-head" transform="translate(0 ${dy}) translate(100 94) scale(${s}) translate(-100 -94)">${head}${rim}${headpiece(l)}${glasses(l)}${hat(l)}</g></g>
     </g>
   </g>`, l, id);
+}
+
+/**
+ * Each look has its own proportions: how big the head is against the body.
+ * Pocketlight keeps the big-headed toy look; Gouache and Wondercut are a little
+ * taller; Classic Ink has the long, graceful proportions of hand-drawn film.
+ * `head` scales the head about the chin, `body` stretches the body up from the feet.
+ */
+const PROPORTIONS: Record<StyleMode, Record<'baby' | 'kid' | 'adult' | 'elder', { head: number; body: number; slim: number }>> = {
+  pocketlight: { baby: { head: 1, body: 1, slim: 1 }, kid: { head: 1, body: 1, slim: 1 }, adult: { head: 1, body: 1, slim: 1 }, elder: { head: 1, body: 1, slim: 1 } },
+  gouache: { baby: { head: 0.94, body: 1.06, slim: 1 }, kid: { head: 0.86, body: 1.16, slim: 0.96 }, adult: { head: 0.8, body: 1.26, slim: 0.94 }, elder: { head: 0.82, body: 1.2, slim: 0.98 } },
+  wondercut: { baby: { head: 0.96, body: 1.04, slim: 1.04 }, kid: { head: 0.9, body: 1.1, slim: 1.02 }, adult: { head: 0.84, body: 1.2, slim: 1 }, elder: { head: 0.86, body: 1.16, slim: 1.04 } },
+  inked: { baby: { head: 0.92, body: 1.08, slim: 1 }, kid: { head: 0.8, body: 1.2, slim: 0.94 }, adult: { head: 0.66, body: 1.42, slim: 0.86 }, elder: { head: 0.7, body: 1.34, slim: 0.9 } },
+};
+const FEET = 252, BODY_TOP = 146, CHIN = 150;
+
+/**
+ * A close-up viewBox (written for the Pocketlight head) moved and scaled to
+ * where the head sits in another look, so face crops stay on the face.
+ */
+export function fitViewBox(vb: string, l: Look, mode: StyleMode = 'pocketlight'): string {
+  if (isPet(l.kind) || l.drawing) return vb;
+  const pr = PROPORTIONS[mode][l.kind as 'baby' | 'kid' | 'adult' | 'elder'];
+  const [x, y, w, h] = vb.split(/\s+/).map(Number);
+  const lift = FEET - (FEET - BODY_TOP) * pr.body - BODY_TOP;
+  const nx = 100 + (x - 100) * pr.head, ny = CHIN + (y - CHIN) * pr.head + lift;
+  return `${nx.toFixed(1)} ${ny.toFixed(1)} ${(w * pr.head).toFixed(1)} ${(h * pr.head).toFixed(1)}`;
 }
 
 /** Applies the mode's line, shadow and texture treatment to finished markup. */

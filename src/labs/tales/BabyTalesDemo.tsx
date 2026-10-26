@@ -7,7 +7,7 @@ import { catchGenmoji, pastedImage } from '../genmoji';
 import { DemoNote, LabsHeader } from '../LabsHeader';
 import { NAMES, PET_NAMES, PLACES, ROLE_LABEL, STORY_TYPES, type Place, type Role, type StoryType } from './catalog';
 import {
-  EXPRESSIONS, EXTRAS, EYE_COLOURS, FACE_VIEWBOX, FACIAL, GLASSES, HAIR_COLOURS, HAIR_STYLES, HATS, OUTFITS, PERSONALITIES, SKIN_TONES, WEAR_BOX,
+  EXPRESSIONS, EXTRAS, EYE_COLOURS, FACE_VIEWBOX, fitViewBox, FACIAL, GLASSES, HAIR_COLOURS, HAIR_STYLES, HATS, OUTFITS, PERSONALITIES, SKIN_TONES, WEAR_BOX,
   characterSvg, exprOf, isPet, type Expression, type Facial, type HairStyle, type Kind, type Look, type Personality, type WearSlot,
 } from './character';
 import { DrawPad, type DrawMode } from './DrawPad';
@@ -289,6 +289,10 @@ export function BabyTalesDemo() {
   return (
     <div className="lab bt">
       <LabsHeader title="Baby Tales" />
+      <div className="bt-lookbar" role="radiogroup" aria-label="Look">
+        <span>Look</span>
+        {STYLE_MODES.map((m) => <button key={m} type="button" role="radio" aria-checked={mode === m} onClick={() => setMode(m)} data-testid={`lookbar-${m}`}>{STYLES[m].name}</button>)}
+      </div>
       <main className="lab-main">
         <section className="lab-hero">
           <p className="eyebrow">NomNoms Baby Tales · Demo</p>
@@ -297,13 +301,28 @@ export function BabyTalesDemo() {
           <DemoNote>Photos are read on this device and never uploaded. Nothing is saved unless you choose “Save to my library”, and then only in this browser.</DemoNote>
         </section>
 
-        {/* ── 1. the cast ─────────────────────────────── */}
+        {/* ── 1. the look ──────────────────────────────── */}
+        <section className="lab-section" aria-labelledby="bt-look">
+          <div className="lab-h"><span className="lab-n">1</span><h2 id="bt-look" className="display">The look</h2></div>
+          <p className="lab-sub bt-look-sub">Everyone keeps their own face, hair and clothes in every look. Switch any time; nothing in the story changes.</p>
+          <div className="bt-looks" role="radiogroup" aria-label="Look of the book">
+            {STYLE_MODES.map((m) => (
+              <button key={m} type="button" className="bt-look" role="radio" aria-checked={mode === m} onClick={() => setMode(m)} data-testid={`look-${m}`}>
+                <span className="bt-look-art" dangerouslySetInnerHTML={{ __html: lookPreviews.get(m)! }} />
+                <strong>{STYLES[m].name}</strong>
+                <small>{STYLES[m].blurb}</small>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        {/* ── 2. the cast ─────────────────────────────── */}
         <section className="lab-section" aria-labelledby="bt-cast">
-          <div className="lab-h"><span className="lab-n">1</span><h2 id="bt-cast" className="display">Who’s in the story</h2></div>
+          <div className="lab-h"><span className="lab-n">2</span><h2 id="bt-cast" className="display">Who’s in the story</h2></div>
           <div className="bt-cast" role="group" aria-label="Cast">
             {cast.map((p, i) => (
               <button key={p.member.id} type="button" className={cx('bt-member', !p.member.inStory && 'is-out')} aria-pressed={i === pi} onClick={() => choose(i)} data-testid={`cast-${p.member.id}`}>
-                <span className="bt-face" dangerouslySetInnerHTML={{ __html: characterSvg(p.look, { style: mode, viewBox: p.look.drawing ? '-20 -30 240 300' : isPet(p.look.kind) ? '30 14 140 140' : FACE_VIEWBOX }) }} />
+                <span className="bt-face" dangerouslySetInnerHTML={{ __html: characterSvg(p.look, { style: mode, viewBox: p.look.drawing ? '-20 -30 240 300' : isPet(p.look.kind) ? '30 14 140 140' : fitViewBox(FACE_VIEWBOX, p.look, mode) }) }} />
                 <span className="bt-member-name">{p.member.name || 'No name'}</span>
                 <small>{usesCall(p.member.role) ? p.member.call : p.look.drawing ? 'Drawn' : ROLE_LABEL[p.member.role]}</small>
               </button>
@@ -355,7 +374,7 @@ export function BabyTalesDemo() {
                 <div className="bt-pers">
                   {(Object.keys(PERSONALITIES) as Personality[]).map((k) => (
                     <button key={k} type="button" className="bt-per" aria-pressed={person.look.personality === k} onClick={() => update({ look: { personality: k, expression: undefined } })} data-testid={`pers-${k}`}>
-                      {!pet && !drawing && <span dangerouslySetInnerHTML={{ __html: characterSvg({ ...person.look, personality: k, expression: undefined, face: undefined, hat: 'none', glasses: 'none' }, { viewBox: '24 30 152 128' }) }} />}
+                      {!pet && !drawing && <span dangerouslySetInnerHTML={{ __html: characterSvg({ ...person.look, personality: k, expression: undefined, face: undefined, hat: 'none', glasses: 'none' }, { style: mode, viewBox: fitViewBox('24 30 152 128', person.look, mode) }) }} />}
                       <strong>{PERSONALITIES[k].label}</strong><small>{PERSONALITIES[k].blurb}</small>
                     </button>
                   ))}
@@ -388,7 +407,7 @@ export function BabyTalesDemo() {
                     <div className="bt-result" role="status" data-testid="photo-result">
                       <span className="bt-result-photo">{result.from ? <img src={result.from} alt="" /> : <Icon name="camera" size={20} />}</span>
                       <Icon name="arrow-right" size={18} />
-                      <span className="bt-result-char" dangerouslySetInnerHTML={{ __html: characterSvg(person.look, { viewBox: FACE_VIEWBOX }) }} />
+                      <span className="bt-result-char" dangerouslySetInnerHTML={{ __html: characterSvg(person.look, { style: mode, viewBox: fitViewBox(FACE_VIEWBOX, person.look, mode) }) }} />
                       <div className="bt-result-text">
                         <strong>{result.who}, from the photo</strong>
                         <div className="bt-matched">{result.matched.map((m) => <span key={m}>{m}</span>)}</div>
@@ -441,7 +460,7 @@ export function BabyTalesDemo() {
                       <div className="bt-hairs">
                         {(Object.keys(HAIR_STYLES) as HairStyle[]).map((h) => (
                           <button key={h} type="button" className="bt-hair" aria-pressed={person.look.hairStyle === h} onClick={() => update({ look: { hairStyle: h } })} data-testid={`hair-${h}`}>
-                            <span dangerouslySetInnerHTML={{ __html: characterSvg({ ...person.look, hairStyle: h, hat: 'none', glasses: 'none' }, { viewBox: '10 -10 180 180' }) }} />
+                            <span dangerouslySetInnerHTML={{ __html: characterSvg({ ...person.look, hairStyle: h, hat: 'none', glasses: 'none' }, { style: mode, viewBox: fitViewBox('10 -10 180 180', person.look, mode) }) }} />
                             <small>{HAIR_STYLES[h]}</small>
                           </button>
                         ))}
@@ -452,7 +471,7 @@ export function BabyTalesDemo() {
                       <div className="bt-hairs">
                         {(Object.keys(EXPRESSIONS) as Expression[]).map((x) => (
                           <button key={x} type="button" className="bt-hair" aria-pressed={exprOf(person.look) === x} onClick={() => update({ look: { expression: x } })} data-testid={`face-${x}`}>
-                            <span dangerouslySetInnerHTML={{ __html: characterSvg({ ...person.look, expression: x, hat: 'none', glasses: 'none' }, { viewBox: '24 30 152 128' }) }} />
+                            <span dangerouslySetInnerHTML={{ __html: characterSvg({ ...person.look, expression: x, hat: 'none', glasses: 'none' }, { style: mode, viewBox: fitViewBox('24 30 152 128', person.look, mode) }) }} />
                             <small>{EXPRESSIONS[x]}</small>
                           </button>
                         ))}
@@ -485,13 +504,13 @@ export function BabyTalesDemo() {
                     </button>
                     {wardrobe.filter((w) => w.slot === tab).map((w) => (
                       <button key={w.id} type="button" className="bt-tile" aria-pressed={person.look[tab] === 'drawn' && person.look.worn?.[tab] === w.image} onClick={() => update({ look: { [tab]: 'drawn', worn: { ...person.look.worn, [tab]: w.image } } as Partial<Look> })} data-testid="wear-drawn">
-                        <span dangerouslySetInnerHTML={{ __html: characterSvg({ ...person.look, [tab]: 'drawn', worn: { ...person.look.worn, [tab]: w.image } }) }} />
+                        <span dangerouslySetInnerHTML={{ __html: characterSvg({ ...person.look, [tab]: 'drawn', worn: { ...person.look.worn, [tab]: w.image } }, { style: mode }) }} />
                         <small>{w.name}</small>
                       </button>
                     ))}
                     {Object.entries(WARDROBE[tab][1]).map(([v, label]) => (
                       <button key={v} type="button" className="bt-tile" aria-pressed={person.look[tab] === v} onClick={() => update({ look: { [tab]: v } as Partial<Look> })} data-testid={`wear-${v}`}>
-                        <span dangerouslySetInnerHTML={{ __html: characterSvg({ ...person.look, [tab]: v }) }} />
+                        <span dangerouslySetInnerHTML={{ __html: characterSvg({ ...person.look, [tab]: v }, { style: mode }) }} />
                         <small>{label}</small>
                       </button>
                     ))}
@@ -499,21 +518,6 @@ export function BabyTalesDemo() {
                 </div>
               )}
             </div>
-          </div>
-        </section>
-
-        {/* ── 2. the look ──────────────────────────────── */}
-        <section className="lab-section" aria-labelledby="bt-look">
-          <div className="lab-h"><span className="lab-n">2</span><h2 id="bt-look" className="display">The look</h2></div>
-          <p className="lab-sub bt-look-sub">Everyone keeps their own face, hair and clothes in every look. Switch any time; nothing in the story changes.</p>
-          <div className="bt-looks" role="radiogroup" aria-label="Look of the book">
-            {STYLE_MODES.map((m) => (
-              <button key={m} type="button" className="bt-look" role="radio" aria-checked={mode === m} onClick={() => setMode(m)} data-testid={`look-${m}`}>
-                <span className="bt-look-art" dangerouslySetInnerHTML={{ __html: lookPreviews.get(m)! }} />
-                <strong>{STYLES[m].name}</strong>
-                <small>{STYLES[m].blurb}</small>
-              </button>
-            ))}
           </div>
         </section>
 

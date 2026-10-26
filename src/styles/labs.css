@@ -268,3 +268,10 @@
 .ast-confirm { border: 1.5px solid var(--accent); border-radius: 14px; padding: 12px; background: var(--paper); display: flex; flex-direction: column; gap: 6px; }
 .ast-confirm p { margin: 0; font-size: 13.5px; color: var(--ink-2); }
 @media (min-width: 900px) { .ast-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* the look, always one tap away */
+.bt-lookbar { position: sticky; top: 57px; z-index: 19; display: flex; gap: 6px; align-items: center; overflow-x: auto; padding: 8px 16px; background: rgba(246, 241, 233, .94); backdrop-filter: blur(12px); border-bottom: 1px solid var(--line); scrollbar-width: none; }
+.bt-lookbar::-webkit-scrollbar { display: none; }
+.bt-lookbar span { font-size: 12px; font-weight: 600; color: var(--ink-3); text-transform: uppercase; letter-spacing: .06em; margin-right: 2px; flex: none; }
+.bt-lookbar button { flex: none; font: inherit; font-size: 13px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--paper); color: var(--ink-2); cursor: pointer; }
+.bt-lookbar button[aria-checked="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
