@@ -8,7 +8,8 @@ import { sceneSvg } from './scene';
 import { decodePhoto, findThingsToHide, rasterToCanvas, rasterToUrl, resize, wipe, detectors } from './assets/browser';
 import { makeMeta, trimObject, type StoredAsset } from './assets/meta';
 import { brushMask, buildBase, cropRaster, hideRegions, maskCoverage, rotate90, subjectMask, MAX_SIDE, type AssetKind, type Raster, type Rect } from './assets/pipeline';
-import { renderBase } from './assets/render';
+import { assetArtUrl } from './assets/browser';
+import { DETAILS, vectorizeAsset } from './assets/vector';
 
 /**
  * Photo → illustrated place or thing, on this device.
@@ -199,6 +200,9 @@ export function AssetStudio({ open, kind: startKind, mode: startMode, star, onCl
         let base = buildBase(w, kind, { mask: m, horizon: horizon ?? undefined, seed: nextSeed, colours: 12 + (nextSeed % 3) * 2 });
         if (kind === 'object') base = trimObject(base);
         else if (horizon === null) setHorizon(base.horizon ?? 0.55);
+        // the illustration itself: redrawn as clean shapes. The first try (seed 7) is 'normal';
+        // each 'Try again' moves to the next level: simple, detailed, normal…
+        base = { ...base, vector: vectorizeAsset(w, kind, m, DETAILS[(((nextSeed - 7) % 3) + 3) % 3]) };
         const meta = makeMeta(base, {
           id: result?.meta.id ?? newId(), name, styleMode: mode, hidden: hides.length, autoFound,
           boundary: kind === 'object' ? (maskEdited ? 'automatic+edited' : 'automatic') : 'not-applicable', heightRatio: height,
@@ -213,7 +217,7 @@ export function AssetStudio({ open, kind: startKind, mode: startMode, star, onCl
   };
 
   /* ── 3. review ───────────────────────────────────────── */
-  const preview = useMemo(() => (result ? rasterToUrl(renderBase(result.base, mode), 'image/png') : ''), [result, mode]);
+  const preview = useMemo(() => (result ? assetArtUrl(result.base, mode) : ''), [result, mode]);
   const beforeUrl = useMemo(() => (step === 'review' && work.current ? rasterToUrl(work.current, 'image/jpeg') : ''), [step, workVersion]); // eslint-disable-line react-hooks/exhaustive-deps
   const inScene = useMemo(() => {
     if (!result || !preview) return '';

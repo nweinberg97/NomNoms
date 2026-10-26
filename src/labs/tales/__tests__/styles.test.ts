@@ -62,6 +62,6 @@ test('clip paths and definitions are never restyled', () => {
 test('scenes take the mode, photo places and things', () => {
   const svg = sceneSvg({ placeId: 'park', seed: 1, chars: [{ look }], style: 'wondercut', photo: { image: 'data:image/png;base64,P', horizon: 0.5 }, things: [{ image: 'data:image/png;base64,T', width: 100, height: 200, heightRatio: 0.5, x: 0.8 }] });
   assert.match(svg, /class="bt-scene st-wondercut"/);
-  assert.match(svg, /bt-par-1/);
+  assert.equal(svg.split('data:image/png;base64,P').length - 1, 1, 'a photo place is drawn once (no sliding copy that doubles edges)');
   assert.match(svg, /href="data:image\/png;base64,T"[^>]*height="95.0"/, 'a thing half a grown-up tall is 95 units');
 });

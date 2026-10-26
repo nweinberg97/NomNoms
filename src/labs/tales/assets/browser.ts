@@ -1,4 +1,7 @@
-import { fitSize, makeRaster, type Raster, type Rect } from './pipeline';
+import { renderBase } from './render';
+import { vectorUrl } from './vectorRender';
+import type { StyleMode } from '../styles';
+import { fitSize, makeRaster, type AssetBase, type Raster, type Rect } from './pipeline';
 
 /**
  * The browser side of the pipeline: decode a photo into pixels, look for faces
@@ -8,6 +11,11 @@ import { fitSize, makeRaster, type Raster, type Rect } from './pipeline';
  */
 
 /** Decode a photo, upright, at most `max` pixels on its long side. The file itself is not kept. */
+/** The picture for an asset in a look: the redrawn vector when there is one, else the older pixel rendering. */
+export function assetArtUrl(base: AssetBase, mode: StyleMode): string {
+  return base.vector ? vectorUrl(base.vector, mode, { transparent: base.kind === 'object' }) : rasterToUrl(renderBase(base, mode), 'image/png');
+}
+
 export async function decodePhoto(file: Blob, max = 1024): Promise<Raster> {
   let bmp: ImageBitmap | null = null;
   try {

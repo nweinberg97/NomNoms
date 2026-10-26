@@ -13,7 +13,7 @@ export interface Rect { x: number; y: number; w: number; h: number }
 export type AssetKind = 'place' | 'object';
 
 /** The working size: big enough for a page, small enough to process in a second on a phone. */
-export const MAX_SIDE = 512;
+export const MAX_SIDE = 640;
 
 export const makeRaster = (w: number, h: number): Raster => ({ w, h, data: new Uint8ClampedArray(w * h * 4) });
 
@@ -304,6 +304,8 @@ export function guessHorizon(src: Raster): number {
 }
 
 /* ── the stored form of an asset ────────────────────────── */
+import type { VectorArt } from './vector';
+
 export interface AssetBase {
   kind: AssetKind;
   w: number;
@@ -322,6 +324,8 @@ export interface AssetBase {
    * identify anything in the photo.
    */
   field?: { w: number; h: number; rgb: Uint8Array };
+  /** The redrawn illustration (outlines and colours only). Assets saved before it existed don't have one. */
+  vector?: VectorArt;
 }
 
 export const FIELD_W = 24;

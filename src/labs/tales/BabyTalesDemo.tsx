@@ -22,11 +22,10 @@ import { fill, generateStory, regeneratePage, tokenize, type CastMember, type St
 import { sceneSvg, type DrawnPlace, type SceneThing } from './scene';
 import { STYLE_MODES, STYLES, type StyleMode } from './styles';
 import { AssetStudio } from './AssetStudio';
-import { rasterToUrl } from './assets/browser';
+import { assetArtUrl } from './assets/browser';
 import { deleteAsset, listAssets, saveAsset } from './assets/library';
 import type { StoredAsset } from './assets/meta';
 import type { AssetKind } from './assets/pipeline';
-import { renderBase } from './assets/render';
 
 /**
  * NomNoms Baby Tales, the try-it demo.
@@ -185,7 +184,7 @@ export function BabyTalesDemo() {
   const [studio, setStudio] = useState<{ kind: AssetKind } | null>(null);
   useEffect(() => { void listAssets().then((a) => { setLibrary(a); setSaved(new Set(a.map((x) => x.meta.id))); }); }, []);
   // every place and thing is redrawn from its stored regions in the current look
-  const art_ = useMemo(() => new Map(library.map((a) => [a.meta.id, rasterToUrl(renderBase(a.base, mode), 'image/png')])), [library, mode]);
+  const art_ = useMemo(() => new Map(library.map((a) => [a.meta.id, assetArtUrl(a.base, mode)])), [library, mode]);
   const photoPlaces = library.filter((a) => a.meta.kind === 'place');
   const things = library.filter((a) => a.meta.kind === 'object');
   const extraPlaces: Place[] = [...drawn, ...photoPlaces.map((a) => familyPlace(a.meta.id, a.meta.name))];

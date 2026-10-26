@@ -89,12 +89,8 @@ export function sceneSvg(opts: {
   const esc = (u: string) => u.replace(/"/g, '&quot;');
   let back: string;
   if (opts.photo) {
-    // the picture stays put; its ground drifts gently in front of it, with a soft top edge, for depth
-    const top = Math.max(0, opts.photo.horizon * 300 * 0.86), fade = 26;
-    back = `<defs><linearGradient id="pf${id}" x1="0" x2="0" gradientUnits="userSpaceOnUse" y1="${top.toFixed(1)}" y2="${(top + fade).toFixed(1)}"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#fff"/></linearGradient>
-        <mask id="pm${id}"><rect x="-20" y="${top.toFixed(1)}" width="440" height="${(300 - top).toFixed(1)}" fill="url(#pf${id})"/></mask></defs>
-      <g class="bt-par bt-par-1"><image href="${esc(opts.photo.image)}" x="-10" y="-8" width="420" height="316" preserveAspectRatio="xMidYMid slice"/></g>
-      <g class="bt-par bt-par-3" mask="url(#pm${id})"><image href="${esc(opts.photo.image)}" x="-10" y="-8" width="420" height="316" preserveAspectRatio="xMidYMid slice"/></g>`;
+    // drawn once: a second, sliding copy made edges double. A redrawn place's clouds drift on their own.
+    back = `<image href="${esc(opts.photo.image)}" x="0" y="0" width="400" height="300" preserveAspectRatio="xMidYMid slice"/>`;
   } else if (opts.drawn) {
     back = `<rect width="400" height="300" fill="#fbf7f0"/><image href="${esc(opts.drawn.image)}" x="0" y="0" width="400" height="300" preserveAspectRatio="xMidYMid slice"/>`;
   } else {
@@ -114,7 +110,7 @@ export function sceneSvg(opts: {
     const w = (h * t.width) / t.height;
     const cx = t.x * 400, y = 292 - h;
     s += `<ellipse cx="${cx.toFixed(1)}" cy="292" rx="${(w * 0.42).toFixed(1)}" ry="${Math.max(3, h * 0.035).toFixed(1)}" fill="${STYLES[mode].palette.shadow}" opacity=".2"/>
-      <image href="${esc(t.image)}" x="${(cx - w / 2).toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" filter="url(#img${id})"/>`;
+      <image href="${esc(t.image)}" x="${(cx - w / 2).toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}"${t.image.startsWith('data:image/svg') ? '' : ` filter="url(#img${id})"`}/>`;
   });
   const slots = opts.chars.length >= 3
     ? [{ x: 10, w: 132 }, { x: 140, w: 124 }, { x: 262, w: 124 }]
