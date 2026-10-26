@@ -534,9 +534,9 @@ function faceSpec(l: Look, w: WorldId): FaceSpec {
     : { top: 36, chin: 155, cran: 57, cheek: 44, chinW: 13, ex: 23.5, ey: 103, erx: 14, ery: 15.5, tilt: 0, brow: 3.4, nose: 1, mouth: 1 };
   const little = k === 'baby' || k === 'kid';
   switch (w) {
-    case 'fairytale': return { ...base, cheek: base.cheek - 4, chinW: base.chinW - (little ? 4 : 5), chin: base.chin + 2, ery: base.ery * 1.06, erx: base.erx * 1.04, tilt: 0.22 };
-    case 'adventure': return { ...base, cran: base.cran + 2, cheek: base.cheek + 6, chinW: base.chinW + 9, erx: base.erx + 0.6, ery: base.ery + 1, brow: base.brow * 1.25 };
-    case 'mythic': return { ...base, cheek: base.cheek + 3, chinW: base.chinW + (little ? 2 : 6), ery: base.ery * (little ? 0.95 : 0.88), tilt: little ? 0.18 : 0.34, brow: base.brow * 1.2 };
+    case 'fairytale': return { ...base, cheek: base.cheek - 4, chinW: base.chinW - (little ? 4 : 5), chin: base.chin + 2, ery: base.ery * 1.06, erx: base.erx * 1.04, tilt: 0.06 };
+    case 'adventure': return { ...base, cran: base.cran + 2, cheek: base.cheek + 6, chinW: base.chinW + 9, erx: base.erx + 0.6, ery: base.ery + 1 };
+    case 'mythic': return { ...base, cheek: base.cheek + 3, chinW: base.chinW + (little ? 2 : 6) };
   }
   return base;
 }
@@ -555,12 +555,12 @@ function coreEye(id: string, s: FaceSpec, l: Look, side: -1 | 1, gap: number, w:
   const es = 1 + SHAPE_RANGE.eyeSize * shapeOf(l, 'eyeSize');
   const cx = 100 + side * (s.ex + gap), cy = s.ey;
   const rx = s.erx * es, ry0 = s.ery * es;
-  const ink = '#2b1d18';
-  const lw = l.kind === 'baby' ? 3 : 3.4;
+  const ink = '#4a3229';
+  const lw = l.kind === 'baby' ? 2.4 : 2.6;
   const lashOut = l.lashes || w === 'fairytale';
   // closed: happy arcs, a wink; asleep
   if (ex === 'laugh' || ex === 'proud' || (ex === 'wink' && side === 1)) {
-    return `<path d="M${cx - rx} ${cy + 2} Q${cx} ${cy - ry0 * 0.9} ${cx + rx} ${cy + 2}" stroke="${ink}" stroke-width="${lw + 0.4}" fill="none" stroke-linecap="round"/>${lashOut ? `<path d="M${cx + side * rx * 0.92} ${cy - 1} l${side * 5} -3.5" stroke="${ink}" stroke-width="2.4" stroke-linecap="round"/>` : ''}`;
+    return `<path d="M${cx - rx * 0.85} ${cy + 2} Q${cx} ${cy - ry0 * 0.75} ${cx + rx * 0.85} ${cy + 2}" stroke="${ink}" stroke-width="${lw + 0.2}" fill="none" stroke-linecap="round"/>`;
   }
   if (ex === 'sleepy') return `<path d="M${cx - rx} ${cy} Q${cx} ${cy + ry0 * 0.5} ${cx + rx} ${cy}" stroke="${ink}" stroke-width="${lw}" fill="none" stroke-linecap="round"/>${lashOut ? `<path d="M${cx + side * rx} ${cy} l${side * 4} 2" stroke="${ink}" stroke-width="2.2" stroke-linecap="round"/>` : ''}`;
   if (ex === 'silly' && side === -1) return `<path d="M${cx - rx * 0.7} ${cy - ry0 * 0.6} L${cx + rx * 0.6} ${cy} L${cx - rx * 0.7} ${cy + ry0 * 0.6}" stroke="${ink}" stroke-width="${lw + 0.4}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
@@ -574,28 +574,27 @@ function coreEye(id: string, s: FaceSpec, l: Look, side: -1 | 1, gap: number, w:
   const eyeCol = l.eyes ?? EYE_COLOURS[0];
   const clip = `ce${id}${side}`;
   // a lowered lid: brave, dreamy, shy (and a hero's steady gaze)
-  const drop = ex === 'brave' ? 0.26 : ex === 'dreamy' ? 0.42 : ex === 'shy' ? 0.22 : 0;
+  const drop = ex === 'dreamy' ? 0.3 : ex === 'shy' ? 0.15 : 0;
   const lidY = cy - ry + ry * 2 * drop;
   const starry = ex === 'starry';
   const shine = starry
     ? sparkle(ix - ir * 0.2, iy - ir * 0.25, ir * 0.62, '#fff') + `<circle cx="${ix + ir * 0.45}" cy="${iy + ir * 0.42}" r="${ir * 0.14}" fill="#fff"/>`
-    : `<ellipse cx="${ix - ir * 0.36}" cy="${iy - ir * 0.38}" rx="${ir * 0.34}" ry="${ir * 0.3}" fill="#fff"/><circle cx="${ix + ir * 0.42}" cy="${iy + ir * 0.38}" r="${ir * 0.15}" fill="#fff" opacity=".9"/>`;
+    : `<ellipse cx="${ix - ir * 0.34}" cy="${iy - ir * 0.36}" rx="${ir * 0.4}" ry="${ir * 0.36}" fill="#fff"/><circle cx="${ix + ir * 0.42}" cy="${iy + ir * 0.4}" r="${ir * 0.18}" fill="#fff" opacity=".95"/>`;
   const glint = w === 'mythic' ? `<circle cx="${ix + ir * 0.05}" cy="${iy + ir * 0.5}" r="${ir * 0.1}" fill="#ffd36b"/>` : w === 'fairytale' && !starry ? sparkle(ix + ir * 0.46, iy - ir * 0.08, ir * 0.16, '#fff') : '';
   // the upper lash line: along the top of the eye (or the lowered lid), thicker toward the outer corner
   const topLine = drop
     ? `M${inner} ${Math.min(cy, lidY + ry * 0.3)} Q${cx} ${lidY - ry * 0.12} ${outer} ${lidY + ry * 0.12 - t * 0.6}`
     : `M${inner} ${cy + ry * 0.05} C${inner} ${cy - ry * 1.32} ${outer} ${cy - ry * 1.32 - t * 0.5} ${outer} ${cy - t}`;
-  const outerHalf = drop ? '' : `<path d="M${cx + side * rx * 0.05} ${cy - ry * 0.99 - t * 0.2} Q${cx + side * rx * 0.78} ${cy - ry * 0.98 - t * 0.5} ${outer + side * 0.5} ${cy - t - 1}" stroke="${ink}" stroke-width="${lw + 1.3}" fill="none" stroke-linecap="round"/>`;
-  const flick = lashOut ? `<path d="M${outer} ${cy - t - (drop ? ry * 0.6 : 1)} q${side * 3.5} -1.5 ${side * 6} -5" stroke="${ink}" stroke-width="2.5" fill="none" stroke-linecap="round"/>${l.lashes && l.kind !== 'elder' ? `<path d="M${outer - side * rx * 0.28} ${cy - ry * 0.92 - t * 0.6 + (drop ? ry * 2 * drop : 0)} q${side * 2.5} -2.5 ${side * 3.4} -6" stroke="${ink}" stroke-width="2.2" fill="none" stroke-linecap="round"/>` : ''}` : '';
-  const lower = `<path d="M${cx - side * rx * 0.1} ${cy + ry * 1.0} Q${cx + side * rx * 0.62} ${cy + ry * 0.92 - t * 0.4} ${outer - side * 0.5} ${cy - t * 0.6 + ry * 0.2}" stroke="${shade(l.skin, -0.3)}" stroke-width="1.5" fill="none" stroke-linecap="round" opacity=".55"/>`;
+  const outerHalf = '';
+  const flick = l.lashes && !drop ? `<path d="M${outer - side * rx * 0.12} ${cy - ry * 0.55} q${side * 3} -1 ${side * 4.5} -4" stroke="${ink}" stroke-width="1.8" fill="none" stroke-linecap="round"/><path d="M${outer - side * rx * 0.45} ${cy - ry * 0.92} q${side * 1.8} -1.8 ${side * 2.6} -4.6" stroke="${ink}" stroke-width="1.7" fill="none" stroke-linecap="round"/>` : '';
+  const lower = `<path d="M${cx - side * rx * 0.1} ${cy + ry * 1.0} Q${cx + side * rx * 0.62} ${cy + ry * 0.92 - t * 0.4} ${outer - side * 0.5} ${cy - t * 0.6 + ry * 0.2}" stroke="${shade(l.skin, -0.25)}" stroke-width="1.3" fill="none" stroke-linecap="round" opacity=".3"/>`;
   return `<clipPath id="${clip}"><path d="${shape}"/></clipPath>
     <path d="${shape}" fill="#fffdf8" stroke="none"/>
     <g clip-path="url(#${clip})">
       <circle cx="${ix}" cy="${iy}" r="${ir}" fill="url(#ir${id})" stroke="${shade(eyeCol, -0.5)}" stroke-width="1.3"/>
-      <ellipse cx="${ix}" cy="${iy - ir * 0.62}" rx="${ir * 1.05}" ry="${ir * 0.5}" fill="${shade(eyeCol, -0.4)}" opacity=".45" stroke="none"/>
+      <ellipse cx="${ix}" cy="${iy - ir * 0.66}" rx="${ir * 1.05}" ry="${ir * 0.42}" fill="${shade(eyeCol, -0.3)}" opacity=".3" stroke="none"/>
       <circle cx="${ix}" cy="${iy + ir * 0.04}" r="${ir * 0.47}" fill="#1a110e" stroke="none"/>
       ${shine}${glint}
-      <ellipse cx="${cx}" cy="${cy - ry * 1.1}" rx="${rx + 3}" ry="${ry * 0.36}" fill="#3a2418" opacity=".07"/>
       ${drop ? `<rect x="${cx - rx - 3}" y="${cy - ry - 6}" width="${rx * 2 + 6}" height="${lidY - (cy - ry) + 6}" fill="url(#sk${id})" stroke="none"/>` : ''}
     </g>
     ${lower}
@@ -606,15 +605,16 @@ function coreBrows(s: FaceSpec, l: Look, gap: number, w: WorldId): string {
   const ex = exprOf(l);
   const [lift, tilt] = BROWS[ex] ?? [0, 0];
   const up = -SHAPE_RANGE.browHeight * shapeOf(l, 'browHeight'), weight = 1 + SHAPE_RANGE.browWeight * shapeOf(l, 'browWeight');
-  const c = l.kind === 'baby' ? shade(l.hair, 0.1) : shade(l.hair, -0.32);
-  const th = s.brow * weight * (w === 'fairytale' ? 0.75 : 1);
+  const c = l.kind === 'baby' ? shade(l.hair, 0.15) : mixHex(shade(l.hair, -0.12), l.skin, 0.18);
+  const th = (l.kind === 'baby' ? 1.6 : 2.2) * weight;
   return ([-1, 1] as const).map((sd) => {
-    const y0 = s.ey - s.ery - 9 + (ex === 'wink' ? (sd === -1 ? lift - 4 : lift + 2) : ex === 'silly' && sd === -1 ? lift + 4 : lift) + up;
+    const y0 = s.ey - s.ery - 13 + (ex === 'wink' ? (sd === -1 ? lift - 4 : lift + 2) : ex === 'silly' && sd === -1 ? lift + 4 : lift) + up;
     const inX = 100 + sd * (s.ex + gap - s.erx * 0.7), outX = 100 + sd * (s.ex + gap + s.erx * 1.05), midX = 100 + sd * (s.ex + gap + s.erx * 0.2);
-    const tilt2 = tilt + (w === 'mythic' && l.kind !== 'baby' ? 2.2 : 0);
-    const arch = w === 'fairytale' ? 6 : w === 'mythic' ? 5.5 : 4.5;
+    // gentle: expressions move the brows a little, and never into a glare
+    const tilt2 = Math.max(-5, Math.min(1.5, tilt * 0.6));
+    const arch = 5;
     // a tapered crescent: thick at the inner end, fine at the outer
-    return `<path d="M${inX} ${y0 + tilt2 + th * 0.5} Q${midX} ${y0 - arch} ${outX} ${y0 + 1.5} Q${midX} ${y0 - arch + th * 0.9} ${inX} ${y0 + tilt2 + th * 1.4} Z" fill="${c}" stroke="${c}" stroke-width="1.2" stroke-linejoin="round"/>`;
+    return `<path d="M${inX} ${y0 + tilt2 + 1} Q${midX} ${y0 - arch} ${outX} ${y0 + 2.5}" stroke="${c}" stroke-width="${th}" fill="none" stroke-linecap="round" opacity=".9"/>`;
   }).join('');
 }
 
