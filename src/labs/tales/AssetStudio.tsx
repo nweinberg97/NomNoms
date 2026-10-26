@@ -1,15 +1,17 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '../../components/Icon';
-import { Sheet, Spinner } from '../../components/ui';
+import { Sheet } from '../../components/ui';
 import { cx } from '../../lib/util';
 import { characterSvg, type Look } from './character';
 import { STYLE_MODES, STYLES, type StyleMode } from './styles';
 import { sceneSvg } from './scene';
 import { decodePhoto, findThingsToHide, rasterToCanvas, rasterToUrl, resize, wipe, detectors } from './assets/browser';
-import { makeMeta, trimObject, type StoredAsset } from './assets/meta';
-import { brushMask, buildBase, cropRaster, hideRegions, maskCoverage, rotate90, subjectMask, MAX_SIDE, type AssetKind, type Raster, type Rect } from './assets/pipeline';
+import { makeMeta, type StoredAsset } from './assets/meta';
+import { brushMask, cropRaster, hideRegions, maskCoverage, rotate90, subjectMask, MAX_SIDE, type AssetKind, type Raster, type Rect } from './assets/pipeline';
 import { assetArtUrl } from './assets/browser';
-import { DETAILS, vectorizeAsset } from './assets/vector';
+import { DETAILS, type VectorStage } from './assets/vector';
+import { makeAsset } from './assets/make';
+import { DrawingMagic } from './DrawingMagic';
 
 /**
  * Photo → illustrated place or thing, on this device.
@@ -55,6 +57,7 @@ export function AssetStudio({ open, kind: startKind, mode: startMode, star, onCl
   const [height, setHeight] = useState(0.35);
   const [horizon, setHorizon] = useState<number | null>(null);
   const [seed, setSeed] = useState(7);
+  const [stage, setStage] = useState<VectorStage | 'start'>('start');
   const [result, setResult] = useState<StoredAsset | null>(null);
   const [confirm, setConfirm] = useState(false);
   const [error, setError] = useState<string>();
@@ -191,18 +194,16 @@ export function AssetStudio({ open, kind: startKind, mode: startMode, star, onCl
   const make = (nextSeed = seed) => {
     if (!work.current) return;
     setStep('working');
+    setStage('start');
     setError(undefined);
-    setTimeout(() => {
+    setTimeout(async () => {
       try {
         const w = work.current!;
         const m = kind === 'object' ? mask ?? subjectMask(w) : undefined;
         if (m && maskCoverage(m) < 0.01) throw new Error('No thing was found in the middle of the photo. Use “Fix the edge” to paint it in.');
-        let base = buildBase(w, kind, { mask: m, horizon: horizon ?? undefined, seed: nextSeed, colours: 12 + (nextSeed % 3) * 2 });
-        if (kind === 'object') base = trimObject(base);
-        else if (horizon === null) setHorizon(base.horizon ?? 0.55);
-        // the illustration itself: redrawn as clean shapes. The first try (seed 7) is 'normal';
-        // each 'Try again' moves to the next level: simple, detailed, normal…
-        base = { ...base, vector: vectorizeAsset(w, kind, m, DETAILS[(((nextSeed - 7) % 3) + 3) % 3]) };
+        // the heavy work runs in a background worker; the animation follows its stages
+        const base = await makeAsset({ raster: w, kind, mask: m, horizon: horizon ?? undefined, seed: nextSeed, colours: 12 + (nextSeed % 3) * 2, detail: DETAILS[(((nextSeed - 7) % 3) + 3) % 3] }, setStage);
+        if (kind === 'place' && horizon === null) setHorizon(base.horizon ?? 0.55);
         const meta = makeMeta(base, {
           id: result?.meta.id ?? newId(), name, styleMode: mode, hidden: hides.length, autoFound,
           boundary: kind === 'object' ? (maskEdited ? 'automatic+edited' : 'automatic') : 'not-applicable', heightRatio: height,
@@ -316,7 +317,7 @@ export function AssetStudio({ open, kind: startKind, mode: startMode, star, onCl
           </div>
         )}
 
-        {step === 'working' && <div className="ast-working"><Spinner /> <span>Drawing it on this device…</span></div>}
+        {step === 'working' && <div className="ast-working" data-testid="ast-working"><DrawingMagic variant="place" stage={stage} /></div>}
 
         {step === 'review' && result && (
           <div className="ast-review" data-testid="ast-review">

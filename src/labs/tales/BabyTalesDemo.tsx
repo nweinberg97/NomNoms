@@ -22,6 +22,7 @@ import { fill, generateStory, regeneratePage, tokenize, type CastMember, type St
 import { sceneSvg, type DrawnPlace, type SceneThing } from './scene';
 import { STYLE_MODES, STYLES, type StyleMode } from './styles';
 import { AssetStudio } from './AssetStudio';
+import { DrawingMagic } from './DrawingMagic';
 import { assetArtUrl } from './assets/browser';
 import { deleteAsset, listAssets, saveAsset } from './assets/library';
 import type { StoredAsset } from './assets/meta';
@@ -484,7 +485,7 @@ export function BabyTalesDemo() {
             </div>
             <input ref={newFileRef} type="file" accept="image/*" hidden data-testid="photo-new-file" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void fromPhoto(f, 'new', '', 'new'); }} />
           </div>
-          {status && busy !== undefined && <p className="lab-status" role="status">{status}</p>}
+          {busy === 'new' && <DrawingMagic variant="face" compact />}
           <div className="bt-cast" role="group" aria-label="Cast">
             {cast.map((p, i) => (
               <button key={p.member.id} type="button" className={cx('bt-member', p.member.id === pendingId ? 'is-new' : !p.member.inStory && 'is-out')} aria-pressed={i === pi} onClick={() => choose(i)} data-testid={`cast-${p.member.id}`}>
@@ -518,6 +519,7 @@ export function BabyTalesDemo() {
                     </button>
                     <button type="button" className="btn btn-ghost btn-sm" onClick={cancelNew} data-testid="new-cancel">Cancel</button>
                   </div>
+                  {busy === 'own' && <DrawingMagic variant="face" compact />}
                   <p className="lab-sub">Or start from:</p>
                   <div className="lab-chips">
                     {ADDABLE.map((a) => <button key={a.label} type="button" className="lab-chip" onClick={() => fillPending(a.make)} data-testid={`add-${a.label}`}>{a.label}</button>)}
@@ -603,7 +605,7 @@ export function BabyTalesDemo() {
                       </div>
                     </div>
                   )}
-                  {status && <p className="lab-status" role="status">{status}</p>}
+                  {busy && busy !== 'new' && person.member.id !== pendingId ? <DrawingMagic variant="face" compact /> : status && <p className="lab-status" role="status">{status}</p>}
 
                   <details className="bt-genmoji">
                     <summary><span>Use a real Genmoji</span><small>iPhone, iPad or Mac with Apple Intelligence</small></summary>

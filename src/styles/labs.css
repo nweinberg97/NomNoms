@@ -257,7 +257,7 @@
 .ast-tools { display: flex; flex-direction: column; gap: 8px; }
 .ast-fields { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
 .ast-fields input[type="range"] { width: 100%; }
-.ast-working { display: flex; gap: 10px; align-items: center; padding: 40px 0; justify-content: center; color: var(--ink-2); }
+.ast-working { display: block; padding: 8px 0; color: var(--ink-2); }
 .ast-compare { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .ast-compare figure { margin: 0; }
 .ast-compare img { width: 100%; aspect-ratio: 4 / 3; object-fit: contain; border-radius: 10px; background: #f1ece4; display: block; }
@@ -334,3 +334,62 @@
 .bt-newcard { border: 1.5px solid var(--accent, #b5532b); background: linear-gradient(135deg, #fff4ea, #fdebe0); }
 .bt-newcard h3 { margin-top: 0; }
 .bt-newcard .btn-primary { min-height: 44px; }
+
+/* ── the fun wait: a page that paints itself ─────────────────── */
+.dm { display: grid; justify-items: center; gap: 8px; padding: 18px 12px; text-align: center; }
+.dm-scene { width: min(320px, 100%); height: auto; overflow: visible; }
+.dm.is-compact .dm-scene { width: min(220px, 70%); }
+.dm-line { margin: 0; font-weight: 600; font-size: 15px; min-height: 1.4em; animation: dmLine .45s ease-out both; }
+.dm-note { color: var(--ink-3, #7a6f66); font-size: 12px; }
+.dm-dots { display: flex; gap: 6px; }
+.dm-dots span { width: 8px; height: 8px; border-radius: 50%; background: var(--line, #e2d8ca); transition: transform .3s; }
+.dm-dots span.is-done { background: var(--accent, #b5532b); }
+.dm-dots span.is-now { background: var(--accent, #b5532b); opacity: .55; transform: scale(1.35); }
+@keyframes dmLine { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+/* each part appears in turn, holds, then the page starts over (5 s loop) */
+.dm-a { animation: 5s ease-in-out infinite both; transform-box: fill-box; }
+.dm-sky   { animation-name: dmSky; transform-origin: top; }
+.dm-sun   { animation-name: dmPop; animation-delay: 0s; transform-origin: center; }
+.dm-hill1 { animation-name: dmRise; transform-origin: bottom; }
+.dm-hill2 { animation-name: dmRise2; transform-origin: bottom; }
+.dm-house { animation-name: dmPop2; transform-origin: bottom; }
+.dm-roof  { animation-name: dmDrop; transform-origin: bottom; transform-box: fill-box; }
+.dm-door  { animation-name: dmPop3; transform-origin: bottom; }
+.dm-win, .dm-win2 { animation-name: dmGlow; }
+.dm-win2 { animation-delay: .15s; }
+.dm-tree  { animation-name: dmGrow; transform-origin: bottom; }
+@keyframes dmSky   { 0% { opacity: 0; transform: scaleY(.2); } 10%, 88% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+@keyframes dmPop   { 0%, 10% { opacity: 0; transform: scale(.2); } 18% { opacity: 1; transform: scale(1.15); } 22%, 88% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+@keyframes dmRise  { 0%, 16% { opacity: 0; transform: translateY(40px); } 26%, 88% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+@keyframes dmRise2 { 0%, 22% { opacity: 0; transform: translateY(40px); } 32%, 88% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+@keyframes dmPop2  { 0%, 32% { opacity: 0; transform: scale(.3); } 40% { opacity: 1; transform: scale(1.08); } 44%, 88% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+@keyframes dmDrop  { 0%, 42% { opacity: 0; transform: translateY(-50px); } 50% { opacity: 1; transform: translateY(3px); } 54%, 88% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+@keyframes dmPop3  { 0%, 52% { opacity: 0; transform: scaleY(0); } 58%, 88% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+@keyframes dmGlow  { 0%, 58% { opacity: 0; } 62% { opacity: 1; } 66% { opacity: .5; } 70%, 88% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes dmGrow  { 0%, 60% { opacity: 0; transform: scale(0); } 68% { opacity: 1; transform: scale(1.12); } 72%, 88% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+.dm-cloud { animation: dmCloud 5s linear infinite; }
+@keyframes dmCloud { 0%, 66% { opacity: 0; transform: translateX(-40px); } 74% { opacity: 1; } 88% { opacity: 1; transform: translateX(14px); } 100% { opacity: 0; transform: translateX(20px); } }
+.dm-spark { animation: dmTwinkle 1.6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+.dm-s2 { animation-delay: .8s; }
+@keyframes dmTwinkle { 0%, 100% { opacity: 0; transform: scale(.3) rotate(0); } 50% { opacity: 1; transform: scale(1) rotate(45deg); } }
+/* the crayon scribbles from part to part */
+.dm-crayon { animation: dmCrayon 5s ease-in-out infinite; }
+@keyframes dmCrayon {
+  0% { transform: translate(30px, 24px) rotate(0); } 10% { transform: translate(200px, 30px) rotate(8deg); }
+  20% { transform: translate(190px, 48px) rotate(-6deg); } 30% { transform: translate(60px, 110px) rotate(6deg); }
+  40% { transform: translate(100px, 100px) rotate(-8deg); } 50% { transform: translate(104px, 74px) rotate(6deg); }
+  60% { transform: translate(102px, 118px) rotate(-6deg); } 70% { transform: translate(172px, 92px) rotate(8deg); }
+  80% { transform: translate(64px, 38px) rotate(-4deg); } 100% { transform: translate(30px, 24px) rotate(0); }
+}
+/* the face: a magnifying glass looks around, points twinkle, eyes blink */
+.dm-glass { animation: dmGlass 3.2s ease-in-out infinite; }
+@keyframes dmGlass { 0% { transform: translate(84px, 72px); } 25% { transform: translate(118px, 70px); } 50% { transform: translate(104px, 104px); } 75% { transform: translate(80px, 98px); } 100% { transform: translate(84px, 72px); } }
+.dm-pt { animation: dmPt 1.9s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes dmPt { 0%, 100% { opacity: .15; transform: scale(.6); } 50% { opacity: 1; transform: scale(1.3); } }
+.dm-blink { animation: dmBlink 3.4s infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes dmBlink { 0%, 92%, 100% { transform: none; } 95% { transform: scaleY(.1); } }
+@media (prefers-reduced-motion: reduce) {
+  .dm-a, .dm-cloud, .dm-spark, .dm-crayon, .dm-glass, .dm-pt, .dm-blink, .dm-line { animation: none !important; opacity: 1; }
+  .dm-crayon { transform: translate(190px, 110px); } .dm-glass { transform: translate(118px, 70px); }
+}

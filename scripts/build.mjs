@@ -75,12 +75,15 @@ ${js}
 </html>`;
 }
 
+// the background worker that turns photos into drawings, bundled as a string the app starts from a Blob
+const assetWorker = (await esbuild.build({ entryPoints: [path.join(root, 'src/labs/tales/assets/worker.ts')], bundle: true, write: false, format: 'iife', minify: true, target: ['es2020', 'safari15'], logLevel: 'warning' })).outputFiles[0].text;
+
 const common = {
   entryPoints: [path.join(root, 'src/main.tsx')],
   bundle: true,
   jsx: 'automatic',
   target: ['es2020', 'safari15'],
-  define: { __NN_ENV__: JSON.stringify(publicEnv), __NN_VENDOR__: JSON.stringify(SINGLE ? 'public/vendor/' : 'vendor/'), 'process.env.NODE_ENV': JSON.stringify(DEV ? 'development' : 'production') },
+  define: { __NN_ENV__: JSON.stringify(publicEnv), __NN_VENDOR__: JSON.stringify(SINGLE ? 'public/vendor/' : 'vendor/'), __NN_ASSET_WORKER__: JSON.stringify(assetWorker), 'process.env.NODE_ENV': JSON.stringify(DEV ? 'development' : 'production') },
   loader: { '.woff': 'file', '.svg': 'file' },
   logLevel: 'info',
 };

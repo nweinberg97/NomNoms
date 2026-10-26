@@ -282,8 +282,17 @@ export interface VectorOptions {
   debug?: (info: unknown) => void;
 }
 
-export function vectorize(src: Raster, opts: VectorOptions = {}): VectorArt {
+/** The stages of a redraw, in order, for anything that wants to show progress. */
+export type VectorStage = 'smoothing' | 'shapes' | 'merging' | 'sky' | 'outlines';
+
+/**
+ * The redraw as a sequence of stages: it pauses (yields) between them so a
+ * page can keep an animation running. `vectorize` runs it straight through;
+ * both give exactly the same result.
+ */
+export function* vectorizeSteps(src: Raster, opts: VectorOptions = {}): Generator<VectorStage, VectorArt> {
   const { w, h } = src, n = w * h;
+  yield 'smoothing';
   const smooth = kuwahara(kuwahara(src, 3), 2);
   const lab = new Float32Array(n * 3);
   for (let i = 0; i < n; i++) { const v = rgbToLab(smooth.data[i * 4], smooth.data[i * 4 + 1], smooth.data[i * 4 + 2]); lab[i * 3] = v[0]; lab[i * 3 + 1] = v[1]; lab[i * 3 + 2] = v[2]; }
@@ -295,7 +304,9 @@ export function vectorize(src: Raster, opts: VectorOptions = {}): VectorArt {
   }
   const detail = opts.detail ?? 'normal';
   const count = Math.round(n / ({ simple: 260, normal: 170, detailed: 110 }[detail]));
+  yield 'shapes';
   const sp = slic(lab, w, h, count, 14, opts.mask);
+  yield 'merging';
   const { label, regions } = merge(sp, lab, grad, w, h, { threshold: { simple: 15, normal: 11, detailed: 8 }[detail], minArea: Math.max(12, Math.round(n * { simple: 0.003, normal: 0.0015, detailed: 0.0008 }[detail])) });
 
   // per-region colour at its top and bottom
@@ -310,6 +321,7 @@ export function vectorize(src: Raster, opts: VectorOptions = {}): VectorArt {
     if (t >= 0.65) { a.b[0] += lab[i * 3]; a.b[1] += lab[i * 3 + 1]; a.b[2] += lab[i * 3 + 2]; a.bn++; }
   }
 
+  yield 'sky';
   // 4. the sky: shapes along the top edge that are bright and smooth, and alike neighbours of those
   const skyIds = new Set<number>();
   if (!opts.mask) {
@@ -348,6 +360,7 @@ export function vectorize(src: Raster, opts: VectorOptions = {}): VectorArt {
     }
   }
 
+  yield 'outlines';
   const shapes: VShape[] = [];
   const toRgb = (l: number[]) => labToRgb(l[0], l[1], l[2]).map((v) => Math.round(v)) as [number, number, number];
   for (const k of ids) {
@@ -372,6 +385,21 @@ export function vectorize(src: Raster, opts: VectorOptions = {}): VectorArt {
   return art;
 }
 
+export function vectorize(src: Raster, opts: VectorOptions = {}): VectorArt {
+  const it = vectorizeSteps(src, opts);
+  for (;;) { const r = it.next(); if (r.done) return r.value; }
+}
+
+/** Run a redraw stage by stage, letting the page breathe (and animate) in between. */
+export async function runSteps<T>(it: Generator<VectorStage, T>, onStage?: (s: VectorStage) => void): Promise<T> {
+  for (;;) {
+    const r = it.next();
+    if (r.done) return r.value;
+    onStage?.(r.value);
+    await new Promise((res) => setTimeout(res, 16));
+  }
+}
+
 export const DETAILS = ['normal', 'simple', 'detailed'] as const;
 
 /**
@@ -380,9 +408,13 @@ export const DETAILS = ['normal', 'simple', 'detailed'] as const;
  * drawing lines up with its size and anchor.
  */
 export function vectorizeAsset(src: Raster, kind: 'place' | 'object', mask: Uint8Array | undefined, detail: VectorOptions['detail'] = 'normal'): VectorArt {
-  if (kind === 'place' || !mask) return vectorize(src, { detail });
+  const it = vectorizeAssetSteps(src, kind, mask, detail);
+  for (;;) { const r = it.next(); if (r.done) return r.value; }
+}
+export function vectorizeAssetSteps(src: Raster, kind: 'place' | 'object', mask: Uint8Array | undefined, detail: VectorOptions['detail'] = 'normal'): Generator<VectorStage, VectorArt> {
+  if (kind === 'place' || !mask) return vectorizeSteps(src, { detail });
   const box = maskBox(mask, src.w, src.h);
-  if (!box) return vectorize(src, { mask, detail });
+  if (!box) return vectorizeSteps(src, { mask, detail });
   const pad = 4;
   const x0 = Math.max(0, box.x - pad), y0 = Math.max(0, box.y - pad);
   const x1 = Math.min(src.w, box.x + box.w + pad), y1 = Math.min(src.h, box.y + box.h + pad);
@@ -390,5 +422,5 @@ export function vectorizeAsset(src: Raster, kind: 'place' | 'object', mask: Uint
   const crop = cropRaster(src, rect);
   const m = new Uint8Array(rect.w * rect.h);
   for (let y = 0; y < rect.h; y++) for (let x = 0; x < rect.w; x++) m[y * rect.w + x] = mask[(y0 + y) * src.w + x0 + x];
-  return vectorize(crop, { mask: m, detail });
+  return vectorizeSteps(crop, { mask: m, detail });
 }
