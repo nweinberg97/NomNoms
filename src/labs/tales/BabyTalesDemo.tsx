@@ -168,7 +168,8 @@ export function BabyTalesDemo() {
   }, []);
   const undoToast = (text: string) => toast(text, { icon: 'check', ms: 5000, action: { label: 'Undo', run: () => undoRef.current() } });
   const [status, setStatus] = useState<string>();
-  const [adding, setAdding] = useState(false);
+  /** A just-added person still waiting for a photo, a preset or a drawing. */
+  const [pendingId, setPendingId] = useState<string | null>(null);
   const [pad, setPad] = useState<{ mode: DrawMode; redraw?: string } | null>(null);
   const [wardrobe, setWardrobe] = useState<DrawnWear[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -222,7 +223,17 @@ export function BabyTalesDemo() {
   const update = (patch: { member?: Partial<CastMember>; look?: Partial<Look> }, i = pi) =>
     setCast((cs) => cs.map((p, k) => (k === i ? { member: { ...p.member, ...patch.member }, look: { ...p.look, ...patch.look } } : p)));
   const byId = (id: string) => cast.find((p) => p.member.id === id);
-  const choose = (i: number) => { setSel(i); setStatus(undefined); setResult(null); };
+  const choose = (i: number) => {
+    setStatus(undefined); setResult(null);
+    // leaving an untouched new person behind simply drops it
+    if (pendingId && cast[i]?.member.id !== pendingId) {
+      const id = cast[i].member.id;
+      const rest = cast.filter((p) => p.member.id !== pendingId);
+      setCast(rest); setPendingId(null); setSel(Math.max(0, rest.findIndex((p) => p.member.id === id)));
+      return;
+    }
+    setSel(i);
+  };
 
   /* ── faces ─────────────────────────────────────────── */
   /** A hand-picked identity trait: change it and remember the parent chose it. */
@@ -253,10 +264,15 @@ export function BabyTalesDemo() {
         setSel(cast.length);
         setCast((cs) => [...cs, { member: { ...fresh.member, role }, look }]);
         setTimeout(() => studioRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
+      } else if (id === pendingId) {
+        // the new person gets their look, a fitting role, and joins the story
+        const role: Role = look.kind === 'elder' ? 'grandparent' : look.kind === 'adult' ? 'relative' : look.kind === 'baby' ? 'sibling' : 'friend';
+        setCast((cs) => cs.map((p) => (p.member.id === id ? { member: { ...p.member, role, inStory: true }, look } : p)));
+        setPendingId(null);
       } else setCast((cs) => cs.map((p) => (p.member.id === id ? { ...p, look } : p)));
       setReadings((rs) => ({ ...rs, [id]: m }));
       setResult({ who: fresh ? 'Someone new' : who.member.name, from, matched: describeDNA(r.dna), notes: r.dna.warnings, kept });
-      setStatus(fresh ? 'Added! Give them a name below.' : undefined);
+      setStatus(fresh || id === pendingId ? 'Added! Give them a name below.' : undefined);
       undoToast(fresh ? 'Added someone new from the photo' : `Made ${who.member.name || 'them'} from the photo`);
     } catch (e) {
       setStatus((e as Error).message);
@@ -289,8 +305,30 @@ export function BabyTalesDemo() {
     const p = make();
     setCast((cs) => [...cs, p]);
     setSel(cast.length);
-    setAdding(false);
     toast(`${p.member.call} joined the story`, { icon: 'plus', ms: 1500 });
+  };
+  /** 'Add': a new, highlighted person of their own, so a photo never replaces anyone else. */
+  const startNew = () => {
+    const open = pendingId ? cast.findIndex((p) => p.member.id === pendingId) : -1;
+    if (open >= 0) { setSel(open); return; }
+    const p = mk('relative', 'New person', 'New person', { kind: 'adult', skin: '#e4ad86', hair: '#7a5236', hairStyle: 'short', outfit: 'tee', personality: 'sunny' });
+    p.member.inStory = false;
+    setCast((cs) => [...cs, p]);
+    setSel(cast.length);
+    setPendingId(p.member.id);
+    setResult(null); setStatus(undefined);
+    setTimeout(() => studioRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
+  };
+  /** The new person becomes a preset (Sister, Grandma, a cat…), in the same spot. */
+  const fillPending = (make: () => Person) => {
+    const p = make();
+    setCast((cs) => cs.map((x) => (x.member.id === pendingId ? { member: { ...p.member, id: x.member.id }, look: p.look } : x)));
+    setPendingId(null);
+    toast(`${p.member.call} joined the story`, { icon: 'plus', ms: 1500 });
+  };
+  const cancelNew = () => {
+    const rest = cast.filter((p) => p.member.id !== pendingId);
+    setCast(rest); setPendingId(null); setSel(Math.min(sel, rest.length - 1));
   };
   const remove = () => {
     if (pi === 0) return;
@@ -312,7 +350,8 @@ export function BabyTalesDemo() {
       setPlaces((ps) => [...ps, id]);
       toast(`“${name}” is in the story now`, { icon: 'sparkle', ms: 1800 });
     } else if (pad?.redraw) {
-      setCast((cs) => cs.map((p) => (p.member.id === pad.redraw ? { ...p, member: { ...p.member, name, call: name }, look: { ...p.look, drawing: image } } : p)));
+      setCast((cs) => cs.map((p) => (p.member.id === pad.redraw ? { ...p, member: { ...p.member, name, call: name, ...(p.member.id === pendingId ? { inStory: true } : {}) }, look: { ...p.look, drawing: image } } : p)));
+      if (pad.redraw === pendingId) setPendingId(null);
     } else {
       const p = mk('friend', name, name, { kind: 'kid', drawing: image });
       setCast((cs) => [...cs, p]);
@@ -448,37 +487,44 @@ export function BabyTalesDemo() {
           {status && busy !== undefined && <p className="lab-status" role="status">{status}</p>}
           <div className="bt-cast" role="group" aria-label="Cast">
             {cast.map((p, i) => (
-              <button key={p.member.id} type="button" className={cx('bt-member', !p.member.inStory && 'is-out')} aria-pressed={i === pi} onClick={() => choose(i)} data-testid={`cast-${p.member.id}`}>
+              <button key={p.member.id} type="button" className={cx('bt-member', p.member.id === pendingId ? 'is-new' : !p.member.inStory && 'is-out')} aria-pressed={i === pi} onClick={() => choose(i)} data-testid={`cast-${p.member.id}`}>
                 <span className="bt-face" dangerouslySetInnerHTML={{ __html: characterSvg(p.look, { style: mode, viewBox: p.look.drawing ? '-20 -30 240 300' : isPet(p.look.kind) ? '30 14 140 140' : fitViewBox(FACE_VIEWBOX, p.look, mode) }) }} />
                 <span className="bt-member-name">{p.member.name || 'No name'}</span>
-                <small>{usesCall(p.member.role) ? p.member.call : p.look.drawing ? 'Drawn' : ROLE_LABEL[p.member.role]}</small>
+                <small>{p.member.id === pendingId ? 'Add a photo' : usesCall(p.member.role) ? p.member.call : p.look.drawing ? 'Drawn' : ROLE_LABEL[p.member.role]}</small>
               </button>
             ))}
             <button type="button" className="bt-member is-add is-photo" onClick={() => newFileRef.current?.click()} disabled={!!busy} data-testid="cast-photo">
               <span className="bt-face"><Icon name="camera" size={22} /></span><span className="bt-member-name">Photo</span><small>add from a photo</small>
             </button>
-            <button type="button" className="bt-member is-add" onClick={() => setAdding((a) => !a)} aria-expanded={adding} data-testid="cast-add">
+            <button type="button" className="bt-member is-add" onClick={startNew} data-testid="cast-add">
               <span className="bt-face"><Icon name="plus" size={24} /></span><span className="bt-member-name">Add</span><small>someone</small>
             </button>
             <button type="button" className="bt-member is-add" onClick={() => setPad({ mode: 'character' })} data-testid="cast-draw">
               <span className="bt-face"><Icon name="pen" size={22} /></span><span className="bt-member-name">Draw</span><small>a character</small>
             </button>
           </div>
-          {adding && (
-            <div className="lab-card bt-adder" data-testid="cast-adder">
-              <h3>Add to the story</h3>
-              <div className="lab-chips">
-                <button type="button" className="lab-chip is-accent" onClick={() => { setAdding(false); newFileRef.current?.click(); }} data-testid="add-photo"><Icon name="camera" size={14} /> From a photo</button>
-                {ADDABLE.map((a) => <button key={a.label} type="button" className="lab-chip" onClick={() => add(a.make)} data-testid={`add-${a.label}`}>{a.label}</button>)}
-                <button type="button" className="lab-chip is-accent" onClick={() => { setAdding(false); setPad({ mode: 'character' }); }} data-testid="add-drawing"><Icon name="pen" size={14} /> Draw a character</button>
-              </div>
-            </div>
-          )}
 
           <div className="bt-studio" ref={studioRef}>
             <div className="bt-stage" dangerouslySetInnerHTML={{ __html: characterSvg(person.look, { animated: true, style: mode, label: `${person.member.name}’s character` }) }} />
 
             <div className="bt-panel">
+              {person.member.id === pendingId && (
+                <div className="lab-card bt-newcard" data-testid="cast-adder">
+                  <h3>Who’s joining the story?</h3>
+                  <p className="lab-sub">Add a photo of them and NomNoms draws them. Nobody else in the story changes.</p>
+                  <div className="lab-row">
+                    <button type="button" className="btn btn-primary" onClick={() => fileRef.current?.click()} disabled={!!busy} data-testid="new-photo">
+                      <Icon name="camera" size={16} /> {busy === 'own' ? 'Reading the face…' : 'Add a photo of them'}
+                    </button>
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={cancelNew} data-testid="new-cancel">Cancel</button>
+                  </div>
+                  <p className="lab-sub">Or start from:</p>
+                  <div className="lab-chips">
+                    {ADDABLE.map((a) => <button key={a.label} type="button" className="lab-chip" onClick={() => fillPending(a.make)} data-testid={`add-${a.label}`}>{a.label}</button>)}
+                    <button type="button" className="lab-chip is-accent" onClick={() => setPad({ mode: 'character', redraw: person.member.id })} data-testid="add-drawing"><Icon name="pen" size={14} /> Draw them</button>
+                  </div>
+                </div>
+              )}
               <div className="lab-card">
                 <div className="bt-names">
                   <label className="field"><span>Name</span>

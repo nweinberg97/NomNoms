@@ -327,3 +327,10 @@
 .bt-kindpick { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 6px 0; font-size: 12.5px; }
 .bt-kindpick > span { color: var(--ink-3, #7a6f66); }
 .bt-kindpick .lab-chip[aria-checked="true"] { background: var(--ink, #2a201c); color: #fff; border-color: var(--ink, #2a201c); }
+
+/* a just-added person: clearly new, clearly theirs */
+.bt-member.is-new .bt-face { outline: 2.5px dashed var(--accent, #b5532b); outline-offset: 3px; background: #fdebe0; }
+.bt-member.is-new small { color: var(--accent, #b5532b); font-weight: 600; }
+.bt-newcard { border: 1.5px solid var(--accent, #b5532b); background: linear-gradient(135deg, #fff4ea, #fdebe0); }
+.bt-newcard h3 { margin-top: 0; }
+.bt-newcard .btn-primary { min-height: 44px; }
