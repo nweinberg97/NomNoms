@@ -122,6 +122,52 @@ export function BabyTalesDemo() {
   const [dropping, setDropping] = useState<'new' | 'current' | false>(false);
   /** The last photo reading per person (numbers only, no pixels), so the age group can be changed with a tap. */
   const [readings, setReadings] = useState<Record<string, Measurements>>({});
+
+  /* ── undo / redo for every change to the characters ──────── */
+  type Snap = { cast: Person[]; chosen: Record<string, IdentityKey[]>; readings: Record<string, Measurements>; sel: number };
+  const past = useRef<Snap[]>([]);
+  const future = useRef<Snap[]>([]);
+  const prevSnap = useRef<Snap>({ cast, chosen, readings, sel });
+  const lastPush = useRef(0);
+  const restoring = useRef(false);
+  const [, setHistoryTick] = useState(0);
+  useEffect(() => {
+    const now: Snap = { cast, chosen, readings, sel };
+    const was = prevSnap.current;
+    prevSnap.current = now;
+    if (restoring.current) { restoring.current = false; return; }
+    if (was.cast === cast && was.chosen === chosen) return; // just picking someone isn't a change
+    const t = Date.now();
+    // a slider drag or a burst of typing is one step
+    if (t - lastPush.current > 700 || !past.current.length) { past.current.push(was); if (past.current.length > 60) past.current.shift(); }
+    lastPush.current = t;
+    future.current = [];
+    setHistoryTick((x) => x + 1);
+  }, [cast, chosen, readings, sel]);
+  const restore = (to: Snap) => {
+    restoring.current = true;
+    lastPush.current = 0;
+    setCast(to.cast); setChosen(to.chosen); setReadings(to.readings);
+    setSel(Math.min(to.sel, to.cast.length - 1));
+    setResult(null); setStatus(undefined);
+    setHistoryTick((x) => x + 1);
+  };
+  const undo = () => { const s = past.current.pop(); if (!s) return; future.current.push(prevSnap.current); restore(s); };
+  const redo = () => { const s = future.current.pop(); if (!s) return; past.current.push(prevSnap.current); restore(s); };
+  const undoRef = useRef(undo); undoRef.current = undo;
+  const redoRef = useRef(redo); redoRef.current = redo;
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 'z' && e.key.toLowerCase() !== 'y') return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) && (t as HTMLInputElement).type !== 'range' && (t as HTMLInputElement).type !== 'checkbox')) return; // text keeps its own undo
+      e.preventDefault();
+      if (e.key.toLowerCase() === 'y' || e.shiftKey) redoRef.current(); else undoRef.current();
+    };
+    window.addEventListener('keydown', key);
+    return () => window.removeEventListener('keydown', key);
+  }, []);
+  const undoToast = (text: string) => toast(text, { icon: 'check', ms: 5000, action: { label: 'Undo', run: () => undoRef.current() } });
   const [status, setStatus] = useState<string>();
   const [adding, setAdding] = useState(false);
   const [pad, setPad] = useState<{ mode: DrawMode; redraw?: string } | null>(null);
@@ -212,6 +258,7 @@ export function BabyTalesDemo() {
       setReadings((rs) => ({ ...rs, [id]: m }));
       setResult({ who: fresh ? 'Someone new' : who.member.name, from, matched: describeDNA(r.dna), notes: r.dna.warnings, kept });
       setStatus(fresh ? 'Added! Give them a name below.' : undefined);
+      undoToast(fresh ? 'Added someone new from the photo' : `Made ${who.member.name || 'them'} from the photo`);
     } catch (e) {
       setStatus((e as Error).message);
     } finally {
@@ -248,8 +295,10 @@ export function BabyTalesDemo() {
   };
   const remove = () => {
     if (pi === 0) return;
+    const name = person.member.name || 'them';
     setCast((cs) => cs.filter((_, k) => k !== pi));
     setSel(Math.max(0, pi - 1));
+    undoToast(`Removed ${name}`);
   };
   const onDrawn = (image: string, name: string) => {
     if (pad && pad.mode !== 'place' && pad.mode !== 'character') {
@@ -341,9 +390,15 @@ export function BabyTalesDemo() {
   return (
     <div className="lab bt">
       <LabsHeader title="Baby Tales" />
-      <div className="bt-lookbar" role="radiogroup" aria-label="Look">
-        <span>Look</span>
-        {STYLE_MODES.map((m) => <button key={m} type="button" role="radio" aria-checked={mode === m} onClick={() => setMode(m)} data-testid={`lookbar-${m}`}>{STYLES[m].name}</button>)}
+      <div className="bt-lookbar">
+        <div className="bt-lookbar-looks" role="radiogroup" aria-label="Look">
+          <span>Look</span>
+          {STYLE_MODES.map((m) => <button key={m} type="button" role="radio" aria-checked={mode === m} onClick={() => setMode(m)} data-testid={`lookbar-${m}`}>{STYLES[m].name}</button>)}
+        </div>
+        <div className="bt-undo" role="group" aria-label="Undo and redo">
+          <button type="button" onClick={undo} disabled={!past.current.length} aria-label="Undo" title="Undo (Ctrl/⌘ Z)" data-testid="undo"><Icon name="undo" size={16} /><em>Undo</em></button>
+          <button type="button" onClick={redo} disabled={!future.current.length} aria-label="Redo" title="Redo (Shift Ctrl/⌘ Z)" data-testid="redo"><Icon name="redo" size={16} /></button>
+        </div>
       </div>
       <main className="lab-main">
         <section className="lab-hero">

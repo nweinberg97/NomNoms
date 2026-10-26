@@ -47,6 +47,7 @@ const P: Record<string, React.ReactNode> = {
   grid: <><rect x="4" y="4" width="7" height="7" rx="1.2" /><rect x="13" y="4" width="7" height="7" rx="1.2" /><rect x="4" y="13" width="7" height="7" rx="1.2" /><rect x="13" y="13" width="7" height="7" rx="1.2" /></>,
   expand: <path d="M4.5 9.5v-5h5M19.5 9.5v-5h-5M4.5 14.5v5h5M19.5 14.5v5h-5" />,
   undo: <path d="M9 7 4.5 11.5 9 16M4.5 11.5H15a4.5 4.5 0 0 1 0 9h-2" />,
+  redo: <path d="M15 7 19.5 11.5 15 16M19.5 11.5H9a4.5 4.5 0 0 0 0 9h2" />,
   stop: <rect x="7" y="7" width="10" height="10" rx="1.5" />,
   flipcam: <><path d="M4 8.5A1.5 1.5 0 0 1 5.5 7h2.1l1.4-2h6l1.4 2h2.1A1.5 1.5 0 0 1 20 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5v-9Z" /><path d="M9 12.5a3 3 0 0 1 5.2-2M15 13a3 3 0 0 1-5.2 2M14.6 8.6v2h-2M9.4 17.2v-2h2" /></>,
   cloud: <path d="M7 18.5a4.5 4.5 0 0 1-.5-9 6 6 0 0 1 11.6 1.5A3.75 3.75 0 0 1 17.5 18.5H7Z" />,
