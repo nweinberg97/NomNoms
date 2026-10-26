@@ -13,7 +13,14 @@ import {
 import { DrawPad, type DrawMode } from './DrawPad';
 import { SAMPLE_PHOTOS, samplePhotoUrl, traitsFromPhoto } from './fromPhoto';
 import { fill, generateStory, regeneratePage, tokenize, type CastMember, type Story, type StoryPage } from './generator';
-import { sceneSvg, type DrawnPlace } from './scene';
+import { sceneSvg, type DrawnPlace, type SceneThing } from './scene';
+import { STYLE_MODES, STYLES, type StyleMode } from './styles';
+import { AssetStudio } from './AssetStudio';
+import { rasterToUrl } from './assets/browser';
+import { deleteAsset, listAssets, saveAsset } from './assets/library';
+import type { StoredAsset } from './assets/meta';
+import type { AssetKind } from './assets/pipeline';
+import { renderBase } from './assets/render';
 
 /**
  * NomNoms Baby Tales, the try-it demo.
@@ -69,14 +76,19 @@ const FACIALS = Object.keys(FACIAL) as Facial[];
 interface DrawnWear { id: string; slot: WearSlot; name: string; image: string }
 const usesCall = (r: Role) => r === 'parent' || r === 'grandparent' || r === 'relative' || r === 'teacher';
 
-function placeFromDrawing(id: string, name: string, image: string): DrawnPlace {
+/** A place the family made (drawn or from a photo), in words the story generator can use. */
+function familyPlace(id: string, name: string): Place {
   const first = name.split(' ')[0];
   const lowered = ['The', 'Our', 'My', 'A', 'An'].includes(first) ? name.charAt(0).toLowerCase() + name.slice(1) : name;
   return {
-    id, name, at: `at ${lowered}`, image, sky: ['#ffffff', '#ffffff'], ground: '#ffffff', groundKind: 'floor', horizon: 'none', props: ['✨', '🎨'],
+    id, name, at: `at ${lowered}`, sky: ['#ffffff', '#ffffff'], ground: '#ffffff', groundKind: 'floor', horizon: 'none', props: ['✨', '🌟'],
     surprises: ['just a little bird singing', 'just a big friendly smile', 'just a rainbow of colours', 'just a funny shadow'],
     doing: ['play and play', 'look all around', 'have a little adventure', 'dance and giggle'],
   };
+}
+
+function placeFromDrawing(id: string, name: string, image: string): DrawnPlace {
+  return { ...familyPlace(id, name), image, props: ['✨', '🎨'] };
 }
 
 export function BabyTalesDemo() {
@@ -102,14 +114,45 @@ export function BabyTalesDemo() {
   const genRef = useRef<HTMLDivElement>(null);
   const members = cast.map((p) => p.member);
   const membership = cast.map((p) => `${p.member.id}:${p.member.inStory}`).join();
-  const extraPlaces: Place[] = drawn;
+  /* ── the look, and the family's places and things ───── */
+  const [mode, setMode] = useState<StyleMode>('pocketlight');
+  const [library, setLibrary] = useState<StoredAsset[]>([]);
+  const [saved, setSaved] = useState<Set<string>>(new Set());
+  const [studio, setStudio] = useState<{ kind: AssetKind } | null>(null);
+  useEffect(() => { void listAssets().then((a) => { setLibrary(a); setSaved(new Set(a.map((x) => x.meta.id))); }); }, []);
+  // every place and thing is redrawn from its stored regions in the current look
+  const art_ = useMemo(() => new Map(library.map((a) => [a.meta.id, rasterToUrl(renderBase(a.base, mode), 'image/png')])), [library, mode]);
+  const photoPlaces = library.filter((a) => a.meta.kind === 'place');
+  const things = library.filter((a) => a.meta.kind === 'object');
+  const extraPlaces: Place[] = [...drawn, ...photoPlaces.map((a) => familyPlace(a.meta.id, a.meta.name))];
+  const onAsset = async (a: StoredAsset, save: boolean) => {
+    setStudio(null);
+    setLibrary((l) => [a, ...l.filter((x) => x.meta.id !== a.meta.id)]);
+    if (a.meta.kind === 'place') setPlaces((ps) => [...ps, a.meta.id]);
+    if (save) {
+      try {
+        await saveAsset(a);
+        setSaved((s0) => new Set(s0).add(a.meta.id));
+        toast(`“${a.meta.name}” is saved in this browser`, { icon: 'check', ms: 2000 });
+      } catch (e) {
+        toast((e as Error).message, { icon: 'x', ms: 2600 });
+      }
+    } else toast(`“${a.meta.name}” is in this story for now`, { icon: 'sparkle', ms: 2000 });
+  };
+  const removeAsset = async (id: string) => {
+    if (saved.has(id)) await deleteAsset(id).catch(() => undefined);
+    setLibrary((l) => l.filter((x) => x.meta.id !== id));
+    setSaved((s0) => { const n = new Set(s0); n.delete(id); return n; });
+    setPlaces((ps) => ps.filter((x) => x !== id));
+    setStory((st) => ({ ...st, pages: st.pages.map((pg) => ({ ...pg, things: pg.things?.filter((t) => t !== id) })) }));
+  };
 
   // a new story whenever its recipe changes
   useEffect(() => {
     setStory(generateStory(type, members, { seed, places, extraPlaces }));
     setView(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [type, seed, places.join(), membership, drawn.length]);
+  }, [type, seed, places.join(), membership, drawn.length, photoPlaces.length]);
 
   const person = cast[Math.min(sel, cast.length - 1)];
   const pi = cast.indexOf(person);
@@ -209,16 +252,30 @@ export function BabyTalesDemo() {
     return l;
   };
   const drawnPlace = (id?: string) => drawn.find((d) => d.id === id);
+  const photoPlace = (id?: string) => {
+    const a = photoPlaces.find((x) => x.meta.id === id);
+    return a && art_.get(a.meta.id) ? { image: art_.get(a.meta.id)!, horizon: a.meta.placement.horizon ?? 0.55 } : undefined;
+  };
+  const thingsFor = (p?: StoryPage): SceneThing[] => (p?.things ?? []).map((tid, i) => {
+    const a = things.find((x) => x.meta.id === tid);
+    if (!a || !art_.get(tid)) return null;
+    return { image: art_.get(tid)!, width: a.base.w, height: a.base.h, heightRatio: a.meta.placement.heightRatio ?? 0.5, x: [0.86, 0.5, 0.14][i % 3] };
+  }).filter(Boolean) as SceneThing[];
   const art = (p: StoryPage | undefined, animated: boolean) => {
     if (!p) {
       const first = story.pages[0];
       const ids = [cast[0].member.id, ...cast.filter((c, i) => i > 0 && c.member.inStory).slice(0, 2).map((c) => c.member.id)];
-      return sceneSvg({ placeId: first?.place ?? 'park', drawn: drawnPlace(first?.place), seed: story.seed, chars: ids.map((id) => ({ look: lookFor(id, first)! })), animated, label: 'Story cover' });
+      return sceneSvg({ placeId: first?.place ?? 'park', drawn: drawnPlace(first?.place), photo: photoPlace(first?.place), seed: story.seed, chars: ids.map((id) => ({ look: lookFor(id, first)! })), animated, label: 'Story cover', style: mode });
     }
     const chars = p.cast.map((id) => lookFor(id, p)).filter(Boolean).map((look) => ({ look: look! }));
-    return sceneSvg({ placeId: p.place, drawn: drawnPlace(p.place), seed: story.seed + view, chars, focus: p.focus, animated, label: fill(p.text, members) });
+    return sceneSvg({ placeId: p.place, drawn: drawnPlace(p.place), photo: photoPlace(p.place), things: thingsFor(p), seed: story.seed + view, chars, focus: p.focus, animated, label: fill(p.text, members), style: mode });
   };
-  const bigArt = useMemo(() => art(page, true), [page, cast, dressUp, story, view, drawn]); // eslint-disable-line react-hooks/exhaustive-deps
+  const bigArt = useMemo(() => art(page, true), [page, cast, dressUp, story, view, drawn, mode, art_]); // eslint-disable-line react-hooks/exhaustive-deps
+  // a preview of each look: the star and one friend at the park
+  const lookPreviews = useMemo(() => {
+    const friend = cast.find((c, i) => i > 0 && !isPet(c.look.kind) && !c.look.drawing) ?? cast[0];
+    return new Map(STYLE_MODES.map((m) => [m, sceneSvg({ placeId: 'park', seed: 4, chars: [{ look: cast[0].look }, { look: friend.look }], style: m })]));
+  }, [cast]);
   const toggle = (id: string) => setPlaces((ps) => (ps.includes(id) ? ps.filter((x) => x !== id) : [...ps, id]));
   const pet = isPet(person.look.kind);
   const drawing = !!person.look.drawing;
@@ -237,7 +294,7 @@ export function BabyTalesDemo() {
           <p className="eyebrow">NomNoms Baby Tales · Demo</p>
           <h1 className="display">The Adventures of <em>{cast[0].member.name || 'your little one'}</em></h1>
           <p className="lab-lede">Turn your family into storybook characters, dress them up, draw your own places and friends, and get a simple story where they’re the heroes. Change any name, place, outfit or word.</p>
-          <DemoNote>Photos are read on this device to make the characters, then let go. Nothing in this demo is uploaded or saved.</DemoNote>
+          <DemoNote>Photos are read on this device and never uploaded. Nothing is saved unless you choose “Save to my library”, and then only in this browser.</DemoNote>
         </section>
 
         {/* ── 1. the cast ─────────────────────────────── */}
@@ -246,7 +303,7 @@ export function BabyTalesDemo() {
           <div className="bt-cast" role="group" aria-label="Cast">
             {cast.map((p, i) => (
               <button key={p.member.id} type="button" className={cx('bt-member', !p.member.inStory && 'is-out')} aria-pressed={i === pi} onClick={() => choose(i)} data-testid={`cast-${p.member.id}`}>
-                <span className="bt-face" dangerouslySetInnerHTML={{ __html: characterSvg(p.look, { viewBox: p.look.drawing ? '-20 -30 240 300' : isPet(p.look.kind) ? '30 14 140 140' : FACE_VIEWBOX }) }} />
+                <span className="bt-face" dangerouslySetInnerHTML={{ __html: characterSvg(p.look, { style: mode, viewBox: p.look.drawing ? '-20 -30 240 300' : isPet(p.look.kind) ? '30 14 140 140' : FACE_VIEWBOX }) }} />
                 <span className="bt-member-name">{p.member.name || 'No name'}</span>
                 <small>{usesCall(p.member.role) ? p.member.call : p.look.drawing ? 'Drawn' : ROLE_LABEL[p.member.role]}</small>
               </button>
@@ -269,7 +326,7 @@ export function BabyTalesDemo() {
           )}
 
           <div className="bt-studio">
-            <div className="bt-stage" dangerouslySetInnerHTML={{ __html: characterSvg(person.look, { animated: true, label: `${person.member.name}’s character` }) }} />
+            <div className="bt-stage" dangerouslySetInnerHTML={{ __html: characterSvg(person.look, { animated: true, style: mode, label: `${person.member.name}’s character` }) }} />
 
             <div className="bt-panel">
               <div className="lab-card">
@@ -445,9 +502,47 @@ export function BabyTalesDemo() {
           </div>
         </section>
 
-        {/* ── 2. the story ─────────────────────────────── */}
+        {/* ── 2. the look ──────────────────────────────── */}
+        <section className="lab-section" aria-labelledby="bt-look">
+          <div className="lab-h"><span className="lab-n">2</span><h2 id="bt-look" className="display">The look</h2></div>
+          <p className="lab-sub bt-look-sub">Everyone keeps their own face, hair and clothes in every look. Switch any time; nothing in the story changes.</p>
+          <div className="bt-looks" role="radiogroup" aria-label="Look of the book">
+            {STYLE_MODES.map((m) => (
+              <button key={m} type="button" className="bt-look" role="radio" aria-checked={mode === m} onClick={() => setMode(m)} data-testid={`look-${m}`}>
+                <span className="bt-look-art" dangerouslySetInnerHTML={{ __html: lookPreviews.get(m)! }} />
+                <strong>{STYLES[m].name}</strong>
+                <small>{STYLES[m].blurb}</small>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        {/* ── 3. places and things from photos ─────────── */}
+        <section className="lab-section" aria-labelledby="bt-things">
+          <div className="lab-h"><span className="lab-n">3</span><h2 id="bt-things" className="display">Your places and things</h2></div>
+          <div className="lab-card">
+            <p className="lab-sub">Take a photo of your house, the zoo, a favourite teddy or the dog, and it becomes part of the storybook, drawn in the book’s look. The photo is turned into a drawing on this device and isn’t uploaded or kept.</p>
+            <div className="lab-row">
+              <button type="button" className="btn btn-primary btn-sm" onClick={() => setStudio({ kind: 'place' })} data-testid="add-photo-place"><Icon name="camera" size={15} /> A place from a photo</button>
+              <button type="button" className="btn btn-primary btn-sm" onClick={() => setStudio({ kind: 'object' })} data-testid="add-photo-thing"><Icon name="camera" size={15} /> A thing from a photo</button>
+            </div>
+            {library.length > 0 ? (
+              <div className="bt-library" data-testid="library">
+                {library.map((a) => (
+                  <div key={a.meta.id} className={cx('bt-asset', a.meta.kind === 'object' && 'is-thing')}>
+                    <img src={art_.get(a.meta.id)} alt="" />
+                    <div><strong>{a.meta.name}</strong><small>{a.meta.kind === 'place' ? 'Place' : 'Thing'} · {saved.has(a.meta.id) ? 'Saved in this browser' : 'This story only'}</small></div>
+                    <button type="button" className="btn btn-danger-ghost btn-sm" onClick={() => void removeAsset(a.meta.id)} aria-label={`Delete ${a.meta.name}`} data-testid="asset-delete"><Icon name="x" size={14} /></button>
+                  </div>
+                ))}
+              </div>
+            ) : <p className="lab-hint">Nothing yet. Places show up as story places; things can be added to any page.</p>}
+          </div>
+        </section>
+
+        {/* ── 4. the story ─────────────────────────────── */}
         <section className="lab-section" aria-labelledby="bt-story">
-          <div className="lab-h"><span className="lab-n">2</span><h2 id="bt-story" className="display">The story</h2></div>
+          <div className="lab-h"><span className="lab-n">4</span><h2 id="bt-story" className="display">The story</h2></div>
           <div className="lab-card">
             <h3>What kind of story?</h3>
             <div className="bt-types">
@@ -463,6 +558,11 @@ export function BabyTalesDemo() {
               {drawn.map((d) => (
                 <button key={d.id} type="button" className="lab-chip is-drawn" aria-pressed={places.includes(d.id)} onClick={() => toggle(d.id)}>
                   <img src={d.image} alt="" /> {d.name}
+                </button>
+              ))}
+              {photoPlaces.map((a) => (
+                <button key={a.meta.id} type="button" className="lab-chip is-drawn" aria-pressed={places.includes(a.meta.id)} onClick={() => toggle(a.meta.id)} data-testid="place-photo">
+                  <img src={art_.get(a.meta.id)} alt="" /> {a.meta.name}
                 </button>
               ))}
               {PLACES.filter((p) => p.id !== 'home').map((p) => (
@@ -510,6 +610,7 @@ export function BabyTalesDemo() {
                 <div className="bt-edit-row">
                   <label className="field"><span>Place</span>
                     <select value={page.place} onChange={(e) => setPage({ place: e.target.value })} data-testid="page-place">
+                      {photoPlaces.length > 0 && <optgroup label="Your photos">{photoPlaces.map((a) => <option key={a.meta.id} value={a.meta.id}>{a.meta.name}</option>)}</optgroup>}
                       {drawn.length > 0 && <optgroup label="Your drawings">{drawn.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</optgroup>}
                       <optgroup label="Places">{PLACES.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</optgroup>
                     </select>
@@ -526,6 +627,19 @@ export function BabyTalesDemo() {
                     </div>
                   </div>
                 </div>
+                {things.length > 0 && (
+                  <div>
+                    <p className="lab-sub">Your things on this page (up to 3)</p>
+                    <div className="lab-chips">
+                      {things.map((a) => (
+                        <button key={a.meta.id} type="button" className="lab-chip is-drawn" aria-pressed={!!page.things?.includes(a.meta.id)} data-testid="page-thing"
+                          onClick={() => setPage({ things: page.things?.includes(a.meta.id) ? page.things.filter((x) => x !== a.meta.id) : [...(page.things ?? []), a.meta.id].slice(0, 3) })}>
+                          <img src={art_.get(a.meta.id)} alt="" /> {a.meta.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <div className="lab-row">
                   <button type="button" className="btn btn-ghost btn-sm" onClick={() => { const fresh = regeneratePage(story, view - 1, members, story.seed * 31 + view * 7 + Math.floor(Math.random() * 1000), extraPlaces); setPage({ ...fresh }); toast('New version of this page', { icon: 'sparkle', ms: 1400 }); }} data-testid="page-again">
                     <Icon name="refresh" size={15} /> Try another version
@@ -539,6 +653,7 @@ export function BabyTalesDemo() {
 
         <p className="lab-fine">A demo of a coming NomNoms feature. Characters and scenes are previews. Sample photos from <a href="https://unsplash.com/?utm_source=nomnoms&utm_medium=referral" target="_blank" rel="noreferrer">Unsplash</a>. Genmoji works on Apple devices with Apple Intelligence.</p>
       </main>
+      <AssetStudio open={!!studio} kind={studio?.kind ?? 'place'} mode={mode} star={cast[0].look} onClose={() => setStudio(null)} onDone={(a, save) => void onAsset(a, save)} />
       <DrawPad open={!!pad} mode={pad?.mode ?? 'character'} guide={guideFor(pad?.mode)} onClose={() => setPad(null)} onDone={onDrawn} />
     </div>
   );

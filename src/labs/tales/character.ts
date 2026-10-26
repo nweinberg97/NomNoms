@@ -1,3 +1,5 @@
+import { STYLES, darken, styleFilters, stylizeShapes, type StyleMode } from './styles';
+
 /**
  * Baby Tales characters: soft, rounded, full-body avatars in the spirit of
  * Bitmoji and animated-film storybooks: big glossy eyes with real eye colours,
@@ -117,16 +119,44 @@ export const shade = (hex: string, k: number) => {
 };
 
 /* ── shared gradients ─────────────────────────────────────── */
+/** The mode of the character being drawn right now (set by characterMarkup). */
+let MODE: StyleMode = 'pocketlight';
+
 function defs(id: string, l: Look, skin: string, fur: string) {
   const eye = l.eyes ?? EYE_COLOURS[0];
-  return `<defs>
-    <radialGradient id="sk${id}" cx="40%" cy="30%" r="78%"><stop offset="0" stop-color="${shade(skin, 0.3)}"/><stop offset=".6" stop-color="${skin}"/><stop offset="1" stop-color="${shade(skin, -0.14)}"/></radialGradient>
-    <linearGradient id="hr${id}" x1="0" y1="0" x2=".3" y2="1"><stop offset="0" stop-color="${shade(l.hair, 0.25)}"/><stop offset=".55" stop-color="${l.hair}"/><stop offset="1" stop-color="${shade(l.hair, -0.22)}"/></linearGradient>
-    <radialGradient id="fu${id}" cx="40%" cy="30%" r="80%"><stop offset="0" stop-color="${shade(fur, 0.3)}"/><stop offset=".6" stop-color="${fur}"/><stop offset="1" stop-color="${shade(fur, -0.18)}"/></radialGradient>
-    <radialGradient id="ir${id}" cx="50%" cy="40%" r="60%"><stop offset="0" stop-color="${shade(eye, 0.45)}"/><stop offset=".6" stop-color="${eye}"/><stop offset="1" stop-color="${shade(eye, -0.45)}"/></radialGradient>
-    <radialGradient id="bl${id}" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#f27d7d" stop-opacity=".55"/><stop offset="1" stop-color="#f27d7d" stop-opacity="0"/></radialGradient>
-    <linearGradient id="gl${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".28"/><stop offset=".55" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".08"/></linearGradient>
-  </defs>`;
+  const stops = (pairs: [number, string, number?][]) => pairs.map(([o, c, a]) => `<stop offset="${o}" stop-color="${c}"${a === undefined ? '' : ` stop-opacity="${a}"`}/>`).join('');
+  const blush = `<radialGradient id="bl${id}" cx="50%" cy="50%" r="50%">${stops([[0, '#f27d7d', MODE === 'wondercut' ? 0.45 : 0.55], [MODE === 'wondercut' ? 0.7 : 1, '#f27d7d', MODE === 'wondercut' ? 0.45 : 0], [1, '#f27d7d', 0]])}</radialGradient>`;
+  let body = '';
+  switch (MODE) {
+    case 'gouache': // painted: gentle, low-contrast washes, no gloss
+      body = `<radialGradient id="sk${id}" cx="42%" cy="34%" r="80%">${stops([[0, shade(skin, 0.12)], [0.7, skin], [1, shade(skin, -0.06)]])}</radialGradient>
+        <linearGradient id="hr${id}" x1="0" y1="0" x2=".2" y2="1">${stops([[0, shade(l.hair, 0.1)], [0.5, l.hair], [1, shade(l.hair, -0.08)]])}</linearGradient>
+        <radialGradient id="fu${id}" cx="42%" cy="34%" r="80%">${stops([[0, shade(fur, 0.12)], [0.6, fur], [1, shade(fur, -0.06)]])}</radialGradient>
+        <radialGradient id="ir${id}" cx="50%" cy="40%" r="60%">${stops([[0, shade(eye, 0.2)], [1, shade(eye, -0.15)]])}</radialGradient>
+        <linearGradient id="gl${id}" x1="0" y1="0" x2="0" y2="1">${stops([[0, '#fff', 0.08], [1, '#000', 0.04]])}</linearGradient>`;
+      break;
+    case 'wondercut': // flat paper colours
+      body = `<linearGradient id="sk${id}">${stops([[0, skin], [1, skin]])}</linearGradient>
+        <linearGradient id="hr${id}">${stops([[0, l.hair], [1, l.hair]])}</linearGradient>
+        <linearGradient id="fu${id}">${stops([[0, fur], [1, fur]])}</linearGradient>
+        <linearGradient id="ir${id}">${stops([[0, eye], [1, eye]])}</linearGradient>
+        <linearGradient id="gl${id}">${stops([[0, '#fff', 0], [1, '#fff', 0]])}</linearGradient>`;
+      break;
+    case 'inked': // two-tone cel shading with a hard shadow edge
+      body = `<radialGradient id="sk${id}" cx="36%" cy="30%" r="82%">${stops([[0, shade(skin, 0.06)], [0.76, skin], [0.76, shade(skin, -0.12)], [1, shade(skin, -0.12)]])}</radialGradient>
+        <linearGradient id="hr${id}" x1="0" y1="0" x2=".3" y2="1">${stops([[0, shade(l.hair, 0.32)], [0.16, shade(l.hair, 0.32)], [0.16, l.hair], [0.62, l.hair], [0.62, shade(l.hair, -0.25)], [1, shade(l.hair, -0.25)]])}</linearGradient>
+        <radialGradient id="fu${id}" cx="36%" cy="30%" r="82%">${stops([[0, fur], [0.76, fur], [0.76, shade(fur, -0.15)], [1, shade(fur, -0.15)]])}</radialGradient>
+        <radialGradient id="ir${id}" cx="50%" cy="40%" r="60%">${stops([[0, shade(eye, 0.3)], [0.5, eye], [0.5, shade(eye, -0.3)], [1, shade(eye, -0.3)]])}</radialGradient>
+        <linearGradient id="gl${id}" x1="0" y1="0" x2="0" y2="1">${stops([[0, '#fff', 0.22], [0.22, '#fff', 0.22], [0.22, '#fff', 0], [0.7, '#000', 0], [0.7, '#000', 0.1], [1, '#000', 0.1]])}</linearGradient>`;
+      break;
+    default: // Pocketlight 3D: soft volume and gloss
+      body = `<radialGradient id="sk${id}" cx="40%" cy="30%" r="78%">${stops([[0, shade(skin, 0.3)], [0.6, skin], [1, shade(skin, -0.14)]])}</radialGradient>
+        <linearGradient id="hr${id}" x1="0" y1="0" x2=".3" y2="1">${stops([[0, shade(l.hair, 0.25)], [0.55, l.hair], [1, shade(l.hair, -0.22)]])}</linearGradient>
+        <radialGradient id="fu${id}" cx="40%" cy="30%" r="80%">${stops([[0, shade(fur, 0.3)], [0.6, fur], [1, shade(fur, -0.18)]])}</radialGradient>
+        <radialGradient id="ir${id}" cx="50%" cy="40%" r="60%">${stops([[0, shade(eye, 0.45)], [0.6, eye], [1, shade(eye, -0.45)]])}</radialGradient>
+        <linearGradient id="gl${id}" x1="0" y1="0" x2="0" y2="1">${stops([[0, '#fff', 0.28], [0.55, '#fff', 0], [1, '#000', 0.08]])}</linearGradient>`;
+  }
+  return `<defs>${body}${blush}${styleFilters(MODE, id)}</defs>`;
 }
 
 /* ── eyes, brows, mouth ───────────────────────────────────── */
@@ -146,7 +176,16 @@ function eye(id: string, cx: number, cy: number, l: Look, side: -1 | 1) {
 
   const size = l.kind === 'baby' ? [13, 14, 11] : l.kind === 'kid' ? [12.5, 13, 10] : l.kind === 'adult' ? [11.5, 11, 8.6] : [10.5, 9.5, 7.6];
   const big = ex === 'wow' || ex === 'starry' || ex === 'worried' || (ex === 'silly' && side === 1);
-  const [w, h, r] = big ? [size[0] + 1, size[1] + 2, size[2] + 0.6] : size;
+  let [w, h, r] = big ? [size[0] + 1, size[1] + 2, size[2] + 0.6] : size;
+  if (MODE === 'inked' && (l.kind === 'adult' || l.kind === 'elder') && !big) { h *= 0.84; w *= 1.06; }
+  if (MODE === 'wondercut') {
+    // cut paper: a solid dark oval with one punched-out highlight
+    const [px, py] = ex === 'shy' ? [-2, 2] : ex === 'dreamy' ? [1.5, -3] : [0, 0];
+    let g = `<ellipse cx="${cx + px}" cy="${cy + 1 + py}" rx="${w * 0.72}" ry="${h * 0.86}" fill="${shade(l.eyes ?? EYE_COLOURS[0], -0.55)}"/><circle cx="${cx + px - w * 0.22}" cy="${cy + py - h * 0.25}" r="${w * 0.26}" fill="#fff"/>`;
+    if (ex === 'sleepy') g = `<path d="M${cx - w} ${cy} Q${cx} ${cy + 5} ${cx + w} ${cy}" stroke="${INK}" stroke-width="3.4" fill="none" stroke-linecap="round"/>`;
+    if (ex === 'starry') g += sparkle(cx + px, cy + py, w * 0.5, '#fff');
+    return g + (l.lashes ? `<path d="M${cx + side * w * 0.6} ${cy - h * 0.7} l${side * 5} -4" stroke="${INK}" stroke-width="3" stroke-linecap="round"/>` : '');
+  }
   const [gx, gy] = ex === 'shy' ? [-2, 2] : ex === 'dreamy' ? [1.5, -4] : ex === 'worried' ? [0, -1] : [0, 0];
   const ix = cx + side * 0.5 + gx, iy = cy + 1 + gy;
   const clip = `ec${id}${side}`;
@@ -170,7 +209,7 @@ function eye(id: string, cx: number, cy: number, l: Look, side: -1 | 1) {
     </g>`;
   s += frac
     ? `<path d="${lidLine}" stroke="${INK}" stroke-width="3.2" fill="none" stroke-linecap="round"/>`
-    : `<path d="M${cx - w - 0.5} ${cy + 1} Q${cx} ${cy - h * 1.38} ${cx + w + 0.5} ${cy + 1}" stroke="${INK}" stroke-width="${l.kind === 'baby' ? 2.6 : 3.2}" fill="none" stroke-linecap="round"/>`;
+    : `<path d="M${cx - w - 0.5} ${cy + 1} Q${cx} ${cy - h * 1.38} ${cx + w + 0.5} ${cy + 1}" stroke="${INK}" stroke-width="${(l.kind === 'baby' ? 2.6 : 3.2) * (MODE === 'inked' ? 1.35 : 1)}" fill="none" stroke-linecap="round"/>`;
   s += lash(w, h);
   if (ex === 'sleepy') s += `<path d="M${cx - w - 1} ${cy + 1} Q${cx} ${cy - h * 1.4} ${cx + w + 1} ${cy + 1} L${cx + w + 1} ${cy - 1} Q${cx} ${cy - 1} ${cx - w - 1} ${cy - 1} Z" fill="url(#sk${id})"/><path d="M${cx - w} ${cy} Q${cx} ${cy + 3} ${cx + w} ${cy}" stroke="${INK}" stroke-width="2.6" fill="none" stroke-linecap="round"/>`;
   if (l.kind === 'elder') s += `<path d="M${cx + side * (w + 3)} ${cy - 2} l${side * 5} -2 M${cx + side * (w + 3)} ${cy + 3} l${side * 5} 2" stroke="${shade(l.skin, -0.28)}" stroke-width="1.6" stroke-linecap="round"/>`;
@@ -186,7 +225,7 @@ function brows(l: Look) {
   const ex = exprOf(l);
   const c = l.kind === 'baby' ? shade(l.hair, 0.15) : shade(l.hair, -0.25);
   const [lift, inner] = BROWS[ex] ?? [0, 0];
-  const w = l.kind === 'baby' ? 2.4 : 4;
+  const w = (l.kind === 'baby' ? 2.4 : 4) * (MODE === 'inked' ? 1.3 : 1);
   const o = l.kind === 'baby' ? 0.6 : 1;
   const left = ex === 'wink' ? lift - 5 : ex === 'silly' ? lift + 4 : lift;
   const right = ex === 'wink' ? lift + 2 : lift;
@@ -620,31 +659,55 @@ function extra(l: Look) {
   }
 }
 
-/** SVG markup (no outer <svg>) for a character in a 200 × 260 box. */
-export function characterMarkup(l: Look, opts: { animated?: boolean } = {}): string {
-  if (l.drawing) {
-    return `<g class="${opts.animated ? 'bt-char is-animated' : 'bt-char'}"><g class="bt-body"><image href="${l.drawing.replace(/"/g, '&quot;')}" x="-10" y="-20" width="220" height="282" preserveAspectRatio="xMidYMax meet"/></g></g>`;
-  }
+/** SVG markup (no outer <svg>) for a character in a 200 × 260 box, drawn in an illustration mode. */
+export function characterMarkup(l: Look, opts: { animated?: boolean; style?: StyleMode } = {}): string {
+  MODE = opts.style ?? 'pocketlight';
   const id = `c${++uid}`;
+  const motion = l.personality ? ` m-${PERSONALITIES[l.personality].motion}` : '';
+  const cls = `${opts.animated ? 'bt-char is-animated' : 'bt-char'}${motion} st-${MODE}`;
+  if (l.drawing) {
+    // a child's drawing is never edited; the mode's treatment is a filter on top
+    const img = `<image href="${l.drawing.replace(/"/g, '&quot;')}" x="-10" y="-20" width="220" height="282" preserveAspectRatio="xMidYMax meet"/>`;
+    return finish(`<g class="${cls}"><defs>${styleFilters(MODE, id)}</defs><g class="bt-body">${img}</g></g>`, l, id);
+  }
   const pet = isPet(l.kind);
   const s = l.face ? (l.faceScale ?? 100) / 100 : 1;
   const dy = l.face ? l.faceY ?? 0 : 0;
   const head = l.face
     ? `<image href="${l.face.replace(/"/g, '&quot;')}" x="34" y="29" width="132" height="132" preserveAspectRatio="xMidYMid meet"/>`
     : pet ? petFace(id, l) : humanFace(id, l);
-  const motion = l.personality ? ` m-${PERSONALITIES[l.personality].motion}` : '';
-  return `<g class="${opts.animated ? 'bt-char is-animated' : 'bt-char'}${motion}">
+  // Pocketlight 3D: a warm rim light along the shadow side of the head
+  const rim = MODE === 'pocketlight' && !l.face ? `<path d="M152 66 Q166 94 152 126" stroke="#fff4dc" stroke-width="4" fill="none" stroke-linecap="round" opacity="${STYLES.pocketlight.lighting.rim}"/>` : '';
+  const shadow = MODE === 'wondercut'
+    ? `<ellipse cx="102" cy="258" rx="54" ry="5" fill="${STYLES.wondercut.palette.shadow}" opacity=".22"/>`
+    : `<ellipse cx="100" cy="257" rx="56" ry="6.5" fill="#000" opacity="${MODE === 'inked' ? 0.14 : 0.09}"/>`;
+  return finish(`<g class="${cls}">
     ${defs(id, l, l.skin, l.hair)}
-    <ellipse cx="100" cy="257" rx="56" ry="6.5" fill="#000" opacity=".09"/>
+    ${shadow}
     <g class="bt-body">${pet ? petBody(id, l) : humanBody(id, l)}${l.outfit === 'drawn' ? wornImage(l, 'outfit') : ''}
-      <g class="bt-head" transform="translate(0 ${dy}) translate(100 94) scale(${s}) translate(-100 -94)">${head}${headpiece(l)}${glasses(l)}${hat(l)}</g>
+      <g class="bt-head" transform="translate(0 ${dy}) translate(100 94) scale(${s}) translate(-100 -94)">${head}${rim}${headpiece(l)}${glasses(l)}${hat(l)}</g>
       ${extra(l)}
     </g>
-  </g>`;
+  </g>`, l, id);
+}
+
+/** Applies the mode's line, shadow and texture treatment to finished markup. */
+function finish(markup: string, l: Look, id: string): string {
+  const ink = (fill: string): string | null => {
+    const k = STYLES.inked.outline.darken;
+    if (fill.startsWith('#')) return darken(fill.length === 4 ? `#${fill[1]}${fill[1]}${fill[2]}${fill[2]}${fill[3]}${fill[3]}` : fill, k);
+    if (fill.startsWith(`url(#sk${id}`)) return darken(l.skin, k);
+    if (fill.startsWith(`url(#hr${id}`) || fill.startsWith(`url(#fu${id}`)) return darken(l.hair, k);
+    return null;
+  };
+  const styled = stylizeShapes(markup, MODE, id, ink);
+  if (MODE === 'gouache') return styled.replace(/^<g class="([^"]*)">/, `<g class="$1"><g filter="url(#grain${id})">`).replace(/<\/g>\s*$/, '</g></g>');
+  if (MODE === 'wondercut') return styled.replace(/^<g class="([^"]*)">/, `<g class="$1"><g filter="url(#paper${id})">`).replace(/<\/g>\s*$/, '</g></g>');
+  return styled;
 }
 
 /** A standalone <svg> for a character. */
-export function characterSvg(l: Look, opts: { animated?: boolean; viewBox?: string; label?: string } = {}): string {
+export function characterSvg(l: Look, opts: { animated?: boolean; viewBox?: string; label?: string; style?: StyleMode } = {}): string {
   const vb = opts.viewBox ?? '-20 -30 240 300';
   return `<svg viewBox="${vb}" ${opts.label ? `role="img" aria-label="${opts.label.replace(/"/g, '&quot;')}"` : 'aria-hidden="true"'}>${characterMarkup(l, opts)}</svg>`;
 }

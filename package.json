@@ -11,7 +11,8 @@
     "preview": "npx serve dist",
     "typecheck": "tsc --noEmit",
     "media": "python3 scripts/generate-demo-media.py",
-    "build:pages": "node scripts/build.mjs --single && cp dist-single/nomnoms.html index.html"
+    "build:pages": "node scripts/build.mjs --single && cp dist-single/nomnoms.html index.html",
+    "test": "node scripts/test.mjs"
   },
   "dependencies": {
     "html-to-image": "^1.11.13",

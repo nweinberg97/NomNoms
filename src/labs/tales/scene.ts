@@ -1,6 +1,7 @@
 import { PLACES, type Place } from './catalog';
 import { characterMarkup, isPet, type Look } from './character';
 import { rng } from './generator';
+import { STYLES, darken, styleFilters, stylizeShapes, type StyleMode } from './styles';
 
 /**
  * Draws one story page as SVG (400 × 300): a backdrop built from the place's
@@ -55,24 +56,66 @@ export function backdrop(p: Place, seed: number): string {
 
 export interface SceneCharacter { look: Look; size?: 'small' | 'normal' }
 
-/** A full story picture. `chars[0]` is the star (drawn on the left). */
 /** A place drawn or uploaded by the family, used as a backdrop. */
 export type DrawnPlace = Place & { image: string };
 
+/** A place made from a photo: its illustrated image and where the horizon sits (0–1 from the top). */
+export interface PhotoPlace { image: string; horizon: number }
+
+/** A thing made from a photo, standing on the ground. */
+export interface SceneThing { image: string; width: number; height: number; heightRatio: number; x: number }
+
+/** How tall a grown-up stands in a 400 × 300 scene; things are sized against it. */
+const PERSON_HEIGHT = 190;
+
+/** A full story picture in an illustration mode. `chars[0]` is the star (drawn on the left). */
 export function sceneSvg(opts: {
   placeId: string;
   /** A drawn place to use instead of the built-in ones. */
   drawn?: DrawnPlace;
+  /** A photo place to use instead of the built-in ones. */
+  photo?: PhotoPlace;
+  things?: SceneThing[];
   seed: number;
   chars: SceneCharacter[];
   focus?: { e: string; count?: number; faded?: boolean };
   animated?: boolean;
   label?: string;
+  style?: StyleMode;
 }): string {
+  const mode = opts.style ?? 'pocketlight';
+  const id = `s${++uid}`;
   const p = PLACES.find((x) => x.id === opts.placeId) ?? PLACES[0];
-  let s = opts.drawn
-    ? `<rect width="400" height="300" fill="#fbf7f0"/><image href="${opts.drawn.image.replace(/"/g, '&quot;')}" x="0" y="0" width="400" height="300" preserveAspectRatio="xMidYMid slice"/>`
-    : backdrop(p, opts.seed);
+  const esc = (u: string) => u.replace(/"/g, '&quot;');
+  let back: string;
+  if (opts.photo) {
+    // the picture stays put; its ground drifts gently in front of it, with a soft top edge, for depth
+    const top = Math.max(0, opts.photo.horizon * 300 * 0.86), fade = 26;
+    back = `<defs><linearGradient id="pf${id}" x1="0" x2="0" gradientUnits="userSpaceOnUse" y1="${top.toFixed(1)}" y2="${(top + fade).toFixed(1)}"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#fff"/></linearGradient>
+        <mask id="pm${id}"><rect x="-20" y="${top.toFixed(1)}" width="440" height="${(300 - top).toFixed(1)}" fill="url(#pf${id})"/></mask></defs>
+      <g class="bt-par bt-par-1"><image href="${esc(opts.photo.image)}" x="-10" y="-8" width="420" height="316" preserveAspectRatio="xMidYMid slice"/></g>
+      <g class="bt-par bt-par-3" mask="url(#pm${id})"><image href="${esc(opts.photo.image)}" x="-10" y="-8" width="420" height="316" preserveAspectRatio="xMidYMid slice"/></g>`;
+  } else if (opts.drawn) {
+    back = `<rect width="400" height="300" fill="#fbf7f0"/><image href="${esc(opts.drawn.image)}" x="0" y="0" width="400" height="300" preserveAspectRatio="xMidYMid slice"/>`;
+  } else {
+    back = backdrop(p, opts.seed);
+  }
+  // the mode's background treatment
+  const inkFor = (fill: string) => (fill.startsWith('#') && fill.length === 7 ? darken(fill, 0.35) : null);
+  if (!opts.photo) {
+    if (mode === 'gouache') back = `<g filter="url(#grain${id})">${stylizeShapes(back, 'gouache', id, inkFor)}</g>`;
+    else if (mode === 'wondercut') back = `<g filter="url(#paper${id})">${stylizeShapes(back, 'wondercut', id, inkFor)}</g>`;
+    else if (mode === 'inked') back = `<g filter="url(#bg${id})">${back}</g>`;
+  }
+  let s = `<defs>${styleFilters(mode, id)}</defs>${back}`;
+  // things made from photos stand on the ground, sized against a grown-up
+  (opts.things ?? []).forEach((t) => {
+    const h = Math.max(22, Math.min(270, t.heightRatio * PERSON_HEIGHT));
+    const w = (h * t.width) / t.height;
+    const cx = t.x * 400, y = 292 - h;
+    s += `<ellipse cx="${cx.toFixed(1)}" cy="292" rx="${(w * 0.42).toFixed(1)}" ry="${Math.max(3, h * 0.035).toFixed(1)}" fill="${STYLES[mode].palette.shadow}" opacity=".2"/>
+      <image href="${esc(t.image)}" x="${(cx - w / 2).toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" filter="url(#img${id})"/>`;
+  });
   const slots = opts.chars.length >= 3
     ? [{ x: 10, w: 132 }, { x: 140, w: 124 }, { x: 262, w: 124 }]
     : [{ x: 36, w: 156 }, { x: 214, w: 150 }];
@@ -83,7 +126,7 @@ export function sceneSvg(opts: {
     const h = w * 1.25;
     const x = slot.x + (slot.w - w) / 2;
     const y = 296 - h + (small ? 4 : 0);
-    s += `<svg x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" viewBox="-20 -30 240 300" overflow="visible">${characterMarkup(c.look, { animated: opts.animated })}</svg>`;
+    s += `<svg x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" viewBox="-20 -30 240 300" overflow="visible">${characterMarkup(c.look, { animated: opts.animated, style: mode })}</svg>`;
   });
   if (opts.focus) {
     const f = opts.focus;
@@ -96,5 +139,6 @@ export function sceneSvg(opts: {
       s += `<g class="bt-focus">${emoji(f.e, 200, 76, 60)}</g>`;
     }
   }
-  return `<svg viewBox="0 0 400 300" ${opts.label ? `role="img" aria-label="${opts.label.replace(/"/g, '&quot;')}"` : 'aria-hidden="true"'}>${s}</svg>`;
+  if (mode === 'pocketlight') s += `<rect width="400" height="300" fill="url(#glow${id})"/><rect width="400" height="300" fill="url(#vig${id})"/>`;
+  return `<svg viewBox="0 0 400 300" class="bt-scene st-${mode}${opts.animated ? ' is-animated' : ''}" ${opts.label ? `role="img" aria-label="${opts.label.replace(/"/g, '&quot;')}"` : 'aria-hidden="true"'}>${s}</svg>`;
 }

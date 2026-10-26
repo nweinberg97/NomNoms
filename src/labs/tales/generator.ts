@@ -33,6 +33,8 @@ export interface StoryPage {
   focus?: { e: string; count?: number; faded?: boolean };
   /** The star's hat on this page (Funny hats story). */
   hat?: string;
+  /** Things made from the family's photos, shown on this page (asset ids). */
+  things?: string[];
   /** The star's outfit on this page (dinosaur suit, superhero cape…). */
   outfit?: string;
   /** How the star feels on this page; friends react to the big moments. */
