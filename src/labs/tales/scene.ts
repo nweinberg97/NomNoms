@@ -126,7 +126,7 @@ export function sceneSvg(opts: {
     const h = w * 1.25;
     const x = slot.x + (slot.w - w) / 2;
     const y = 296 - h + (small ? 4 : 0);
-    s += `<svg x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" viewBox="-20 -30 240 300" overflow="visible">${characterMarkup(c.look, { animated: opts.animated, style: mode })}</svg>`;
+    s += `<svg x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" viewBox="-20 -44 240 314" overflow="visible">${characterMarkup(c.look, { animated: opts.animated, style: mode })}</svg>`;
   });
   s += worldAtmosphere(opts.world, id, opts.seed);
   if (opts.focus && hasThing(opts.focus.e)) {

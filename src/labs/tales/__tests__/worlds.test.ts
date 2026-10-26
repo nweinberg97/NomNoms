@@ -68,9 +68,8 @@ test('each world is its own art style, not just a costume', () => {
   // its own construction: different head, eyes and line in each world, even in the same clothes
   const heads = new Set([every, fairy, adv, myth].map(headShape));
   assert.equal(heads.size, 4, 'four different face constructions');
-  assert.match(myth, /stroke-width="2.2" stroke-linejoin="round" paint-order="stroke"/, 'mythic: strong lines');
-  assert.ok(!/stroke-width="3.2" stroke-linejoin="round" paint-order="stroke"/.test(adv), 'adventure: no outlines');
-  assert.match(fairy, /stroke-width="1.6" stroke-linejoin="round" paint-order="stroke"/, 'fairytale: fine ink lines');
+  // one storybook line throughout, as on the drawn story things
+  for (const svg of [every, fairy, adv, myth]) assert.match(svg, /stroke-width="2.3" stroke-linejoin="round" paint-order="stroke"/);
   // grown-ups are built differently in each world; babies stay babies
   const bodyScale = (svg: string) => svg.match(/scale\(([\d.]+) ([\d.]+)\) translate\(-100 -252\)/)?.slice(1).map(Number);
   const sz = WORLD_IDS.map((w) => bodyScale(draw(w)));

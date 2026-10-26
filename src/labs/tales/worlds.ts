@@ -49,25 +49,34 @@ export function worldCostume(world: WorldId, look: Look, star: boolean): Partial
   const glasses = look.glasses === 'sun' ? 'none' : look.glasses;
   const accent = accentOf(look.outfit);
   const c = costumeFor(world, star, skirt, elder, grown, look, glasses);
-  return accent ? { ...c, accent } : c;
+  // each world's mood: wide-eyed wonder, a big grin, a determined look
+  const expression = world === 'fairytale' ? (grown || elder ? 'smile' : 'starry') : world === 'adventure' ? 'grin' : look.kind === 'baby' ? 'grin' : 'smile';
+  return { ...c, expression, ...(accent ? { accent } : {}) } as Partial<Look>;
+}
+/** A steady pick from a few options, by who someone is, so siblings and friends don't come out as clones. */
+function variant(look: Look, n: number): number {
+  const key = `${look.hairStyle}|${look.skin}|${look.hair}|${look.outfit}`;
+  let h = 7; for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+  return h % n;
 }
 function costumeFor(world: WorldId, star: boolean, skirt: boolean, elder: boolean, grown: boolean, look: Look, glasses: string): Partial<Look> {
+  const v = variant(look, 3);
   switch (world) {
     case 'fairytale': // the royal family of a storybook kingdom
       if (star) return { outfit: skirt ? 'gown' : 'ftunic', hat: look.kind === 'baby' ? 'crown' : skirt ? 'tiara' : 'crown', extra: 'lantern', glasses, pose: 'wave' };
       if (elder) return { outfit: 'cloak', hat: skirt ? 'tiara' : 'none', extra: 'staff', glasses };
       if (grown) return { outfit: skirt ? 'gown' : 'ftunic', hat: skirt ? 'tiara' : 'crown', extra: 'none', glasses, pose: 'wave' };
-      return { outfit: skirt ? 'gown' : 'cloak', hat: 'circlet', extra: 'wand', glasses, pose: 'wave' };
+      return [{ outfit: skirt ? 'gown' : 'cloak', hat: 'circlet', extra: 'wand', glasses, pose: 'wave' as Pose }, { outfit: skirt ? 'gown' : 'ftunic', hat: skirt ? 'tiara' : 'crown', extra: 'lantern', glasses, pose: 'stand' as Pose }, { outfit: skirt ? 'fairy' : 'cloak', hat: 'flowers', extra: 'flower', glasses, pose: 'hips' as Pose }][v];
     case 'adventure': // an expedition team: hats, packs and kit
       if (star) return { outfit: 'explorer', hat: 'brimhat', extra: 'map', pose: 'point' };
       if (elder) return { outfit: 'ranger', hat: 'brimhat', extra: 'map', pose: 'stand' };
-      if (grown) return { outfit: 'ranger', hat: skirt ? 'bandana' : 'brimhat', extra: 'spyglass', pose: 'hips' };
-      return { outfit: 'explorer', hat: 'bandana', extra: 'net', pose: 'point' };
+      if (grown) return [{ outfit: 'ranger', hat: skirt ? 'bandana' : 'brimhat', extra: 'spyglass', pose: 'hips' as Pose }, { outfit: 'explorer', hat: 'brimhat', extra: 'map', pose: 'point' as Pose }, { outfit: 'puffer', hat: 'beanie', extra: 'spyglass', pose: 'hips' as Pose }][v];
+      return [{ outfit: 'explorer', hat: 'bandana', extra: 'net', pose: 'point' as Pose }, { outfit: 'explorer', hat: 'brimhat', extra: 'spyglass', pose: 'hips' as Pose }, { outfit: 'ranger', hat: 'capback', extra: 'map', pose: 'cheer' as Pose }][v];
     case 'mythic': // heroes of legend: armour, capes and gold
       if (star) return { outfit: 'armour', hat: 'helm', extra: 'shield', pose: 'hips' };
       if (elder) return { outfit: 'sunrobe', hat: 'laurel', extra: 'staff', pose: 'stand' };
       if (grown) return { outfit: skirt ? 'sunrobe' : 'armour', hat: 'laurel', extra: skirt ? 'staff' : 'shield', pose: skirt ? 'cheer' : 'hips' };
-      return { outfit: 'armour', hat: 'laurel', extra: 'shield', pose: 'hips' };
+      return [{ outfit: 'armour', hat: 'laurel', extra: 'shield', pose: 'hips' as Pose }, { outfit: 'armour', hat: 'helm', extra: 'staff', pose: 'cheer' as Pose }, { outfit: 'sunrobe', hat: 'laurel', extra: 'staff', pose: 'point' as Pose }][v];
   }
   return {};
 }

@@ -176,12 +176,12 @@ test('without a person outline, the reader says background may be mistaken for h
   assert.match(measure(faceOf(astronaut), { raster }).warnings.join(' '), /background/);
 });
 
-test('characters without photo proportions draw exactly as before', () => {
+test('characters without photo proportions keep the designed face', () => {
   const svg = characterMarkup(LOOK);
-  assert.match(svg, /<ellipse cx="100" cy="94" rx="57" ry="60"/);
-  assert.ok(!svg.includes('translate(100 112) scale'), 'no nose transform');
-  const shaped = characterMarkup({ ...LOOK, shape: { eyeGap: 1 } });
-  assert.match(shaped, /<path d="M43 9\d/, 'shaped heads are a path');
+  assert.ok(!svg.includes('translate(100 112) scale'), 'no nose transform without photo proportions');
+  const head = (x: string) => /<path d="(M100 [^"]+)" fill="url\(#sk/.exec(x)?.[1];
+  const shaped = characterMarkup({ ...LOOK, shape: { faceWidth: 1 } });
+  assert.ok(head(svg) && head(shaped) && head(svg) !== head(shaped), 'photo proportions reshape the head');
 });
 
 test('the photo picks baby, kid, grown-up or grandparent, and a parent can override it', () => {
