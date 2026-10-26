@@ -454,8 +454,8 @@ export function BabyTalesDemo() {
   const shown = dressed(person);
   const WORLD_WEAR: Record<WorldId, Partial<Record<WardrobeTab, string[]>>> = {
     everyday: {},
-    fairytale: { outfit: ['gown', 'ftunic', 'cloak', 'fairy'], hat: ['circlet', 'flowers', 'wizard'], extra: ['lantern', 'staff', 'wand'] },
-    adventure: { outfit: ['explorer', 'ranger'], hat: ['brimhat', 'bucket', 'sunhat'], extra: ['map', 'spyglass', 'net'] },
+    fairytale: { outfit: ['gown', 'ftunic', 'cloak', 'fairy'], hat: ['crown', 'tiara', 'circlet', 'flowers', 'wizard'], extra: ['lantern', 'staff', 'wand'] },
+    adventure: { outfit: ['explorer', 'ranger'], hat: ['brimhat', 'bandana', 'bucket', 'sunhat'], extra: ['map', 'spyglass', 'net'] },
     mythic: { outfit: ['armour', 'sunrobe', 'knight'], hat: ['laurel', 'helm'], extra: ['shield', 'staff'] },
   };
   const worldPicks = (t: WardrobeTab) => WORLD_WEAR[world][t] ?? [];

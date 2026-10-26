@@ -65,3 +65,42 @@ test('the same photo always gives the same cut, and "keep more" keeps at least a
   const count = (m: Uint8Array) => m.reduce((s, v) => s + v, 0);
   assert.ok(count(cutOut(r, { keep: 1 })) >= count(cutOut(r, { keep: -1 })));
 });
+
+/*
+ * A real photo that failed: a golden teddy on a golden backdrop. The fur's colour is
+ * almost the backdrop's, so a colour-only cut punched stripes into the head and lost the
+ * arms. The fur is fuzzy and the backdrop is smooth; the cut-out uses that.
+ */
+function fuzzyTeddy(w = 240, h = 320) {
+  const r = makeRaster(w, h), truth = new Uint8Array(w * h);
+  const ell = (x: number, y: number, cx: number, cy: number, rx: number, ry: number) => ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 <= 1;
+  let seed = 11; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647 - 0.5);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const head = ell(x, y, 120, 110, 62, 56), ears = ell(x, y, 66, 66, 24, 24) || ell(x, y, 174, 66, 24, 24);
+    const body = ell(x, y, 120, 220, 70, 72), arms = ell(x, y, 40, 205, 30, 52) || ell(x, y, 200, 205, 30, 52);
+    const feet = ell(x, y, 72, 280, 34, 28) || ell(x, y, 168, 280, 34, 28), muzzle = ell(x, y, 120, 135, 26, 20);
+    // backdrop: a smooth golden sweep; fur: a little darker, lit from the top (so the top of
+    // the head is nearly the backdrop's colour), and fuzzy
+    const t = y / h, bg = [236 - 20 * t, 176 - 16 * t, 70 - 8 * t];
+    let c = bg;
+    if (head || ears || body || arms || feet) {
+      truth[y * w + x] = 1;
+      const lit = Math.max(0, 1 - Math.hypot(x - 120, y - 70) / 100) * 30, f = rnd() * 70;
+      c = muzzle ? [235 + f * 0.2, 205 + f * 0.2, 170 + f * 0.2] : [bg[0] - 40 + lit + f, bg[1] - 32 + lit * 0.8 + f * 0.8, bg[2] + f * 0.5];
+    } else { const g = rnd() * 3; c = c.map((v) => v + g); }
+    const i = (y * w + x) * 4;
+    r.data[i] = c[0]; r.data[i + 1] = c[1]; r.data[i + 2] = c[2]; r.data[i + 3] = 255;
+  }
+  return { r, truth };
+}
+
+test('a fuzzy teddy on a backdrop of its own colour comes out whole, with no gaps in the head', () => {
+  const { r, truth } = fuzzyTeddy();
+  const m = cutOut(r);
+  const got = score(m, truth);
+  assert.ok(got.iou > 0.93, `overlap ${got.iou.toFixed(3)}, missed ${(got.missed * 100).toFixed(1)}%`);
+  // the head (where the light makes the fur look like the backdrop) has no holes
+  let headMiss = 0, headN = 0;
+  for (let y = 70; y < 160; y++) for (let x = 80; x < 160; x++) { headN++; if (!m[y * 240 + x]) headMiss++; }
+  assert.ok(headMiss / headN < 0.01, `head gaps ${(100 * headMiss / headN).toFixed(1)}%`);
+});

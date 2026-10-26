@@ -57,20 +57,48 @@ export interface Look {
   pose?: Pose;
   /** The story world being drawn (art direction, not identity): posture and finishing light. */
   world?: WorldId;
+  /** A world costume's signature colour, carried over from the person's everyday clothes. */
+  accent?: string;
 }
-export type Pose = 'stand' | 'point' | 'hips' | 'cheer';
+export type Pose = 'stand' | 'point' | 'hips' | 'cheer' | 'wave';
 export type WorldId = 'everyday' | 'fairytale' | 'adventure' | 'mythic';
 /**
- * How each story world carries the body. Multiplies the look's proportions;
- * never touches the face. Fairytale: a little taller and more graceful.
- * Adventure: a sturdier frame. Mythic: broad, heroic shoulders, chin up.
+ * How each story world draws people: its art direction. Identity (skin, hair colour and
+ * style, eye colour, face shape, facial hair, glasses: the Character DNA) is never touched;
+ * the world decides the build, how the eyes and brows are drawn, the finish on the hair,
+ * the light around the character and their stance.
+ *
+ *   Classic Fairytale: graceful and a little taller, big starry eyes, soft brows, glossy
+ *     hair, a rosy glow with twinkles.
+ *   Adventure Story: sporty and sturdy, bright lively eyes, windswept hair, wind and dust.
+ *   Mythic Hero: tall and broad-shouldered, a determined look with strong angled brows,
+ *     a golden rim light and a halo of light behind.
  */
 export const WORLD_BODY: Record<WorldId, { head: number; body: number; slim: number }> = {
   everyday: { head: 1, body: 1, slim: 1 },
-  fairytale: { head: 0.98, body: 1.05, slim: 0.95 },
-  adventure: { head: 1, body: 1.01, slim: 1.05 },
-  mythic: { head: 0.96, body: 1.06, slim: 1.1 },
+  fairytale: { head: 0.8, body: 1.28, slim: 0.9 },
+  adventure: { head: 0.86, body: 1.2, slim: 1.03 },
+  mythic: { head: 0.76, body: 1.36, slim: 1.12 },
 };
+/** Babies stay babies: the world's build is applied gently to little ones. */
+const WORLD_BODY_K: Record<string, number> = { baby: 0.35, kid: 0.7, adult: 1, elder: 0.85 };
+export function worldBody(world: WorldId | undefined, kind: Kind): { head: number; body: number; slim: number } {
+  const b = WORLD_BODY[world ?? 'everyday'], k = WORLD_BODY_K[kind] ?? 0;
+  return { head: 1 + (b.head - 1) * k, body: 1 + (b.body - 1) * k, slim: 1 + (b.slim - 1) * k };
+}
+/** A look's proportions times the world's build, kept within what still reads as the same person. */
+function buildOf(base: { head: number; body: number; slim: number }, wb: { head: number; body: number; slim: number }) {
+  return { head: Math.max(0.6, base.head * wb.head), body: Math.min(1.6, base.body * wb.body), slim: Math.max(0.82, Math.min(1.2, base.slim * wb.slim)) };
+}
+/** How each world draws eyes (width, height) and brows (weight, inner end down). */
+const WORLD_ART: Record<WorldId, { eye: [number, number]; brow: [number, number] }> = {
+  everyday: { eye: [1, 1], brow: [1, 0] },
+  fairytale: { eye: [1.1, 1.14], brow: [0.85, -1.5] },
+  adventure: { eye: [1.04, 1.04], brow: [1.12, 1] },
+  mythic: { eye: [1.04, 0.88], brow: [1.4, 4] },
+};
+/** The world being drawn right now (set by characterMarkup; 'everyday' for pets, drawings and Genmoji faces). */
+let WORLD: WorldId = 'everyday';
 
 /** A face proportion, clamped, and softened for babies and kids, whose storybook proportions lead. */
 export const shapeOf = (l: Look, k: keyof NonNullable<Look['shape']>) =>
@@ -113,7 +141,7 @@ export const HATS: Record<string, string> = {
   sunhat: 'Sun hat', visor: 'Visor', beret: 'Beret', bandana: 'Bandana', earmuffs: 'Earmuffs', helmet: 'Bike helmet', catears: 'Cat ears', bunny: 'Bunny ears',
   bow: 'Big bow', clips: 'Hair clips', flowers: 'Flower crown', party: 'Party', propeller: 'Propeller cap', crown: 'Crown', pirate: 'Pirate',
   cowboy: 'Cowboy', chef: 'Chef', wizard: 'Wizard',
-  circlet: 'Leaf circlet', brimhat: 'Explorer hat', laurel: 'Golden laurel', helm: 'Hero helm',
+  circlet: 'Leaf circlet', tiara: 'Tiara', brimhat: 'Explorer hat', laurel: 'Golden laurel', helm: 'Hero helm',
 };
 export const GLASSES: Record<string, string> = { none: 'None', round: 'Round', square: 'Square', cateye: 'Cat-eye', sun: 'Sunglasses', aviator: 'Aviators', hearts: 'Hearts', stars: 'Stars', goggles: 'Goggles', mask: 'Hero mask', nose: 'Funny nose' };
 export const OUTFITS: Record<string, string> = {
@@ -213,6 +241,7 @@ function eye(id: string, cx: number, cy: number, l: Look, side: -1 | 1) {
   let [w, h, r] = big ? [size[0] + 1, size[1] + 2, size[2] + 0.6] : size;
   const es = 1 + SHAPE_RANGE.eyeSize * shapeOf(l, 'eyeSize');
   w *= es; h *= es; r *= es;
+  const wa = WORLD_ART[WORLD].eye; w *= wa[0]; h *= wa[1]; r *= Math.min(wa[0], wa[1] * 1.06);
   if (MODE === 'inked' && (l.kind === 'adult' || l.kind === 'elder') && !big) { h *= 0.84; w *= 1.06; }
   if (MODE === 'gouache') {
     // picture-book bean eyes: a soft dark oval, a dot of light, no whites
@@ -224,21 +253,24 @@ function eye(id: string, cx: number, cy: number, l: Look, side: -1 | 1) {
     if (ex === 'brave') g += `<path d="M${cx - w * 0.6} ${cy - h * 0.5} L${cx + w * 0.6} ${cy - h * 0.5 + side * -3}" stroke="url(#sk${id})" stroke-width="${h * 0.5}"/>`;
     return g + (l.lashes ? `<path d="M${cx + side * w * 0.42} ${cy - h * 0.45} l${side * 5} -4" stroke="${INK}" stroke-width="2.6" stroke-linecap="round"/>` : '');
   }
-  if (MODE === 'inked' && (l.kind === 'adult' || l.kind === 'elder' || l.kind === 'kid') && !['sleepy'].includes(ex)) {
+  // hand-drawn film eyes: Classic Ink always; Fairytale and Mythic worlds in the 3D look too
+  const filmEyes = MODE === 'inked' || (MODE === 'pocketlight' && (WORLD === 'fairytale' || WORLD === 'mythic'));
+  if (filmEyes && (l.kind === 'adult' || l.kind === 'elder' || l.kind === 'kid') && !['sleepy'].includes(ex)) {
     // hand-drawn almond eyes: white, a large iris, a heavy upper lid that sweeps out
-    const ew = w * 1.12, eh = h * (l.kind === 'kid' ? 0.95 : 0.78) * (big ? 1.2 : 1);
+    const ew = w * 1.12 * (WORLD === 'fairytale' ? 1.06 : 1), eh = h * (l.kind === 'kid' ? 0.95 : 0.78) * (big ? 1.2 : 1) * (WORLD === 'fairytale' ? 1.12 : 1);
     const [gx2, gy2] = ex === 'shy' ? [-2.5, 2] : ex === 'dreamy' ? [1.5, -2.5] : [0, 0];
     const clip2 = `ea${id}${side}`;
     const inner = cx - side * ew, outer = cx + side * ew;
     const almond = `M${inner} ${cy + 1} Q${cx - side * ew * 0.2} ${cy - eh * 1.25} ${outer} ${cy - eh * 0.25} Q${cx + side * ew * 0.3} ${cy + eh * 1.05} ${inner} ${cy + 1} Z`;
     const ir = Math.min(ew, eh) * 0.82;
-    const lidDrop = ex === 'brave' ? eh * 0.5 : ex === 'dreamy' ? eh * 0.6 : 0;
+    // a hero's steady, determined lid
+    const lidDrop = ex === 'brave' ? eh * 0.5 : ex === 'dreamy' ? eh * 0.6 : WORLD === 'mythic' && !big ? eh * 0.14 : 0;
     return `<clipPath id="${clip2}"><path d="${almond}"/></clipPath><path d="${almond}" fill="#fff"/>
       <g clip-path="url(#${clip2})"><circle cx="${cx + gx2}" cy="${cy + gy2}" r="${ir}" fill="url(#ir${id})"/><circle cx="${cx + gx2}" cy="${cy + gy2}" r="${ir * 0.45}" fill="#120d0b"/><circle cx="${cx + gx2 - ir * 0.32}" cy="${cy + gy2 - ir * 0.38}" r="${ir * 0.28}" fill="#fff"/>
       ${lidDrop ? `<rect x="${cx - ew - 2}" y="${cy - eh * 1.4}" width="${ew * 2 + 4}" height="${eh * 0.4 + lidDrop + eh}" fill="url(#sk${id})"/>` : ''}</g>
       <path d="M${inner} ${cy + 1} Q${cx - side * ew * 0.2} ${cy - eh * 1.25 + lidDrop} ${outer + side * 3} ${cy - eh * 0.45}" stroke="${INK}" stroke-width="4.2" fill="none" stroke-linecap="round"/>
       <path d="M${cx - side * ew * 0.1} ${cy + eh * 0.85} Q${cx + side * ew * 0.45} ${cy + eh * 0.7} ${outer - side * 1} ${cy + eh * 0.05}" stroke="${shade(l.skin, -0.4)}" stroke-width="1.6" fill="none" stroke-linecap="round"/>
-      ${l.lashes ? `<path d="M${outer + side * 2} ${cy - eh * 0.4} l${side * 6} -5 M${outer - side * 2} ${cy - eh * 0.75} l${side * 4} -6" stroke="${INK}" stroke-width="2.6" stroke-linecap="round"/>` : ''}`;
+      ${l.lashes ? `<path d="M${outer + side * 2} ${cy - eh * 0.4} l${side * 6} -5 M${outer - side * 2} ${cy - eh * 0.75} l${side * 4} -6" stroke="${INK}" stroke-width="2.6" stroke-linecap="round"/>` : WORLD === 'fairytale' ? `<path d="M${outer + side * 2} ${cy - eh * 0.42} l${side * 5} -3" stroke="${INK}" stroke-width="2.4" stroke-linecap="round"/>` : ''}`;
   }
   if (MODE === 'wondercut') {
     // cut paper: a solid dark oval with one punched-out highlight
@@ -286,8 +318,9 @@ function brows(l: Look) {
   if (l.face) return '';
   const ex = exprOf(l);
   const c = l.kind === 'baby' ? shade(l.hair, 0.15) : shade(l.hair, -0.25);
-  const [lift, inner] = BROWS[ex] ?? [0, 0];
-  const w = (l.kind === 'baby' ? 2.4 : 4) * (MODE === 'inked' ? 1.3 : 1) * (1 + SHAPE_RANGE.browWeight * shapeOf(l, 'browWeight'));
+  const [lift, inner0] = BROWS[ex] ?? [0, 0];
+  const wa = WORLD_ART[WORLD].brow, inner = inner0 + (l.kind === 'baby' ? wa[1] * 0.4 : wa[1]);
+  const w = (l.kind === 'baby' ? 2.4 : 4) * (MODE === 'inked' ? 1.3 : 1) * (1 + SHAPE_RANGE.browWeight * shapeOf(l, 'browWeight')) * (l.kind === 'baby' ? 1 + (wa[0] - 1) * 0.4 : wa[0]);
   const o = l.kind === 'baby' ? 0.6 : 1;
   const up = -SHAPE_RANGE.browHeight * shapeOf(l, 'browHeight');
   const left = (ex === 'wink' ? lift - 5 : ex === 'silly' ? lift + 4 : lift) + up;
@@ -454,11 +487,68 @@ function facialHair(id: string, l: Look) {
   return `<path d="${jaw}" fill="${H}"/><path d="${jaw}" fill="#000" opacity=".06"/>${tache}`;
 }
 
+/* ── the world's touches on a face: in the eyes and on the hair ── */
+const CLOSED: Expression[] = ['laugh', 'proud', 'sleepy'];
+function worldEyes(l: Look, gap: number): string {
+  if (WORLD === 'everyday' || MODE === 'gouache') return '';
+  const ex = exprOf(l);
+  if (CLOSED.includes(ex)) return '';
+  const at = (side: -1 | 1) => side === 1 && ex === 'wink' ? null : side === -1 && ex === 'silly' ? null : [side === -1 ? 78 - gap : 122 + gap, 101] as const;
+  return ([-1, 1] as const).map((sd) => {
+    const p = at(sd); if (!p) return '';
+    const [x, y] = p;
+    // fairytale: a little star of light in each eye; mythic: a golden glint; adventure: a bright second catchlight
+    return WORLD === 'fairytale' ? sparkle(x + 4.5, y - 6, 3.6, '#fff')
+      : WORLD === 'mythic' ? `<circle cx="${x + 4}" cy="${y + 4}" r="1.9" fill="#ffd36b"/>`
+      : `<circle cx="${x + 5}" cy="${y - 5}" r="1.8" fill="#fff"/>`;
+  }).join('');
+}
+/** Headwear that sits on the hair without covering it (a bun or puff still shows). */
+const OPEN_HEADWEAR = ['none', 'circlet', 'laurel', 'tiara', 'flowers', 'crown', 'headband', 'clips', 'bow', 'bandana', 'headphones'];
+const BIG_HAIR: HairStyle[] = ['afro', 'puff', 'bald', 'buzz', 'cornrows', 'coils'];
+function worldHair(l: Look): string {
+  if (WORLD === 'everyday' || BIG_HAIR.includes(l.hairStyle)) return '';
+  const open = OPEN_HEADWEAR.includes(l.hat) && l.hat !== 'bandana';
+  switch (WORLD) {
+    case 'fairytale': // a glossy band of light across the hair
+      return open ? `<path d="M66 54 Q98 30 132 50" stroke="#fff" stroke-width="5" fill="none" stroke-linecap="round" opacity=".38"/><path d="M76 48 Q86 41 96 39" stroke="#fff" stroke-width="2.5" fill="none" stroke-linecap="round" opacity=".55"/>` : '';
+    case 'adventure': // windswept: a few tufts blown to one side
+      return l.hat === 'none' ? `<g fill="${l.hair}"><path d="M120 40 Q132 22 150 24 Q136 30 134 44 Z"/><path d="M132 50 Q150 38 166 46 Q150 48 142 58 Z"/><path d="M90 36 Q96 20 112 18 Q102 26 104 38 Z"/></g>` : `<g fill="${l.hair}"><path d="M150 70 Q166 60 176 66 Q164 70 158 80 Z"/></g>`;
+    case 'mythic': // a golden rim of light along the top of the hair
+      return open ? `<path d="M56 66 Q58 32 100 26 Q128 26 140 40" stroke="#ffd36b" stroke-width="3.2" fill="none" stroke-linecap="round" opacity=".75"/>` : '';
+  }
+  return '';
+}
+
+/**
+ * The world's light around the character, behind them: a rosy glow with twinkles
+ * (fairytale), wind and dust (adventure), a golden halo with rays (mythic).
+ * `hy` is where the head sits after the world's build.
+ */
+function worldAura(id: string, hy: number): string {
+  switch (WORLD) {
+    case 'fairytale':
+      return `<defs><radialGradient id="au${id}"><stop offset="0" stop-color="#ffc4dc" stop-opacity=".95"/><stop offset=".55" stop-color="#ffdcb0" stop-opacity=".6"/><stop offset="1" stop-color="#ffe9c9" stop-opacity="0"/></radialGradient></defs>
+        <ellipse cx="100" cy="${(hy + 70).toFixed(0)}" rx="112" ry="140" fill="url(#au${id})"/>
+        <g class="bt-twinkles">${[[24, hy - 30, 6], [176, hy - 10, 5], [14, hy + 70, 4], [186, hy + 96, 6], [160, hy - 52, 3.5]].map(([x, y, r], i) => `<g class="bt-twinkle" style="animation-delay:${(i * 0.37).toFixed(2)}s">${sparkle(x, y, r, i % 2 ? '#ffd9e8' : '#fff4c4')}</g>`).join('')}</g>`;
+    case 'adventure':
+      return `<g fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" opacity=".7"><path d="M-6 ${(hy + 40).toFixed(0)} Q22 ${(hy + 30).toFixed(0)} 42 ${(hy + 40).toFixed(0)}"/><path d="M-14 ${(hy + 62).toFixed(0)} Q14 ${(hy + 52).toFixed(0)} 30 ${(hy + 60).toFixed(0)}"/><path d="M168 ${(hy + 10).toFixed(0)} Q188 ${hy.toFixed(0)} 208 ${(hy + 8).toFixed(0)}"/></g>
+        <g fill="#d8c7a6" opacity=".55">${[[48, 252, 9], [36, 246, 6], [152, 252, 9], [166, 246, 6], [60, 256, 5]].map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}"/>`).join('')}</g>`;
+    case 'mythic':
+      return `<defs><radialGradient id="au${id}"><stop offset="0" stop-color="#fff2c4" stop-opacity=".95"/><stop offset=".45" stop-color="#ffd36b" stop-opacity=".45"/><stop offset="1" stop-color="#ffd36b" stop-opacity="0"/></radialGradient>
+        <radialGradient id="ag${id}"><stop offset="0" stop-color="#ffd36b" stop-opacity=".55"/><stop offset="1" stop-color="#ffd36b" stop-opacity="0"/></radialGradient></defs>
+        <g opacity=".42">${Array.from({ length: 12 }, (_, i) => { const a = (i / 12) * Math.PI * 2, x1 = 100 + 150 * Math.cos(a - 0.07), y1 = hy + 150 * Math.sin(a - 0.07), x2 = 100 + 150 * Math.cos(a + 0.07), y2 = hy + 150 * Math.sin(a + 0.07); return `<path d="M100 ${hy.toFixed(0)} L${x1.toFixed(0)} ${y1.toFixed(0)} L${x2.toFixed(0)} ${y2.toFixed(0)} Z" fill="#ffe08a"/>`; }).join('')}</g>
+        <circle cx="100" cy="${hy.toFixed(0)}" r="96" fill="url(#au${id})"/>
+        <ellipse cx="100" cy="254" rx="80" ry="12" fill="url(#ag${id})"/>`;
+  }
+  return '';
+}
+
 /* ── faces ────────────────────────────────────────────────── */
 function humanFace(id: string, l: Look) {
   const [rawBack, front] = hair(id, l);
   // buns and puffs tuck under a hat
-  const back = l.hat !== 'none' && ['puff', 'topknot', 'bun'].includes(l.hairStyle) ? '' : rawBack;
+  const back = !OPEN_HEADWEAR.includes(l.hat) && ['puff', 'topknot', 'bun'].includes(l.hairStyle) ? '' : rawBack;
   const skin = `url(#sk${id})`;
   const fr = l.freckles ? [[64, 116], [70, 120], [60, 121], [136, 116], [130, 120], [140, 121]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="1.6" fill="${shade(l.skin, -0.35)}" opacity=".7"/>`).join('') : '';
   const narrow = l.kind === 'adult' || l.kind === 'elder';
@@ -487,9 +577,9 @@ function humanFace(id: string, l: Look) {
     ${head}
     <ellipse cx="100" cy="148" rx="30" ry="6" fill="#000" opacity=".05"/>
     ${blush}${fr}
-    <g class="bt-eyes">${eye(id, 78 - gap, 101, l, -1)}${eye(id, 122 + gap, 101, l, 1)}</g>
+    <g class="bt-eyes">${eye(id, 78 - gap, 101, l, -1)}${eye(id, 122 + gap, 101, l, 1)}${worldEyes(l, gap)}</g>
     ${brows(l)}
-    ${around(100, 112, nose, 1 + (nose - 1) * 0.35, MODE === 'inked' && (l.kind === 'adult' || l.kind === 'elder')
+    ${around(100, 112, nose, 1 + (nose - 1) * 0.35, (MODE === 'inked' || (MODE === 'pocketlight' && (WORLD === 'fairytale' || WORLD === 'mythic'))) && (l.kind === 'adult' || l.kind === 'elder')
       ? `<path d="M101 98 Q105 110 101 116 Q98 117 96 115" stroke="${shade(l.skin, -0.42)}" stroke-width="2.2" fill="none" stroke-linecap="round"/>`
       : MODE === 'gouache' ? `<ellipse cx="100" cy="114" rx="3.2" ry="2.2" fill="${shade(l.skin, -0.18)}"/>`
       : MODE === 'wondercut' ? `<circle cx="100" cy="114" r="3" fill="${shade(l.skin, -0.14)}"/>`
@@ -497,6 +587,7 @@ function humanFace(id: string, l: Look) {
     ${facialHair(id, l)}
     ${around(100, 128, mw, 1, mouth(id, l))}
     ${front}
+    ${worldHair(l)}
     <ellipse cx="80" cy="64" rx="22" ry="9" fill="#fff" opacity=".12" transform="rotate(-16 80 64)"/>
     ${flair(l)}`;
 }
@@ -580,10 +671,23 @@ const OUTFIT: Record<string, Outfit> = {
   armour: { top: '#c7cdd6', sleeve: 'long', bottom: '#3f5a8a', shoes: '#8a6a3a' },
   sunrobe: { top: '#f5ecd7', sleeve: 'none', bottom: '', skirt: '#efe2c3', shoes: '#c99a2e', bare: true },
 };
+/** The most colourful part of an outfit: what a world costume borrows so each person keeps their own colour. */
+export function accentOf(outfit: string): string | undefined {
+  const o = OUTFIT[outfit]; if (!o) return undefined;
+  const sat = (hex: string) => { const n = parseInt(hex.slice(1), 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255; const mx = Math.max(r, g, b), mn = Math.min(r, g, b); return mx ? (mx - mn) / mx : 0; };
+  const cs = [o.top, o.bottom, o.skirt ?? ''].filter((c) => /^#[0-9a-f]{6}$/i.test(c));
+  const best = cs.sort((a, b) => sat(b) - sat(a))[0];
+  return best && sat(best) > 0.2 ? best : undefined;
+}
+const WORLD_TINTED = ['gown', 'ftunic', 'cloak', 'armour', 'sunrobe', 'ranger', 'explorer'];
 const TORSO = 'M64 158 C68 146 132 146 136 158 L141 220 C128 230 72 230 59 220 Z';
 
 function humanBody(id: string, l: Look) {
-  const o = l.outfit === 'drawn' ? OUTFIT.none : OUTFIT[l.outfit] ?? OUTFIT.tee;
+  let o = l.outfit === 'drawn' ? OUTFIT.none : OUTFIT[l.outfit] ?? OUTFIT.tee;
+  // world costumes take the person's own colour: the cape, tunic or gown in their shade
+  const tint = l.accent && WORLD_TINTED.includes(l.outfit) ? l.accent : undefined;
+  if (tint && (l.outfit === 'ftunic' || l.outfit === 'gown')) o = { ...o, top: tint, skirt: o.skirt ? shade(tint, -0.12) : undefined };
+  const cape = (dflt: string) => (tint ? shade(tint, -0.3) : dflt);
   const skin = `url(#sk${id})`;
   const sl = o.sleeve === 'none' ? skin : o.top;
   const legs = o.bottom || skin;
@@ -624,23 +728,26 @@ function humanBody(id: string, l: Look) {
       back = `<ellipse cx="68" cy="158" rx="13" ry="10" fill="#d9bde6"/><ellipse cx="132" cy="158" rx="13" ry="10" fill="#d9bde6"/>`;
       over = `<path d="M90 152 L100 166 L110 152" stroke="#fff" stroke-width="2.5" fill="none"/><path d="M94 172 L106 180 M106 172 L94 180 M94 184 L106 192 M106 184 L94 192" stroke="#8e6aa8" stroke-width="1.6"/><path d="M62 200 Q100 210 138 200 L138 208 Q100 218 62 208 Z" fill="#f2d38a"/><path d="M100 204 l-14 14 M100 204 l14 14" stroke="#f2d38a" stroke-width="4" stroke-linecap="round"/>`; break;
     case 'ftunic': // a belted tunic with a short shoulder cape and a clasp
-      back = `<path d="M66 154 Q100 144 134 154 L150 214 Q100 206 50 214 Z" fill="#a8473f"/>`;
-      over = `<path d="M70 154 Q100 166 130 154 L128 168 Q100 178 72 168 Z" fill="#a8473f"/><circle cx="100" cy="166" r="5" fill="#f2c14e" stroke="#c99a2e" stroke-width="1.5"/><rect x="60" y="202" width="80" height="7" rx="3" fill="#6b4a32"/><rect x="95" y="200" width="10" height="11" rx="2" fill="#f2c14e"/>`; break;
+      back = `<path d="M66 154 Q100 144 134 154 L150 214 Q100 206 50 214 Z" fill="${cape('#a8473f')}"/>`;
+      over = `<path d="M70 154 Q100 166 130 154 L128 168 Q100 178 72 168 Z" fill="${cape('#a8473f')}"/><circle cx="100" cy="166" r="5" fill="#f2c14e" stroke="#c99a2e" stroke-width="1.5"/><rect x="60" y="202" width="80" height="7" rx="3" fill="#6b4a32"/><rect x="95" y="200" width="10" height="11" rx="2" fill="#f2c14e"/>`; break;
     case 'cloak': // a travelling cloak with its hood down and a round clasp
-      back = `<path d="M62 152 Q100 138 138 152 L156 246 Q100 236 44 246 Z" fill="#4f6f86"/><path d="M70 150 Q100 134 130 150 Q122 166 100 168 Q78 166 70 150 Z" fill="#3f5c72"/>`;
-      over = `<path d="M70 156 L84 226 M130 156 L116 226" stroke="#4f6f86" stroke-width="12" stroke-linecap="round"/><circle cx="100" cy="160" r="5.5" fill="#d9a94a"/><path d="M60 208 L140 208" stroke="#8a6a4a" stroke-width="5"/>`; break;
-    case 'explorer': // a many-pocket vest over a shirt, with a satchel strap
+      back = `<path d="M62 152 Q100 138 138 152 L156 246 Q100 236 44 246 Z" fill="${cape('#4f6f86')}"/><path d="M70 150 Q100 134 130 150 Q122 166 100 168 Q78 166 70 150 Z" fill="${tint ? shade(tint, -0.42) : '#3f5c72'}"/>`;
+      over = `<path d="M70 156 L84 226 M130 156 L116 226" stroke="${cape('#4f6f86')}" stroke-width="12" stroke-linecap="round"/><circle cx="100" cy="160" r="5.5" fill="#d9a94a"/><path d="M60 208 L140 208" stroke="#8a6a4a" stroke-width="5"/>`; break;
+    case 'explorer': // a many-pocket vest over a shirt, with a satchel strap and a backpack
+      back = `<rect x="54" y="156" width="92" height="60" rx="16" fill="#8a6a3f"/><rect x="58" y="150" width="84" height="14" rx="7" fill="#c9a96e"/><path d="M62 150 Q100 136 138 150" stroke="#6b4a32" stroke-width="8" fill="none" stroke-linecap="round"/>`;
       over = `<path d="M74 152 L94 156 L92 224 L72 222 Z M126 152 L106 156 L108 224 L128 222 Z" fill="#a0855c"/><rect x="76" y="182" width="12" height="10" rx="2" fill="#8a7049"/><rect x="112" y="182" width="12" height="10" rx="2" fill="#8a7049"/><rect x="76" y="200" width="12" height="10" rx="2" fill="#8a7049"/><path d="M128 152 L74 212" stroke="#6b4a32" stroke-width="5"/><path d="M90 150 L100 158 L110 150" stroke="#f0e3c8" stroke-width="3" fill="none"/>`; break;
-    case 'ranger': // a trail jacket with a neck scarf, a belt with a pouch, rolled cuffs
-      over = `<path d="M84 150 Q100 166 116 150 L112 166 Q100 174 88 166 Z" fill="#d9775b"/><path d="M96 166 L92 180 L100 172 L108 180 L104 166" fill="#d9775b"/><path d="M100 168 L100 226" stroke="#5a7046" stroke-width="2"/><rect x="60" y="206" width="80" height="7" rx="3" fill="#5a3b26"/><rect x="112" y="204" width="14" height="13" rx="3" fill="#8a6a4a"/><path d="M60 174 h12 M128 174 h12" stroke="#5a7046" stroke-width="2.5"/>`; break;
+    case 'ranger': // a trail jacket with a neck scarf, a belt with a pouch, rolled cuffs, a bedroll on the back
+      back = `<rect x="52" y="152" width="96" height="58" rx="14" fill="#5a6b4a"/><rect x="46" y="140" width="108" height="18" rx="9" fill="#b8553e"/><path d="M66 140 V158 M134 140 V158" stroke="#6b4a32" stroke-width="3"/>`;
+      over = `<path d="M84 150 Q100 166 116 150 L112 166 Q100 174 88 166 Z" fill="${tint ?? '#d9775b'}"/><path d="M96 166 L92 180 L100 172 L108 180 L104 166" fill="${tint ?? '#d9775b'}"/><path d="M100 168 L100 226" stroke="#5a7046" stroke-width="2"/><rect x="60" y="206" width="80" height="7" rx="3" fill="#5a3b26"/><rect x="112" y="204" width="14" height="13" rx="3" fill="#8a6a4a"/><path d="M60 174 h12 M128 174 h12" stroke="#5a7046" stroke-width="2.5"/>`; break;
     case 'armour': // soft, rounded armour: a breastplate with a sun, shoulder guards and a flowing cape
-      back = `<path d="M62 152 Q100 140 138 152 L162 248 Q100 236 38 248 Z" fill="#c4473b"/>`;
+      back = `<path d="M62 152 Q100 140 138 152 L162 248 Q100 236 38 248 Z" fill="${cape('#c4473b')}"/>`;
       over = `<path d="M74 158 Q100 150 126 158 L124 202 Q100 214 76 202 Z" fill="#dfe4ea" stroke="#9aa6b4" stroke-width="2"/><circle cx="100" cy="182" r="9" fill="#f2c14e"/>${[0, 45, 90, 135, 180, 225, 270, 315].map((a) => `<path d="M100 182 L${(100 + 14 * Math.cos((a * Math.PI) / 180)).toFixed(1)} ${(182 + 14 * Math.sin((a * Math.PI) / 180)).toFixed(1)}" stroke="#f2c14e" stroke-width="2.5" stroke-linecap="round"/>`).join('')}<ellipse cx="68" cy="160" rx="15" ry="11" fill="#c9a24a" stroke="#a5822e" stroke-width="2"/><ellipse cx="132" cy="160" rx="15" ry="11" fill="#c9a24a" stroke="#a5822e" stroke-width="2"/><rect x="62" y="206" width="76" height="8" rx="3" fill="#8a6a3a"/>`; break;
-    case 'sunrobe': // a draped robe with a gold-trimmed sash over one shoulder
+    case 'sunrobe': // a draped robe with a gold-trimmed sash over one shoulder, and a long cape
+      back = `<path d="M62 152 Q100 140 138 152 L162 250 Q100 238 38 250 Z" fill="${cape('#3f5a8a')}"/><path d="M62 152 Q100 140 138 152" stroke="#d9a94a" stroke-width="4" fill="none"/>`;
       over = `<path d="M70 152 L130 214" stroke="#d9a94a" stroke-width="10" stroke-linecap="round"/><path d="M70 152 L130 214" stroke="#f5d488" stroke-width="3" stroke-linecap="round"/><path d="M62 206 Q100 214 138 206" stroke="#d9a94a" stroke-width="3" fill="none"/><circle cx="74" cy="156" r="6" fill="#f2c14e" stroke="#c99a2e" stroke-width="1.5"/>`; break;
   }
   const P = POSES[l.pose ?? 'stand'];
-  const raised = l.pose === 'point' || l.pose === 'cheer';
+  const raised = l.pose === 'point' || l.pose === 'cheer' || l.pose === 'wave';
   const armL = P.arm, armR = 'M130 162 C140 176 146 194 149 212';
   const sleeveEnd = o.sleeve === 'short' ? P.sleeve : '';
   const sleeveEndR = o.sleeve === 'short' ? 'M130 162 C136 170 140 178 142 186' : '';
@@ -666,8 +773,9 @@ function humanBody(id: string, l: Look) {
 
 /** A raised arm (pointing, cheering) is drawn in front of the head, so long hair can't hide it. */
 function raisedArm(id: string, l: Look): string {
-  if (isPet(l.kind) || l.drawing || !(l.pose === 'point' || l.pose === 'cheer')) return '';
-  const o = l.outfit === 'drawn' ? OUTFIT.none : OUTFIT[l.outfit] ?? OUTFIT.tee;
+  if (isPet(l.kind) || l.drawing || !(l.pose === 'point' || l.pose === 'cheer' || l.pose === 'wave')) return '';
+  let o = l.outfit === 'drawn' ? OUTFIT.none : OUTFIT[l.outfit] ?? OUTFIT.tee;
+  if (l.accent && (l.outfit === 'ftunic' || l.outfit === 'gown')) o = { ...o, top: l.accent };
   const P = POSES[l.pose], skin = `url(#sk${id})`;
   return `<path d="${P.arm}" stroke="${o.sleeve === 'long' ? o.top : skin}" stroke-width="17" fill="none" stroke-linecap="round"/>${o.sleeve === 'short' ? `<path d="${P.sleeve}" stroke="${o.top}" stroke-width="19" fill="none" stroke-linecap="round"/>` : ''}<circle cx="${P.hand[0]}" cy="${P.hand[1]}" r="10.5" fill="${skin}"/><circle cx="${P.thumb[0]}" cy="${P.thumb[1]}" r="4.5" fill="${skin}"/>`;
 }
@@ -678,6 +786,7 @@ const POSES: Record<Pose, { arm: string; sleeve: string; hand: [number, number];
   point: { arm: 'M70 162 C56 154 42 138 32 118', sleeve: 'M70 162 C64 158 58 154 53 148', hand: [30, 112], thumb: [37, 114] },
   hips: { arm: 'M70 162 C50 172 50 192 70 202', sleeve: 'M70 162 C62 166 58 172 56 180', hand: [72, 203], thumb: [67, 197] },
   cheer: { arm: 'M70 162 C62 142 60 120 58 98', sleeve: 'M70 162 C66 154 64 146 63 140', hand: [58, 92], thumb: [64, 96] },
+  wave: { arm: 'M70 162 C54 158 44 146 40 128', sleeve: 'M70 162 C63 160 57 157 52 152', hand: [39, 121], thumb: [46, 124] },
 };
 
 function petBody(id: string, l: Look) {
@@ -728,6 +837,7 @@ function hat(l: Look) {
     case 'catears': return `<path d="M42 62 Q100 22 158 62" stroke="#2b2622" stroke-width="5" fill="none"/><path d="M54 52 L58 14 L84 40 Z M146 52 L142 14 L116 40 Z" fill="#2b2622"/><path d="M61 44 L63 26 L76 39 Z M139 44 L137 26 L124 39 Z" fill="#f4b8c3"/>`;
     case 'clips': return `<g transform="rotate(-20 66 52)"><rect x="54" y="48" width="24" height="7" rx="3.5" fill="#f2c14e"/></g><g transform="rotate(-30 80 42)"><rect x="70" y="38" width="22" height="7" rx="3.5" fill="#ef9fb6"/></g><path d="M138 50 C132 42 138 36 142 41 C146 36 152 42 146 50 L142 54 Z" fill="#7fc8e0"/>`;
     case 'propeller': return `<path d="M50 60 Q52 14 100 12 Q148 14 150 60 Z" fill="#e86f5b"/><path d="M100 12 Q74 18 50 60 L84 60 Z" fill="#f2c14e"/><path d="M100 12 Q126 18 150 60 L116 60 Z" fill="#5e8fb8"/><rect x="40" y="56" width="120" height="8" rx="4" fill="#4a76a8"/><path d="M100 12 V0" stroke="#3b3f4a" stroke-width="3"/><ellipse cx="84" cy="-2" rx="17" ry="4" fill="#7fb069"/><ellipse cx="116" cy="-2" rx="17" ry="4" fill="#e86f8a"/><circle cx="100" cy="-2" r="4" fill="#3b3f4a"/>`;
+    case 'tiara': return `<path d="M58 58 Q100 40 142 58" stroke="#e3b23c" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M78 52 L84 36 L92 48 L100 26 L108 48 L116 36 L122 52 Q100 44 78 52 Z" fill="#f2c14e" stroke="#c99a2e" stroke-width="2" stroke-linejoin="round"/><circle cx="100" cy="40" r="4.5" fill="#8fd0e6"/><circle cx="84" cy="46" r="2.6" fill="#f4a3b5"/><circle cx="116" cy="46" r="2.6" fill="#f4a3b5"/>`;
     case 'circlet': return `<path d="M44 66 Q100 34 156 66" stroke="#7a9a5a" stroke-width="5" fill="none" stroke-linecap="round"/>${[[52, 60], [70, 50], [130, 50], [148, 60]].map(([x, y], i) => `<ellipse cx="${x}" cy="${y}" rx="9" ry="5" fill="#8fbf6f" transform="rotate(${i < 2 ? -30 : 30} ${x} ${y})"/>`).join('')}<circle cx="100" cy="42" r="8" fill="#f4c6d6"/><circle cx="100" cy="42" r="3.5" fill="#f2c14e"/><circle cx="84" cy="46" r="5" fill="#fbe7b0"/><circle cx="116" cy="46" r="5" fill="#fbe7b0"/>`;
     case 'brimhat': return `<path d="M20 60 Q100 40 180 60 Q170 72 100 70 Q30 72 20 60 Z" fill="#b08a5a"/><path d="M62 60 Q62 18 100 16 Q138 18 138 60 Q100 52 62 60 Z" fill="#c49a66"/><path d="M62 52 Q100 44 138 52 L138 60 Q100 52 62 60 Z" fill="#6b4a32"/><path d="M60 64 Q48 96 64 120" stroke="#6b4a32" stroke-width="1.8" fill="none"/>`;
     case 'laurel': return [-1, 1].map((sd) => `<path d="M100 ${30} Q${100 + sd * 46} ${34} ${100 + sd * 58} ${70}" stroke="#c99a2e" stroke-width="3" fill="none"/>${[0, 1, 2, 3, 4].map((i) => { const t = i / 4, x = 100 + sd * (8 + 50 * t), y = 32 + 36 * t * t; return `<ellipse cx="${x.toFixed(1)}" cy="${(y - 4).toFixed(1)}" rx="8" ry="4" fill="#f2c14e" transform="rotate(${sd * (20 + 40 * t)} ${x.toFixed(1)} ${(y - 4).toFixed(1)})"/><ellipse cx="${(x + sd * 2).toFixed(1)}" cy="${(y + 5).toFixed(1)}" rx="8" ry="4" fill="#e3b23c" transform="rotate(${sd * (-10 + 40 * t)} ${(x + sd * 2).toFixed(1)} ${(y + 5).toFixed(1)})"/>`; }).join('')}`).join('');
@@ -808,6 +918,7 @@ export function characterMarkup(l: Look, opts: { animated?: boolean; style?: Sty
     return finish(`<g class="${cls}"><defs>${styleFilters(MODE, id)}</defs><g class="bt-body">${img}</g></g>`, l, id);
   }
   const pet = isPet(l.kind);
+  WORLD = pet || l.face ? 'everyday' : l.world ?? 'everyday';
   const s = l.face ? (l.faceScale ?? 100) / 100 : 1;
   const dy = l.face ? l.faceY ?? 0 : 0;
   const head = l.face
@@ -819,20 +930,20 @@ export function characterMarkup(l: Look, opts: { animated?: boolean; style?: Sty
     ? `<ellipse cx="102" cy="258" rx="54" ry="5" fill="${STYLES.wondercut.palette.shadow}" opacity=".22"/>`
     : `<ellipse cx="100" cy="257" rx="56" ry="6.5" fill="#000" opacity="${MODE === 'inked' ? 0.14 : 0.09}"/>`;
   const base = pet ? { head: 1, body: 1, slim: 1 } : PROPORTIONS[MODE][l.kind as 'baby' | 'kid' | 'adult' | 'elder'];
-  const wb = pet ? WORLD_BODY.everyday : WORLD_BODY[l.world ?? 'everyday'];
-  const pr = { head: base.head * wb.head, body: base.body * wb.body, slim: base.slim * wb.slim };
-  // the world's finishing light: a gold hero's rim, or a few fairytale glints
-  const worldLight = pet || l.face ? '' : l.world === 'mythic'
-    ? `<path d="M154 62 Q170 96 154 132" stroke="#ffd36b" stroke-width="5" fill="none" stroke-linecap="round" opacity=".75"/><path d="M46 70 Q38 94 46 118" stroke="#ffe6a8" stroke-width="3" fill="none" stroke-linecap="round" opacity=".45"/>`
-    : l.world === 'fairytale' ? sparkle(44, 50, 5, '#fff6c9') + sparkle(160, 36, 4, '#ffe0ef') : '';
+  const wb = pet ? WORLD_BODY.everyday : worldBody(l.world, l.kind);
+  const pr = buildOf(base, wb);
+  // the hero's rim light down the shadow side of the body
+  const bodyRim = WORLD === 'mythic' ? `<path d="M137 160 L142 218" stroke="#ffd36b" stroke-width="3.4" stroke-linecap="round" opacity=".7"/>` : '';
   const bodyT = `translate(100 ${FEET}) scale(${pr.slim} ${pr.body}) translate(-100 -${FEET})`;
   const lift = FEET - (FEET - BODY_TOP) * pr.body - BODY_TOP; // how far the body's top moved up
   const headT = `translate(0 ${lift.toFixed(1)}) translate(100 ${CHIN}) scale(${pr.head}) translate(-100 -${CHIN})`;
+  const headY = lift + CHIN + (94 - CHIN) * pr.head;
   return finish(`<g class="${cls}">
     ${defs(id, l, l.skin, l.hair)}
+    ${l.drawing ? '' : worldAura(id, headY)}
     ${shadow}
-    <g class="bt-body"><g transform="${bodyT}">${pet ? petBody(id, l) : humanBody(id, l)}${l.outfit === 'drawn' ? wornImage(l, 'outfit') : ''}${extra(l)}</g>
-      <g transform="${headT}"><g class="bt-head" transform="translate(0 ${dy}) translate(100 94) scale(${s}) translate(-100 -94)">${head}${rim}${worldLight}${headpiece(l)}${glasses(l)}${hat(l)}</g></g>
+    <g class="bt-body"><g transform="${bodyT}">${pet ? petBody(id, l) : humanBody(id, l)}${l.outfit === 'drawn' ? wornImage(l, 'outfit') : ''}${pet ? '' : bodyRim}${extra(l)}</g>
+      <g transform="${headT}"><g class="bt-head" transform="translate(0 ${dy}) translate(100 94) scale(${s}) translate(-100 -94)">${head}${rim}${headpiece(l)}${glasses(l)}${hat(l)}</g></g>
       ${pet ? '' : `<g transform="${bodyT}">${raisedArm(id, l)}</g>`}
     </g>
   </g>`, l, id);
@@ -858,8 +969,8 @@ const FEET = 252, BODY_TOP = 146, CHIN = 150;
  */
 export function fitViewBox(vb: string, l: Look, mode: StyleMode = 'pocketlight'): string {
   if (isPet(l.kind) || l.drawing) return vb;
-  const b = PROPORTIONS[mode][l.kind as 'baby' | 'kid' | 'adult' | 'elder'], wb = WORLD_BODY[l.world ?? 'everyday'];
-  const pr = { head: b.head * wb.head, body: b.body * wb.body, slim: b.slim * wb.slim };
+  const b = PROPORTIONS[mode][l.kind as 'baby' | 'kid' | 'adult' | 'elder'], wb = worldBody(l.world, l.kind);
+  const pr = buildOf(b, wb);
   const [x, y, w, h] = vb.split(/\s+/).map(Number);
   const lift = FEET - (FEET - BODY_TOP) * pr.body - BODY_TOP;
   const nx = 100 + (x - 100) * pr.head, ny = CHIN + (y - CHIN) * pr.head + lift;

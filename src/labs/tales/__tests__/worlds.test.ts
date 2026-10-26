@@ -16,11 +16,9 @@ import { WORLDS, WORLD_IDS, worldBackdrop, worldCostume } from '../worlds';
 const mom: Look = { kind: 'adult', skin: '#d39a6e', hair: '#1f1a17', hairStyle: 'curtain', eyes: '#5a3a22', outfit: 'dress', hat: 'none', glasses: 'round', extra: 'none', personality: 'calm', shape: { faceWidth: 0.4, eyeGap: -0.3, nose: 0.5 } };
 const kid: Look = { kind: 'kid', skin: '#efc19f', hair: '#7a5236', hairStyle: 'messy', eyes: '#4a7fb5', outfit: 'tee', hat: 'none', glasses: 'none', extra: 'none', personality: 'silly' };
 const inWorld = (w: WorldId, l: Look, star = false): Look => ({ ...l, ...worldCostume(w, l, star), world: w });
-/** The head as drawn: everything that makes the face theirs. */
-const face = (svg: string) => (svg.match(/<g class="bt-head"[\s\S]*?<\/g><\/g>/)?.[0] ?? '')
-  // the world's finishing light (gold rim, glints) is lighting, not the face
-  .replace(/<path[^>]*(#ffd36b|#ffe6a8|#fff6c9|#ffe0ef)[^>]*\/>/g, '')
-  .replace(/c\d+/g, '');
+/** The face's own outline: the head shape read from the photo (Character DNA), however it's drawn. */
+const headShape = (svg: string) => svg.match(/<path d="(M[\d.]+ [\d.]+ C[^"]+)" fill="url\(#sk/)?.[1];
+const IDENTITY: (keyof Look)[] = ['kind', 'skin', 'hair', 'hairStyle', 'eyes', 'shape', 'facial', 'beard', 'freckles', 'lashes', 'face', 'drawing'];
 
 test('every world has its own costumes, places and story', () => {
   for (const w of WORLD_IDS.filter((x) => x !== 'everyday')) {
@@ -34,18 +32,46 @@ test('every world has its own costumes, places and story', () => {
   assert.equal(new Set(costumes).size, 3, 'three different costumes');
 });
 
-test('a world changes the clothes and the posture, never the face', () => {
+test('a world changes how someone is drawn, never who they are', () => {
   const base = characterMarkup(mom);
   for (const w of WORLD_IDS) {
+    // the costume never touches identity
+    for (const star of [true, false]) for (const who of [mom, kid]) {
+      const c = worldCostume(w, who, star);
+      for (const k of IDENTITY) assert.ok(!(k in c), `${w}: costume leaves ${k} alone`);
+    }
     const svg = characterMarkup(inWorld(w, mom));
-    assert.ok(svg.includes(mom.skin) && svg.includes(mom.hair), `${w}: same skin and hair`);
+    assert.ok(svg.includes(mom.skin) && svg.includes(mom.hair) && svg.includes(mom.eyes!), `${w}: same skin, hair and eye colour`);
     assert.ok(/<circle cx="7\d(\.\d+)?" cy="\d+" r="17"/.test(svg), `${w}: still wears their glasses`);
     if (w !== 'everyday') assert.notEqual(svg, base, `${w}: something changes`);
   }
-  // the same face in every world, every pose and every expression
-  const faces = new Set<string>();
-  for (const w of WORLD_IDS) for (const pose of ['stand', 'point', 'hips', 'cheer'] as const) faces.add(face(characterMarkup({ ...inWorld(w, mom), hat: 'none', pose, expression: 'smile' })));
-  assert.equal(faces.size, 1, 'face drawn identically across worlds and poses');
+  // the same face shape (from the photo) in every world, pose and expression
+  const shapes = new Set<string | undefined>();
+  for (const w of WORLD_IDS) for (const pose of ['stand', 'point', 'hips', 'cheer', 'wave'] as const) for (const expression of ['smile', 'brave', 'laugh'] as const) shapes.add(headShape(characterMarkup({ ...inWorld(w, mom), pose, expression })));
+  assert.equal(shapes.size, 1, 'one face shape across worlds');
+  assert.ok([...shapes][0], 'the face shape is drawn');
+});
+
+test('each world has its own art direction, not just a costume', () => {
+  const draw = (w: WorldId) => characterMarkup({ ...inWorld(w, mom), outfit: 'tee', hat: 'none', extra: 'none', accent: undefined });
+  const [every, fairy, adv, myth] = WORLD_IDS.map(draw);
+  // same clothes: what's left is the world's own drawing
+  assert.notEqual(fairy, every); assert.notEqual(adv, every); assert.notEqual(myth, every);
+  assert.match(fairy, /bt-twinkle/, 'fairytale glow and twinkles');
+  assert.match(myth, /#ffe08a/, 'mythic halo of light');
+  assert.match(adv, /#d8c7a6/, 'adventure dust at the feet');
+  // grown-ups are built differently in each world; babies stay babies
+  const bodyScale = (svg: string) => svg.match(/scale\(([\d.]+) ([\d.]+)\) translate\(-100 -252\)/)?.slice(1).map(Number);
+  const sz = WORLD_IDS.map((w) => bodyScale(draw(w)));
+  assert.ok(sz[3]![1] > sz[1]![1] && sz[1]![1] > sz[0]![1], 'mythic tallest, fairytale taller than everyday');
+  const baby = (w: WorldId) => bodyScale(characterMarkup({ ...kid, kind: 'baby', world: w }))!;
+  assert.ok(baby('mythic')[1] - 1 < (sz[3]![1] - 1) / 2, 'a baby is changed much less');
+});
+
+test('everyone keeps their own colour in a world costume', () => {
+  const dad: Look = { ...kid, kind: 'adult', outfit: 'denim' };
+  const a = worldCostume('mythic', mom, false).accent, b = worldCostume('mythic', dad, false).accent;
+  assert.ok(a && b && a !== b, 'different people, different capes');
 });
 
 test('Dad is not put in a gown: costumes follow what someone already wears', () => {

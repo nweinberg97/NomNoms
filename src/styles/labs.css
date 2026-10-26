@@ -148,7 +148,6 @@
 }
 @media (min-width: 900px) {
   .bt-studio { grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr); }
-  .bt-stage { position: sticky; top: 80px; }
   .bt-spread { grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); }
   .dp-studio { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); }
   .dp-stage { position: sticky; top: 80px; }
@@ -419,7 +418,7 @@
 .bt-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
 @media (min-width: 1000px) {
   .bt-layout { grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 28px; align-items: start; }
-  .bt-booksec { position: sticky; top: 110px; order: 2; }
+  .bt-booksec { position: sticky; top: 118px; order: 2; max-height: calc(100vh - 130px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; padding-bottom: 8px; }
   .bt-edits { order: 1; min-width: 0; }
   .bt-layout .bt-studio { grid-template-columns: minmax(0, 1fr); }
   .bt-layout .bt-stage { max-width: 260px; margin: 0 auto; }
@@ -438,7 +437,7 @@
 .bt-places[open] { display: grid; gap: 10px; }
 .bt-places[open] > summary { margin-bottom: 2px; }
 .bt-who { display: grid; gap: 10px; }
-.bt-editor-tabs { position: sticky; top: 110px; z-index: 5; background: var(--paper, #f6f1e9); padding: 4px 0; }
+.bt-editor-tabs { padding: 4px 0; }
 .bt-member.is-add.is-photo { border: 2px dashed var(--accent, #e9876b); background: #fff6ef; }
 .bt-member.is-add.is-photo .bt-face { color: var(--accent, #e9876b); }
 .bt-cast.is-dropping { outline: 3px dashed var(--accent, #e9876b); outline-offset: 4px; border-radius: 14px; }
@@ -452,3 +451,7 @@
   .bt-lookbar { gap: 6px; padding-left: 12px; padding-right: 12px; }
   .bt-pick select { max-width: none; font-size: 13px; }
 }
+/* story worlds: fairytale twinkles behind a character */
+@keyframes bt-twinkle { 0%, 100% { opacity: .25; transform: scale(.7); } 50% { opacity: 1; transform: scale(1.1); } }
+.bt-char.is-animated .bt-twinkle, .bt-scene.is-animated .bt-twinkle { animation: bt-twinkle 2.4s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+@media (prefers-reduced-motion: reduce) { .bt-twinkle { animation: none !important; } }
