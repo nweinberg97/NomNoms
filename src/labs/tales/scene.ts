@@ -4,17 +4,15 @@ import { PLACES, type Place } from './catalog';
 import { characterMarkup, isPet, type Look } from './character';
 import { rng } from './generator';
 import { STYLES, darken, styleFilters, stylizeShapes, type StyleMode } from './styles';
+import { askMark, hasThing, thingArt } from './things';
 
 /**
  * Draws one story page as SVG (400 × 300): a backdrop built from the place's
  * colours and horizon, a few props, the characters and the page's "big thing".
- * Props and animals are system emoji, which on Apple devices sit naturally
- * beside Genmoji faces.
+ * Props, animals and the page's big thing are drawn (things/), never emoji.
  */
 
-const EMOJI_FONT = `'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji',sans-serif`;
-const emoji = (e: string, x: number, y: number, size: number, extra = '') =>
-  `<text x="${x}" y="${y}" font-size="${size}" text-anchor="middle" dominant-baseline="central" font-family="${EMOJI_FONT}" ${extra}>${e}</text>`;
+const emoji = (e: string, x: number, y: number, size: number, extra = '') => thingArt(e, x, y, size, extra);
 
 const shade = (hex: string, k: number) => {
   const n = parseInt(hex.slice(1), 16);
@@ -54,7 +52,7 @@ export function backdrop(p: Place, seed: number): string {
   if (p.night) s += Array.from({ length: 10 }, () => `<circle cx="${r.next() * 400}" cy="${r.next() * 120}" r="1.2" fill="#fff" opacity=".8"/>`).join('');
   // a couple of props, kept clear of the characters
   const spots: [number, number, number][] = [[34, gy - 12, 30], [372, gy - 14, 30], [60, 50, 26], [200, gy + 70, 24], [372, 64, 26]];
-  r.shuffle(p.props).slice(0, 3).forEach((e, i) => { const [x, y, z] = spots[(i + Math.floor(r.next() * 2)) % spots.length]; s += emoji(e, x, y, z, 'opacity=".95"'); });
+  r.shuffle(p.props.filter(hasThing)).slice(0, 3).forEach((e, i) => { const [x, y, z] = spots[(i + Math.floor(r.next() * 2)) % spots.length]; s += emoji(e, x, y, z, 'opacity=".95"'); });
   return s;
 }
 
@@ -131,15 +129,15 @@ export function sceneSvg(opts: {
     s += `<svg x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" viewBox="-20 -30 240 300" overflow="visible">${characterMarkup(c.look, { animated: opts.animated, style: mode })}</svg>`;
   });
   s += worldAtmosphere(opts.world, id, opts.seed);
-  if (opts.focus) {
+  if (opts.focus && hasThing(opts.focus.e)) {
     const f = opts.focus;
     if (f.count) {
       const n = f.count, size = n > 3 ? 30 : 38, gap = size + 8, x0 = 200 - ((n - 1) * gap) / 2;
       s += `<g class="bt-focus">${Array.from({ length: n }, (_, i) => emoji(f.e, x0 + i * gap, 58 + (i % 2) * 10, size)).join('')}</g>`;
     } else if (f.faded) {
-      s += `<g class="bt-focus" opacity=".9"><circle cx="200" cy="74" r="38" fill="#fff" opacity=".7"/>${emoji(f.e, 200, 74, 46, 'opacity=".35"')}${emoji('❓', 232, 46, 26)}</g>`;
+      s += `<g class="bt-focus" opacity=".9"><circle cx="200" cy="74" r="38" fill="#fff" opacity=".7"/>${emoji(f.e, 200, 74, 46, 'opacity=".35"')}${askMark(232, 46, 26)}</g>`;
     } else {
-      s += `<g class="bt-focus">${emoji(f.e, 200, 76, 60)}</g>`;
+      s += `<g class="bt-focus"><ellipse cx="200" cy="80" rx="44" ry="40" fill="#fff" opacity=".28"/>${emoji(f.e, 200, 76, 64)}</g>`;
     }
   }
   if (mode === 'pocketlight') s += `<rect width="400" height="300" fill="url(#glow${id})"/><rect width="400" height="300" fill="url(#vig${id})"/>`;

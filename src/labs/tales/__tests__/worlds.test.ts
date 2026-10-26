@@ -45,14 +45,19 @@ test('a world changes how someone is drawn, never who they are', () => {
     assert.ok(/<circle cx="7\d(\.\d+)?" cy="\d+" r="17"/.test(svg), `${w}: still wears their glasses`);
     if (w !== 'everyday') assert.notEqual(svg, base, `${w}: something changes`);
   }
-  // the same face shape (from the photo) in every world, pose and expression
-  const shapes = new Set<string | undefined>();
-  for (const w of WORLD_IDS) for (const pose of ['stand', 'point', 'hips', 'cheer', 'wave'] as const) for (const expression of ['smile', 'brave', 'laugh'] as const) shapes.add(headShape(characterMarkup({ ...inWorld(w, mom), pose, expression })));
-  assert.equal(shapes.size, 1, 'one face shape across worlds');
-  assert.ok([...shapes][0], 'the face shape is drawn');
+  // each world draws faces its own way, but within a world the face (from the photo) holds
+  // across every pose and expression, and the photo's proportions shape it in every world
+  for (const w of WORLD_IDS) {
+    const shapes = new Set<string | undefined>();
+    for (const pose of ['stand', 'point', 'hips', 'cheer', 'wave'] as const) for (const expression of ['smile', 'brave', 'laugh'] as const) shapes.add(headShape(characterMarkup({ ...inWorld(w, mom), pose, expression })));
+    assert.equal(shapes.size, 1, `${w}: one face shape across poses and expressions`);
+    assert.ok([...shapes][0], `${w}: the face shape is drawn`);
+    const wider = headShape(characterMarkup({ ...inWorld(w, mom), shape: { ...mom.shape, faceWidth: 1 } }));
+    assert.notEqual(wider, [...shapes][0], `${w}: a wider face in the photo draws a wider face`);
+  }
 });
 
-test('each world has its own art direction, not just a costume', () => {
+test('each world is its own art style, not just a costume', () => {
   const draw = (w: WorldId) => characterMarkup({ ...inWorld(w, mom), outfit: 'tee', hat: 'none', extra: 'none', accent: undefined });
   const [every, fairy, adv, myth] = WORLD_IDS.map(draw);
   // same clothes: what's left is the world's own drawing
@@ -60,6 +65,12 @@ test('each world has its own art direction, not just a costume', () => {
   assert.match(fairy, /bt-twinkle/, 'fairytale glow and twinkles');
   assert.match(myth, /#ffe08a/, 'mythic halo of light');
   assert.match(adv, /#d8c7a6/, 'adventure dust at the feet');
+  // its own construction: different head, eyes and line in each world, even in the same clothes
+  const heads = new Set([every, fairy, adv, myth].map(headShape));
+  assert.equal(heads.size, 4, 'four different face constructions');
+  assert.match(myth, /stroke-width="2.2" stroke-linejoin="round" paint-order="stroke"/, 'mythic: strong lines');
+  assert.ok(!/stroke-width="3.2" stroke-linejoin="round" paint-order="stroke"/.test(adv), 'adventure: no outlines');
+  assert.match(fairy, /stroke-width="1.7" stroke-linejoin="round" paint-order="stroke"/, 'fairytale: fine ink lines');
   // grown-ups are built differently in each world; babies stay babies
   const bodyScale = (svg: string) => svg.match(/scale\(([\d.]+) ([\d.]+)\) translate\(-100 -252\)/)?.slice(1).map(Number);
   const sz = WORLD_IDS.map((w) => bodyScale(draw(w)));
