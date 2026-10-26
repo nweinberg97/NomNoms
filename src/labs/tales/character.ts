@@ -53,7 +53,24 @@ export interface Look {
    * expressions and looks change around these, never these themselves.
    */
   shape?: Partial<Record<'faceWidth' | 'faceLength' | 'jaw' | 'eyeSize' | 'eyeGap' | 'nose' | 'mouth' | 'browHeight' | 'browWeight', number>>;
+  /** Body language for this moment (performance, not identity): what the free arm does. */
+  pose?: Pose;
+  /** The story world being drawn (art direction, not identity): posture and finishing light. */
+  world?: WorldId;
 }
+export type Pose = 'stand' | 'point' | 'hips' | 'cheer';
+export type WorldId = 'everyday' | 'fairytale' | 'adventure' | 'mythic';
+/**
+ * How each story world carries the body. Multiplies the look's proportions;
+ * never touches the face. Fairytale: a little taller and more graceful.
+ * Adventure: a sturdier frame. Mythic: broad, heroic shoulders, chin up.
+ */
+export const WORLD_BODY: Record<WorldId, { head: number; body: number; slim: number }> = {
+  everyday: { head: 1, body: 1, slim: 1 },
+  fairytale: { head: 0.98, body: 1.05, slim: 0.95 },
+  adventure: { head: 1, body: 1.01, slim: 1.05 },
+  mythic: { head: 0.96, body: 1.06, slim: 1.1 },
+};
 
 /** A face proportion, clamped, and softened for babies and kids, whose storybook proportions lead. */
 export const shapeOf = (l: Look, k: keyof NonNullable<Look['shape']>) =>
@@ -96,6 +113,7 @@ export const HATS: Record<string, string> = {
   sunhat: 'Sun hat', visor: 'Visor', beret: 'Beret', bandana: 'Bandana', earmuffs: 'Earmuffs', helmet: 'Bike helmet', catears: 'Cat ears', bunny: 'Bunny ears',
   bow: 'Big bow', clips: 'Hair clips', flowers: 'Flower crown', party: 'Party', propeller: 'Propeller cap', crown: 'Crown', pirate: 'Pirate',
   cowboy: 'Cowboy', chef: 'Chef', wizard: 'Wizard',
+  circlet: 'Leaf circlet', brimhat: 'Explorer hat', laurel: 'Golden laurel', helm: 'Hero helm',
 };
 export const GLASSES: Record<string, string> = { none: 'None', round: 'Round', square: 'Square', cateye: 'Cat-eye', sun: 'Sunglasses', aviator: 'Aviators', hearts: 'Hearts', stars: 'Stars', goggles: 'Goggles', mask: 'Hero mask', nose: 'Funny nose' };
 export const OUTFITS: Record<string, string> = {
@@ -103,11 +121,15 @@ export const OUTFITS: Record<string, string> = {
   dress: 'Dress', cardigan: 'Cardigan', sailor: 'Sailor', pajamas: 'Pajamas', swimsuit: 'Swimsuit', raincoat: 'Raincoat', snowsuit: 'Snowsuit', party: 'Party dress',
   tutu: 'Tutu', apron: 'Chef', doctor: 'Doctor', firefighter: 'Firefighter', knight: 'Knight', fairy: 'Fairy', bee: 'Bee', dino: 'Dinosaur', pirate: 'Pirate',
   astronaut: 'Astronaut', hero: 'Superhero', none: 'Onesie',
+  gown: 'Storybook gown', ftunic: 'Tunic & cape', cloak: 'Hooded cloak',
+  explorer: 'Explorer vest', ranger: 'Trail jacket',
+  armour: 'Hero armour', sunrobe: 'Sun robe',
 };
 export const EXTRAS: Record<string, string> = {
   none: 'Nothing', balloon: 'Balloon', teddy: 'Teddy', ball: 'Ball', kite: 'Kite', bubbles: 'Bubbles', floatie: 'Swim ring', book: 'Book', ukulele: 'Ukulele',
   wand: 'Magic wand', pinwheel: 'Pinwheel', net: 'Bug net', dinotoy: 'Toy dino', lollipop: 'Lollipop', cupcake: 'Cupcake', icecream: 'Ice cream',
   flower: 'Flower', bucket: 'Bucket', umbrella: 'Umbrella', sock: 'Sock',
+  lantern: 'Lantern', map: 'Map', spyglass: 'Spyglass', shield: 'Sun shield', staff: 'Star staff',
 };
 
 /** Where a drawn wardrobe piece sits on a character: x, y, width, height in the 200 × 260 box. */
@@ -549,6 +571,14 @@ const OUTFIT: Record<string, Outfit> = {
   knight: { top: '#b9c2cc', sleeve: 'long', bottom: '#8a96a3', shoes: '#6b7480' },
   fairy: { top: '#a9dccb', sleeve: 'none', bottom: '', skirt: '#8fd0bd', shoes: '#f2c14e', bare: true },
   drawn: { top: 'none', sleeve: 'none', bottom: '', shoes: '', bare: true },
+  // story worlds: original designs, no costume from any film
+  gown: { top: '#c9a6d9', sleeve: 'short', bottom: '', skirt: '#b48fd0', shoes: '#f2d38a', bare: true },
+  ftunic: { top: '#5d8fb0', sleeve: 'long', bottom: '#e9dcc4', shoes: '#7a5236' },
+  cloak: { top: '#e9dcc4', sleeve: 'long', bottom: '#8a6a4a', shoes: '#5a3b26' },
+  explorer: { top: '#f0e3c8', sleeve: 'short', bottom: '#7d6a4f', shoes: '#6b4a32' },
+  ranger: { top: '#6f8f5a', sleeve: 'long', bottom: '#5a4a3a', shoes: '#4a3526' },
+  armour: { top: '#c7cdd6', sleeve: 'long', bottom: '#3f5a8a', shoes: '#8a6a3a' },
+  sunrobe: { top: '#f5ecd7', sleeve: 'none', bottom: '', skirt: '#efe2c3', shoes: '#c99a2e', bare: true },
 };
 const TORSO = 'M64 158 C68 146 132 146 136 158 L141 220 C128 230 72 230 59 220 Z';
 
@@ -590,9 +620,29 @@ function humanBody(id: string, l: Look) {
     case 'knight': over = `<path d="M72 156 L128 156 L126 220 L74 220 Z" fill="#5e8fb8"/><path d="M100 176 l5 10 11 1.5 -8 7.5 2 11 -10 -5.5 -10 5.5 2 -11 -8 -7.5 11 -1.5z" fill="#f2c14e"/><rect x="66" y="206" width="68" height="7" rx="3" fill="#8a6a4a"/>`; break;
     case 'fairy': back = `<ellipse cx="54" cy="168" rx="34" ry="22" fill="#e5f3fb" opacity=".85" stroke="#b9dcef" stroke-width="2" transform="rotate(-30 54 168)"/><ellipse cx="146" cy="168" rx="34" ry="22" fill="#e5f3fb" opacity=".85" stroke="#b9dcef" stroke-width="2" transform="rotate(30 146 168)"/><ellipse cx="62" cy="200" rx="20" ry="13" fill="#f3e5fb" opacity=".85" transform="rotate(20 62 200)"/><ellipse cx="138" cy="200" rx="20" ry="13" fill="#f3e5fb" opacity=".85" transform="rotate(-20 138 200)"/>`;
       over = sparkle(86, 180, 4, '#fff') + sparkle(114, 190, 3.5, '#fff'); break;
+    case 'gown': // puffed shoulders, a laced bodice, a ribbon sash, a layered skirt
+      back = `<ellipse cx="68" cy="158" rx="13" ry="10" fill="#d9bde6"/><ellipse cx="132" cy="158" rx="13" ry="10" fill="#d9bde6"/>`;
+      over = `<path d="M90 152 L100 166 L110 152" stroke="#fff" stroke-width="2.5" fill="none"/><path d="M94 172 L106 180 M106 172 L94 180 M94 184 L106 192 M106 184 L94 192" stroke="#8e6aa8" stroke-width="1.6"/><path d="M62 200 Q100 210 138 200 L138 208 Q100 218 62 208 Z" fill="#f2d38a"/><path d="M100 204 l-14 14 M100 204 l14 14" stroke="#f2d38a" stroke-width="4" stroke-linecap="round"/>`; break;
+    case 'ftunic': // a belted tunic with a short shoulder cape and a clasp
+      back = `<path d="M66 154 Q100 144 134 154 L150 214 Q100 206 50 214 Z" fill="#a8473f"/>`;
+      over = `<path d="M70 154 Q100 166 130 154 L128 168 Q100 178 72 168 Z" fill="#a8473f"/><circle cx="100" cy="166" r="5" fill="#f2c14e" stroke="#c99a2e" stroke-width="1.5"/><rect x="60" y="202" width="80" height="7" rx="3" fill="#6b4a32"/><rect x="95" y="200" width="10" height="11" rx="2" fill="#f2c14e"/>`; break;
+    case 'cloak': // a travelling cloak with its hood down and a round clasp
+      back = `<path d="M62 152 Q100 138 138 152 L156 246 Q100 236 44 246 Z" fill="#4f6f86"/><path d="M70 150 Q100 134 130 150 Q122 166 100 168 Q78 166 70 150 Z" fill="#3f5c72"/>`;
+      over = `<path d="M70 156 L84 226 M130 156 L116 226" stroke="#4f6f86" stroke-width="12" stroke-linecap="round"/><circle cx="100" cy="160" r="5.5" fill="#d9a94a"/><path d="M60 208 L140 208" stroke="#8a6a4a" stroke-width="5"/>`; break;
+    case 'explorer': // a many-pocket vest over a shirt, with a satchel strap
+      over = `<path d="M74 152 L94 156 L92 224 L72 222 Z M126 152 L106 156 L108 224 L128 222 Z" fill="#a0855c"/><rect x="76" y="182" width="12" height="10" rx="2" fill="#8a7049"/><rect x="112" y="182" width="12" height="10" rx="2" fill="#8a7049"/><rect x="76" y="200" width="12" height="10" rx="2" fill="#8a7049"/><path d="M128 152 L74 212" stroke="#6b4a32" stroke-width="5"/><path d="M90 150 L100 158 L110 150" stroke="#f0e3c8" stroke-width="3" fill="none"/>`; break;
+    case 'ranger': // a trail jacket with a neck scarf, a belt with a pouch, rolled cuffs
+      over = `<path d="M84 150 Q100 166 116 150 L112 166 Q100 174 88 166 Z" fill="#d9775b"/><path d="M96 166 L92 180 L100 172 L108 180 L104 166" fill="#d9775b"/><path d="M100 168 L100 226" stroke="#5a7046" stroke-width="2"/><rect x="60" y="206" width="80" height="7" rx="3" fill="#5a3b26"/><rect x="112" y="204" width="14" height="13" rx="3" fill="#8a6a4a"/><path d="M60 174 h12 M128 174 h12" stroke="#5a7046" stroke-width="2.5"/>`; break;
+    case 'armour': // soft, rounded armour: a breastplate with a sun, shoulder guards and a flowing cape
+      back = `<path d="M62 152 Q100 140 138 152 L162 248 Q100 236 38 248 Z" fill="#c4473b"/>`;
+      over = `<path d="M74 158 Q100 150 126 158 L124 202 Q100 214 76 202 Z" fill="#dfe4ea" stroke="#9aa6b4" stroke-width="2"/><circle cx="100" cy="182" r="9" fill="#f2c14e"/>${[0, 45, 90, 135, 180, 225, 270, 315].map((a) => `<path d="M100 182 L${(100 + 14 * Math.cos((a * Math.PI) / 180)).toFixed(1)} ${(182 + 14 * Math.sin((a * Math.PI) / 180)).toFixed(1)}" stroke="#f2c14e" stroke-width="2.5" stroke-linecap="round"/>`).join('')}<ellipse cx="68" cy="160" rx="15" ry="11" fill="#c9a24a" stroke="#a5822e" stroke-width="2"/><ellipse cx="132" cy="160" rx="15" ry="11" fill="#c9a24a" stroke="#a5822e" stroke-width="2"/><rect x="62" y="206" width="76" height="8" rx="3" fill="#8a6a3a"/>`; break;
+    case 'sunrobe': // a draped robe with a gold-trimmed sash over one shoulder
+      over = `<path d="M70 152 L130 214" stroke="#d9a94a" stroke-width="10" stroke-linecap="round"/><path d="M70 152 L130 214" stroke="#f5d488" stroke-width="3" stroke-linecap="round"/><path d="M62 206 Q100 214 138 206" stroke="#d9a94a" stroke-width="3" fill="none"/><circle cx="74" cy="156" r="6" fill="#f2c14e" stroke="#c99a2e" stroke-width="1.5"/>`; break;
   }
-  const armL = 'M70 162 C60 176 54 194 51 212', armR = 'M130 162 C140 176 146 194 149 212';
-  const sleeveEnd = o.sleeve === 'short' ? 'M70 162 C64 170 60 178 58 186' : '';
+  const P = POSES[l.pose ?? 'stand'];
+  const raised = l.pose === 'point' || l.pose === 'cheer';
+  const armL = P.arm, armR = 'M130 162 C140 176 146 194 149 212';
+  const sleeveEnd = o.sleeve === 'short' ? P.sleeve : '';
   const sleeveEndR = o.sleeve === 'short' ? 'M130 162 C136 170 140 178 142 186' : '';
   const skirt = l.outfit === 'tutu'
     ? `<path d="M58 202 L142 202 L170 226 L156 228 L150 238 L138 232 L124 242 L112 234 L100 244 L88 234 L76 242 L62 232 L50 238 L44 228 L30 226 Z" fill="${o.skirt}" opacity=".95"/><path d="M62 204 L138 204 L154 222 L100 230 L46 222 Z" fill="#f6b6c8" opacity=".6"/>`
@@ -603,16 +653,32 @@ function humanBody(id: string, l: Look) {
     <rect x="76" y="212" width="21" height="34" rx="10" fill="${legs}"/><rect x="103" y="212" width="21" height="34" rx="10" fill="${legs}"/>
     <ellipse cx="85" cy="249" rx="16" ry="8.5" fill="${feet}"/><ellipse cx="115" cy="249" rx="16" ry="8.5" fill="${feet}"/>
     ${o.shoes ? `<path d="M72 247 Q85 242 99 247 M101 247 Q115 242 128 247" stroke="#fff" stroke-width="2" fill="none" opacity=".5"/>` : ''}
-    <path d="${armL}" stroke="${o.sleeve === 'long' ? sl : skin}" stroke-width="17" fill="none" stroke-linecap="round"/>
+    ${raised ? '' : `<path d="${armL}" stroke="${o.sleeve === 'long' ? sl : skin}" stroke-width="17" fill="none" stroke-linecap="round"/>`}
     <path d="${armR}" stroke="${o.sleeve === 'long' ? sl : skin}" stroke-width="17" fill="none" stroke-linecap="round"/>
-    ${sleeveEnd ? `<path d="${sleeveEnd}" stroke="${o.top}" stroke-width="19" fill="none" stroke-linecap="round"/><path d="${sleeveEndR}" stroke="${o.top}" stroke-width="19" fill="none" stroke-linecap="round"/>` : ''}
+    ${sleeveEnd ? `${raised ? '' : `<path d="${sleeveEnd}" stroke="${o.top}" stroke-width="19" fill="none" stroke-linecap="round"/>`}<path d="${sleeveEndR}" stroke="${o.top}" stroke-width="19" fill="none" stroke-linecap="round"/>` : ''}
     <path d="${TORSO}" fill="${o.top}"/>
     ${skirt}
     ${over}
     <path d="${TORSO}" fill="url(#gl${id})"/>
-    <circle cx="50" cy="216" r="10.5" fill="${skin}"/><circle cx="150" cy="216" r="10.5" fill="${skin}"/>
-    <circle cx="57" cy="211" r="4.5" fill="${skin}"/><circle cx="143" cy="211" r="4.5" fill="${skin}"/>`;
+    ${raised ? '' : `<circle cx="${P.hand[0]}" cy="${P.hand[1]}" r="10.5" fill="${skin}"/><circle cx="${P.thumb[0]}" cy="${P.thumb[1]}" r="4.5" fill="${skin}"/>`}
+    <circle cx="150" cy="216" r="10.5" fill="${skin}"/><circle cx="143" cy="211" r="4.5" fill="${skin}"/>`;
 }
+
+/** A raised arm (pointing, cheering) is drawn in front of the head, so long hair can't hide it. */
+function raisedArm(id: string, l: Look): string {
+  if (isPet(l.kind) || l.drawing || !(l.pose === 'point' || l.pose === 'cheer')) return '';
+  const o = l.outfit === 'drawn' ? OUTFIT.none : OUTFIT[l.outfit] ?? OUTFIT.tee;
+  const P = POSES[l.pose], skin = `url(#sk${id})`;
+  return `<path d="${P.arm}" stroke="${o.sleeve === 'long' ? o.top : skin}" stroke-width="17" fill="none" stroke-linecap="round"/>${o.sleeve === 'short' ? `<path d="${P.sleeve}" stroke="${o.top}" stroke-width="19" fill="none" stroke-linecap="round"/>` : ''}<circle cx="${P.hand[0]}" cy="${P.hand[1]}" r="10.5" fill="${skin}"/><circle cx="${P.thumb[0]}" cy="${P.thumb[1]}" r="4.5" fill="${skin}"/>`;
+}
+
+/** The free (left) arm for each pose. The right hand always holds the prop. */
+const POSES: Record<Pose, { arm: string; sleeve: string; hand: [number, number]; thumb: [number, number] }> = {
+  stand: { arm: 'M70 162 C60 176 54 194 51 212', sleeve: 'M70 162 C64 170 60 178 58 186', hand: [50, 216], thumb: [57, 211] },
+  point: { arm: 'M70 162 C56 154 42 138 32 118', sleeve: 'M70 162 C64 158 58 154 53 148', hand: [30, 112], thumb: [37, 114] },
+  hips: { arm: 'M70 162 C50 172 50 192 70 202', sleeve: 'M70 162 C62 166 58 172 56 180', hand: [72, 203], thumb: [67, 197] },
+  cheer: { arm: 'M70 162 C62 142 60 120 58 98', sleeve: 'M70 162 C66 154 64 146 63 140', hand: [58, 92], thumb: [64, 96] },
+};
 
 function petBody(id: string, l: Look) {
   const F = `url(#fu${id})`;
@@ -662,6 +728,10 @@ function hat(l: Look) {
     case 'catears': return `<path d="M42 62 Q100 22 158 62" stroke="#2b2622" stroke-width="5" fill="none"/><path d="M54 52 L58 14 L84 40 Z M146 52 L142 14 L116 40 Z" fill="#2b2622"/><path d="M61 44 L63 26 L76 39 Z M139 44 L137 26 L124 39 Z" fill="#f4b8c3"/>`;
     case 'clips': return `<g transform="rotate(-20 66 52)"><rect x="54" y="48" width="24" height="7" rx="3.5" fill="#f2c14e"/></g><g transform="rotate(-30 80 42)"><rect x="70" y="38" width="22" height="7" rx="3.5" fill="#ef9fb6"/></g><path d="M138 50 C132 42 138 36 142 41 C146 36 152 42 146 50 L142 54 Z" fill="#7fc8e0"/>`;
     case 'propeller': return `<path d="M50 60 Q52 14 100 12 Q148 14 150 60 Z" fill="#e86f5b"/><path d="M100 12 Q74 18 50 60 L84 60 Z" fill="#f2c14e"/><path d="M100 12 Q126 18 150 60 L116 60 Z" fill="#5e8fb8"/><rect x="40" y="56" width="120" height="8" rx="4" fill="#4a76a8"/><path d="M100 12 V0" stroke="#3b3f4a" stroke-width="3"/><ellipse cx="84" cy="-2" rx="17" ry="4" fill="#7fb069"/><ellipse cx="116" cy="-2" rx="17" ry="4" fill="#e86f8a"/><circle cx="100" cy="-2" r="4" fill="#3b3f4a"/>`;
+    case 'circlet': return `<path d="M44 66 Q100 34 156 66" stroke="#7a9a5a" stroke-width="5" fill="none" stroke-linecap="round"/>${[[52, 60], [70, 50], [130, 50], [148, 60]].map(([x, y], i) => `<ellipse cx="${x}" cy="${y}" rx="9" ry="5" fill="#8fbf6f" transform="rotate(${i < 2 ? -30 : 30} ${x} ${y})"/>`).join('')}<circle cx="100" cy="42" r="8" fill="#f4c6d6"/><circle cx="100" cy="42" r="3.5" fill="#f2c14e"/><circle cx="84" cy="46" r="5" fill="#fbe7b0"/><circle cx="116" cy="46" r="5" fill="#fbe7b0"/>`;
+    case 'brimhat': return `<path d="M20 60 Q100 40 180 60 Q170 72 100 70 Q30 72 20 60 Z" fill="#b08a5a"/><path d="M62 60 Q62 18 100 16 Q138 18 138 60 Q100 52 62 60 Z" fill="#c49a66"/><path d="M62 52 Q100 44 138 52 L138 60 Q100 52 62 60 Z" fill="#6b4a32"/><path d="M60 64 Q48 96 64 120" stroke="#6b4a32" stroke-width="1.8" fill="none"/>`;
+    case 'laurel': return [-1, 1].map((sd) => `<path d="M100 ${30} Q${100 + sd * 46} ${34} ${100 + sd * 58} ${70}" stroke="#c99a2e" stroke-width="3" fill="none"/>${[0, 1, 2, 3, 4].map((i) => { const t = i / 4, x = 100 + sd * (8 + 50 * t), y = 32 + 36 * t * t; return `<ellipse cx="${x.toFixed(1)}" cy="${(y - 4).toFixed(1)}" rx="8" ry="4" fill="#f2c14e" transform="rotate(${sd * (20 + 40 * t)} ${x.toFixed(1)} ${(y - 4).toFixed(1)})"/><ellipse cx="${(x + sd * 2).toFixed(1)}" cy="${(y + 5).toFixed(1)}" rx="8" ry="4" fill="#e3b23c" transform="rotate(${sd * (-10 + 40 * t)} ${(x + sd * 2).toFixed(1)} ${(y + 5).toFixed(1)})"/>`; }).join('')}`).join('');
+    case 'helm': return `<path d="M40 82 Q38 8 100 6 Q162 8 160 82 L146 82 Q144 36 100 32 Q56 36 54 82 Z" fill="#c9a24a" stroke="#a5822e" stroke-width="2"/><path d="M100 8 Q120 -16 150 -8 Q128 -2 118 14 Z" fill="#c4473b"/><path d="M100 8 Q84 -14 58 -6 Q78 0 86 14 Z" fill="#d9584b"/><path d="M92 20 L108 20 L104 52 L96 52 Z" fill="#a5822e"/>`;
     case 'drawn': return wornImage(l, 'hat');
     default: return '';
   }
@@ -715,6 +785,11 @@ function extra(l: Look) {
     case 'dinotoy': return `<g transform="translate(144 196)"><path d="M6 30 Q0 10 14 6 Q20 -8 32 -2 Q38 6 30 10 Q36 20 30 34 Z" fill="#7fb069"/><path d="M6 30 Q-6 34 -10 26 Q0 28 6 22" fill="#7fb069"/><circle cx="28" cy="2" r="2" fill="#2b2622"/><path d="M16 8 l3 -5 3 5 3 -5 3 5" stroke="#f2c14e" stroke-width="2" fill="none"/><rect x="10" y="30" width="7" height="8" rx="3" fill="#6d9b59"/><rect x="22" y="30" width="7" height="8" rx="3" fill="#6d9b59"/></g>`;
     case 'lollipop': return `<path d="M154 214 L168 168" stroke="#f5efe4" stroke-width="4" stroke-linecap="round"/><circle cx="170" cy="154" r="17" fill="#ef9fb6"/><path d="M170 154 m-11 0 a11 11 0 1 1 11 11 a7 7 0 1 1 -7 -7 a3 3 0 1 1 3 3" stroke="#fff" stroke-width="3.5" fill="none"/>`;
     case 'cupcake': return `<g transform="translate(146 190)"><path d="M2 14 L30 14 L26 36 L6 36 Z" fill="#e8a5b8"/><path d="M8 14 v22 M16 14 v22 M24 14 v22" stroke="#d48aa0" stroke-width="1.5"/><path d="M0 16 Q0 0 16 0 Q32 0 32 16 Z" fill="#fbf3e6"/><circle cx="16" cy="-3" r="4" fill="#d9534f"/><path d="M8 8 l2 -1 M18 6 l2 1 M24 10 l-1 2" stroke="#5e8fb8" stroke-width="2" stroke-linecap="round"/></g>`;
+    case 'lantern': return `<path d="M156 214 L164 176" stroke="#5a514a" stroke-width="3" stroke-linecap="round"/><g transform="translate(164 150)"><circle cx="0" cy="12" r="22" fill="#ffe7a3" opacity=".35"/><path d="M-6 -12 Q0 -20 6 -12" stroke="#5a514a" stroke-width="2.5" fill="none"/><rect x="-10" y="-10" width="20" height="4" rx="2" fill="#6b4a32"/><path d="M-9 -6 L9 -6 L11 20 L-11 20 Z" fill="#ffd77a" stroke="#6b4a32" stroke-width="2"/><path d="M0 -6 L0 20" stroke="#6b4a32" stroke-width="1.5"/><rect x="-12" y="20" width="24" height="5" rx="2" fill="#6b4a32"/></g>`;
+    case 'map': return `<g transform="translate(140 176) rotate(-8)"><path d="M0 0 L14 4 L28 0 L42 4 L42 40 L28 36 L14 40 L0 36 Z" fill="#f3e3bd" stroke="#b08a5a" stroke-width="2"/><path d="M14 4 L14 40 M28 0 L28 36" stroke="#d9c39a" stroke-width="1.5"/><path d="M6 28 Q14 18 22 24 T36 12" stroke="#c4473b" stroke-width="2" stroke-dasharray="3 3" fill="none"/><path d="M33 9 l5 5 M38 9 l-5 5" stroke="#c4473b" stroke-width="2.4" stroke-linecap="round"/></g>`;
+    case 'spyglass': return `<g transform="translate(150 212) rotate(-55)"><rect x="-5" y="-60" width="10" height="26" rx="3" fill="#c9a24a"/><rect x="-6.5" y="-36" width="13" height="22" rx="3" fill="#8a6a3a"/><rect x="-8" y="-16" width="16" height="16" rx="3" fill="#c9a24a"/><ellipse cx="0" cy="-60" rx="5" ry="2" fill="#bfe3f2"/></g>`;
+    case 'shield': return `<g transform="translate(160 196)"><circle cx="0" cy="0" r="28" fill="#3f5a8a" stroke="#c9a24a" stroke-width="5"/><circle cx="0" cy="0" r="9" fill="#f2c14e"/>${[0, 60, 120, 180, 240, 300].map((a) => `<path d="M${(13 * Math.cos((a * Math.PI) / 180)).toFixed(1)} ${(13 * Math.sin((a * Math.PI) / 180)).toFixed(1)} L${(21 * Math.cos((a * Math.PI) / 180)).toFixed(1)} ${(21 * Math.sin((a * Math.PI) / 180)).toFixed(1)}" stroke="#f2c14e" stroke-width="3" stroke-linecap="round"/>`).join('')}</g>`;
+    case 'staff': return `<path d="M152 246 Q156 180 160 120" stroke="#8a6a4a" stroke-width="5" stroke-linecap="round" fill="none"/><path d="M160 120 Q150 110 156 98 Q166 104 164 116" fill="none" stroke="#8a6a4a" stroke-width="4"/><circle cx="160" cy="104" r="14" fill="#cfe9ff" opacity=".45"/>${sparkle(160, 104, 9, '#ffffff')}`;
     case 'drawn': return wornImage(l, 'extra');
     case 'icecream': return `<g transform="translate(150 160)"><path d="M0 22 L12 56 L24 22 Z" fill="#d9a066"/><circle cx="12" cy="16" r="13" fill="#f6c3d2"/><circle cx="12" cy="0" r="11" fill="#fbf3e6"/><circle cx="16" cy="-6" r="2" fill="#d9534f"/></g>`;
     default: return '';
@@ -743,7 +818,13 @@ export function characterMarkup(l: Look, opts: { animated?: boolean; style?: Sty
   const shadow = MODE === 'wondercut'
     ? `<ellipse cx="102" cy="258" rx="54" ry="5" fill="${STYLES.wondercut.palette.shadow}" opacity=".22"/>`
     : `<ellipse cx="100" cy="257" rx="56" ry="6.5" fill="#000" opacity="${MODE === 'inked' ? 0.14 : 0.09}"/>`;
-  const pr = pet ? { head: 1, body: 1, slim: 1 } : PROPORTIONS[MODE][l.kind as 'baby' | 'kid' | 'adult' | 'elder'];
+  const base = pet ? { head: 1, body: 1, slim: 1 } : PROPORTIONS[MODE][l.kind as 'baby' | 'kid' | 'adult' | 'elder'];
+  const wb = pet ? WORLD_BODY.everyday : WORLD_BODY[l.world ?? 'everyday'];
+  const pr = { head: base.head * wb.head, body: base.body * wb.body, slim: base.slim * wb.slim };
+  // the world's finishing light: a gold hero's rim, or a few fairytale glints
+  const worldLight = pet || l.face ? '' : l.world === 'mythic'
+    ? `<path d="M154 62 Q170 96 154 132" stroke="#ffd36b" stroke-width="5" fill="none" stroke-linecap="round" opacity=".75"/><path d="M46 70 Q38 94 46 118" stroke="#ffe6a8" stroke-width="3" fill="none" stroke-linecap="round" opacity=".45"/>`
+    : l.world === 'fairytale' ? sparkle(44, 50, 5, '#fff6c9') + sparkle(160, 36, 4, '#ffe0ef') : '';
   const bodyT = `translate(100 ${FEET}) scale(${pr.slim} ${pr.body}) translate(-100 -${FEET})`;
   const lift = FEET - (FEET - BODY_TOP) * pr.body - BODY_TOP; // how far the body's top moved up
   const headT = `translate(0 ${lift.toFixed(1)}) translate(100 ${CHIN}) scale(${pr.head}) translate(-100 -${CHIN})`;
@@ -751,7 +832,8 @@ export function characterMarkup(l: Look, opts: { animated?: boolean; style?: Sty
     ${defs(id, l, l.skin, l.hair)}
     ${shadow}
     <g class="bt-body"><g transform="${bodyT}">${pet ? petBody(id, l) : humanBody(id, l)}${l.outfit === 'drawn' ? wornImage(l, 'outfit') : ''}${extra(l)}</g>
-      <g transform="${headT}"><g class="bt-head" transform="translate(0 ${dy}) translate(100 94) scale(${s}) translate(-100 -94)">${head}${rim}${headpiece(l)}${glasses(l)}${hat(l)}</g></g>
+      <g transform="${headT}"><g class="bt-head" transform="translate(0 ${dy}) translate(100 94) scale(${s}) translate(-100 -94)">${head}${rim}${worldLight}${headpiece(l)}${glasses(l)}${hat(l)}</g></g>
+      ${pet ? '' : `<g transform="${bodyT}">${raisedArm(id, l)}</g>`}
     </g>
   </g>`, l, id);
 }
@@ -776,7 +858,8 @@ const FEET = 252, BODY_TOP = 146, CHIN = 150;
  */
 export function fitViewBox(vb: string, l: Look, mode: StyleMode = 'pocketlight'): string {
   if (isPet(l.kind) || l.drawing) return vb;
-  const pr = PROPORTIONS[mode][l.kind as 'baby' | 'kid' | 'adult' | 'elder'];
+  const b = PROPORTIONS[mode][l.kind as 'baby' | 'kid' | 'adult' | 'elder'], wb = WORLD_BODY[l.world ?? 'everyday'];
+  const pr = { head: b.head * wb.head, body: b.body * wb.body, slim: b.slim * wb.slim };
   const [x, y, w, h] = vb.split(/\s+/).map(Number);
   const lift = FEET - (FEET - BODY_TOP) * pr.body - BODY_TOP;
   const nx = 100 + (x - 100) * pr.head, ny = CHIN + (y - CHIN) * pr.head + lift;

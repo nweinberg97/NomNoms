@@ -1,4 +1,4 @@
-import type { Expression } from './character';
+import type { Expression, Pose } from './character';
 import { ANIMALS, COLOURS, COUNTABLES, FOODS, LOST, LOVES, NUMBER_WORDS, PLACES, YUCKS, type Place, type Role, type StoryType } from './catalog';
 
 /**
@@ -39,6 +39,8 @@ export interface StoryPage {
   outfit?: string;
   /** How the star feels on this page; friends react to the big moments. */
   mood?: Expression;
+  /** The star's body language on this page (story worlds). */
+  pose?: Pose;
   /** Set when the words were changed by hand. */
   edited?: boolean;
 }
@@ -299,6 +301,38 @@ export function generateStory(type: StoryType, cast: CastMember[], opts: { seed:
         add({ place: spots[i], text: ride.t.replace(/\{H\}/g, H).replace(/\{X\}/g, tok(X)), cast: [hero.id, X.id], focus: { e: ride.e }, mood: (['laugh', 'wow', 'grin', 'proud'] as Expression[])[i % 4] });
       });
       add({ place: 'home', text: `What a day! ${H} hugs the new teddy all the way home.`, cast: [hero.id, ...others.slice(0, 2).map((c) => c.id)], focus: { e: '🧸' }, mood: 'sleepy' });
+      break;
+    }
+    case 'fairytale': {
+      title = `${H} and the Wishing Lantern`;
+      const c0 = companion(0), c1 = companion(1);
+      add({ place: 'hillcastle', text: `Once upon a time, in a castle on a hill, there lived ${H}, who had the kindest heart in the land.`, cast: [hero.id, c0.id], mood: 'dreamy' });
+      add({ place: 'enchanted', text: `One evening, a tiny light blinked at the edge of the Enchanted Wood. “Come and see!” said ${tok(c0)}.`, cast: [hero.id, c0.id], focus: { e: '✨' }, mood: 'wow', pose: 'point' });
+      add({ place: 'enchanted', text: `There sat a little firefly who had lost her glow. “Don’t worry,” said ${H}. “We’ll help you find it.”`, cast: [hero.id, c1.id], focus: { e: '🪲' }, mood: 'shy' });
+      add({ place: 'enchanted', text: `${H} held up the wishing lantern and made a wish, not for themself, but for the firefly.`, cast: [hero.id, c0.id], focus: { e: '🏮' }, mood: 'brave' });
+      add({ place: 'hillcastle', text: `The firefly glowed brighter than ever, and so did the whole sky! Kindness, ${H} learned, makes everything shine.`, cast: [hero.id, c0.id, c1.id], focus: { e: '🌟' }, mood: 'laugh', pose: 'cheer' });
+      add({ place: 'hillcastle', text: `And they all lived happily, and twinkly, ever after. The end.`, cast: [hero.id, ...others.slice(0, 2).map((c) => c.id)], focus: { e: '💫' }, mood: 'starry' });
+      break;
+    }
+    case 'expedition': {
+      title = `${H} and the Map with No Edges`;
+      const c0 = companion(0), c1 = companion(1);
+      add({ place: 'jungle', text: `${H} found an old map with a big red X. “An adventure!” ${H} shouted.`, cast: [hero.id, c0.id], focus: { e: '🗺️' }, mood: 'wow', pose: 'point' });
+      add({ place: 'jungle', text: `Through the jungle they went: past swinging vines, over river stones, splash, splash, hop!`, cast: [hero.id, c0.id], focus: { e: '🦜' }, mood: 'laugh' });
+      add({ place: 'peaks', text: `Up the mountain pass! ${tok(c1)} held the rope, and ${H} held on tight.`, cast: [hero.id, c1.id], focus: { e: '🧗' }, mood: 'brave', pose: 'hips' });
+      add({ place: 'peaks', text: `At the very top, beside the flag: the X! Inside the box was… another map, full of places nobody had explored yet.`, cast: [hero.id, c0.id, c1.id], focus: { e: '📦' }, mood: 'starry', pose: 'cheer' });
+      add({ place: 'peaks', text: `The world is bigger than any map, ${H}. Tomorrow, a brand-new adventure!`, cast: [hero.id, ...others.slice(0, 2).map((c) => c.id)], focus: { e: '🧭' }, mood: 'proud', pose: 'hips' });
+      break;
+    }
+    case 'legend': {
+      title = `${H} and the Morning Star`;
+      const c0 = companion(0), c1 = companion(1);
+      add({ place: 'starpeak', text: `Long ago, the Morning Star fell fast asleep, and the sun forgot to rise.`, cast: [hero.id, c0.id], focus: { e: '😴' }, mood: 'worried' });
+      add({ place: 'starpeak', text: `“I’ll wake it,” said ${H} the brave. With ${tok(c0)} beside them, ${H} climbed the Starlit Summit.`, cast: [hero.id, c0.id], focus: { e: '⭐' }, mood: 'brave', pose: 'hips' });
+      add({ place: 'skytemple', text: `Above the clouds stood a temple of tall white columns. ${tok(c1)} rang the sunrise bell. Dong, dong!`, cast: [hero.id, c1.id], focus: { e: '🔔' }, mood: 'wow', pose: 'point' });
+      add({ place: 'skytemple', text: `${H} raised the sun shield high and sang the waking song as loud as a lion.`, cast: [hero.id, c0.id], focus: { e: '🎶' }, mood: 'brave', pose: 'cheer' });
+      add({ place: 'skytemple', text: `The Morning Star yawned, stretched, and lit up the whole sky! Good morning, world.`, cast: [hero.id, c0.id, c1.id], focus: { e: '🌅' }, mood: 'starry', pose: 'cheer' });
+      add({ place: 'skytemple', text: `And that is how ${H} became the legend who woke the morning. The end.`, cast: [hero.id, ...others.slice(0, 2).map((c) => c.id)], focus: { e: '🏆' }, mood: 'proud', pose: 'hips' });
       break;
     }
     case 'hero': {

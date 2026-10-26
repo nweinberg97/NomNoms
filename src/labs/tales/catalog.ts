@@ -27,9 +27,19 @@ export interface Place {
   dress?: { outfit?: string; hat?: string; glasses?: string };
   night?: boolean;
   imaginary?: boolean;
+  /** Drawn for a story world: the backdrop comes from worlds.ts instead of the generic one. */
+  world?: 'fairytale' | 'adventure' | 'mythic';
+  art?: string;
 }
 
 export const PLACES: Place[] = [
+  // story-world places, each with its own hand-drawn backdrop (worlds.ts)
+  { id: 'hillcastle', name: 'The Hilltop Castle', at: 'at the hilltop castle', sky: ['#f6c9c4', '#fdf1dc'], ground: '#9fc27e', groundKind: 'grass', horizon: 'none', props: ['🌹', '🕊️'], surprises: ['just a bluebird singing on the tower', 'just a rose that smells like honey'], doing: ['dance in the courtyard', 'wave from the tower', 'share sweet buns in the garden'], imaginary: true, world: 'fairytale', art: 'hillcastle' },
+  { id: 'enchanted', name: 'The Enchanted Wood', at: 'in the Enchanted Wood', sky: ['#28485e', '#5f8f7a'], ground: '#4f7f5f', groundKind: 'grass', horizon: 'none', props: ['🍄', '✨'], surprises: ['just a glowing mushroom', 'just a firefly saying hello'], doing: ['follow the fireflies', 'tiptoe past the glowing mushrooms', 'whisper to the old oak'], imaginary: true, world: 'fairytale', art: 'enchanted' },
+  { id: 'jungle', name: 'The Jungle Trail', at: 'on the jungle trail', sky: ['#bfe6d6', '#eaf6d9'], ground: '#8fbf6a', groundKind: 'grass', horizon: 'none', props: ['🦜', '🦋'], surprises: ['just a parrot who can whistle', 'just a butterfly as big as a hand'], doing: ['swing past the vines', 'hop across the river stones', 'listen for the waterfall'], imaginary: true, world: 'adventure', art: 'jungle' },
+  { id: 'peaks', name: 'The Mountain Pass', at: 'up the mountain pass', sky: ['#9fcdef', '#e6f3fa'], ground: '#7fae7a', groundKind: 'grass', horizon: 'none', props: ['🦅', '⛺'], surprises: ['just an eagle riding the wind', 'just a mountain goat with a beard'], doing: ['climb to the flag', 'pitch the tent', 'spot the eagle'], imaginary: true, world: 'adventure', art: 'peaks' },
+  { id: 'skytemple', name: 'The Temple in the Clouds', at: 'at the temple in the clouds', sky: ['#f7b98a', '#fdf0d6'], ground: '#ffffff', groundKind: 'grass', horizon: 'none', props: ['☀️', '🕊️'], surprises: ['just a sleepy cloud', 'just a golden feather'], doing: ['ring the sunrise bell', 'walk between the tall columns', 'look down at the clouds'], imaginary: true, world: 'mythic', art: 'skytemple' },
+  { id: 'starpeak', name: 'The Starlit Summit', at: 'on the starlit summit', sky: ['#1f2350', '#8a6aa0'], ground: '#4a4278', groundKind: 'grass', horizon: 'none', props: ['⭐', '🌙'], surprises: ['just a shooting star', 'just a constellation that winks'], doing: ['count the constellations', 'climb through the stone arch', 'follow the beam of light'], imaginary: true, night: true, world: 'mythic', art: 'starpeak' },
   { id: 'beach', name: 'The beach', at: 'at the beach', sky: ['#bfe3f2', '#e9f5f8'], ground: '#f0dcb4', groundKind: 'sand', horizon: 'sea', props: ['🐚', '⛱️', '🦀', '🏖️'], surprises: ['just a crab in a tiny hat', 'just a shell that sounds like the sea', 'just a sandcastle with a flag on top'], doing: ['dig in the sand', 'splash in the waves', 'build a sandcastle'], dress: { outfit: 'swimsuit', hat: 'sunhat', glasses: 'sun' } },
   { id: 'zoo', name: 'The zoo', at: 'at the zoo', sky: ['#cfe8d8', '#f1f6e6'], ground: '#b9d68f', groundKind: 'grass', horizon: 'trees', props: ['🦒', '🐘', '🌴', '🎈'], surprises: ['just a giraffe eating leaves', 'just an elephant having a bath', 'just a monkey with a banana'], doing: ['wave at the giraffes', 'watch the penguins', 'roar like a lion'] },
   { id: 'home', name: 'Home', at: 'at home', sky: ['#f6e8d6', '#fbf3e8'], ground: '#e2cfb4', groundKind: 'floor', horizon: 'wall', props: ['🪴', '🧸', '🖼️', '🛋️'], surprises: ['just a teddy under the couch', 'just a cushion fort', 'just a cat taking a nap'], doing: ['build a block tower', 'dance in the kitchen', 'read a book on the rug'] },
@@ -190,6 +200,9 @@ export const ROLE_LABEL: Record<Role, string> = {
 
 /** The kinds of story the generator can tell. */
 export const STORY_TYPES = [
+  { id: 'fairytale', name: 'The Wishing Lantern', blurb: 'A fairytale of kindness and light' },
+  { id: 'expedition', name: 'The Map with No Edges', blurb: 'An adventure up mountains and through jungles' },
+  { id: 'legend', name: 'The Morning Star', blurb: 'A legend: a brave quest to wake the sun' },
   { id: 'lost', name: 'Lost something', blurb: 'Where’s the sock? Is it at the zoo? No!' },
   { id: 'water', name: 'Splash day', blurb: 'Pool, water slide, splash!' },
   { id: 'treasure', name: 'Treasure hunt', blurb: 'X marks the spot!' },

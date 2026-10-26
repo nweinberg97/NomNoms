@@ -1,3 +1,5 @@
+import { worldAtmosphere, worldBackdrop } from './worlds';
+import type { WorldId } from './character';
 import { PLACES, type Place } from './catalog';
 import { characterMarkup, isPet, type Look } from './character';
 import { rng } from './generator';
@@ -24,6 +26,8 @@ let uid = 0;
 
 export function backdrop(p: Place, seed: number): string {
   const id = `sc${++uid}`;
+  // story-world places are drawn by hand (worlds.ts)
+  if (p.art) { const art = worldBackdrop(p.art, seed, id); if (art) return art; }
   const r = rng(seed);
   const indoor = p.horizon === 'wall';
   const gy = indoor ? 206 : 196;
@@ -82,6 +86,8 @@ export function sceneSvg(opts: {
   animated?: boolean;
   label?: string;
   style?: StyleMode;
+  /** The story world: adds its light and atmosphere over the picture. */
+  world?: WorldId;
 }): string {
   const mode = opts.style ?? 'pocketlight';
   const id = `s${++uid}`;
@@ -124,6 +130,7 @@ export function sceneSvg(opts: {
     const y = 296 - h + (small ? 4 : 0);
     s += `<svg x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" viewBox="-20 -30 240 300" overflow="visible">${characterMarkup(c.look, { animated: opts.animated, style: mode })}</svg>`;
   });
+  s += worldAtmosphere(opts.world, id, opts.seed);
   if (opts.focus) {
     const f = opts.focus;
     if (f.count) {
