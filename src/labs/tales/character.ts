@@ -537,10 +537,10 @@ interface FaceSpec { top: number; chin: number; cran: number; cheek: number; chi
 /** Head and feature layout by age and world (the shape language). */
 function faceSpec(l: Look, w: WorldId): FaceSpec {
   const k = l.kind;
-  const base: FaceSpec = k === 'baby' ? { top: 34, chin: 152, cran: 62, cheek: 57, chinW: 27, ex: 24.5, ey: 106, erx: 14.6, ery: 16.5, tilt: 0, brow: 2.6, nose: 0, mouth: 0 }
-    : k === 'kid' ? { top: 35, chin: 152, cran: 60, cheek: 51, chinW: 20, ex: 24.5, ey: 104, erx: 14.1, ery: 16, tilt: 0, brow: 3.6, nose: 0, mouth: 0 }
-    : k === 'elder' ? { top: 37, chin: 154, cran: 57, cheek: 46, chinW: 15, ex: 24, ey: 103, erx: 13.8, ery: 15, tilt: 0, brow: 3.6, nose: 1, mouth: 1 }
-    : { top: 36, chin: 155, cran: 57, cheek: 44, chinW: 13, ex: 24, ey: 103, erx: 14.6, ery: 16.5, tilt: 0, brow: 3.4, nose: 1, mouth: 1 };
+  const base: FaceSpec = k === 'baby' ? { top: 34, chin: 153, cran: 58, cheek: 52, chinW: 22, ex: 24.5, ey: 106, erx: 14.6, ery: 16.5, tilt: 0, brow: 2.6, nose: 0, mouth: 0 }
+    : k === 'kid' ? { top: 35, chin: 154, cran: 55, cheek: 46, chinW: 16, ex: 24.5, ey: 104, erx: 14.1, ery: 16, tilt: 0, brow: 3.6, nose: 0, mouth: 0 }
+    : k === 'elder' ? { top: 36, chin: 157, cran: 53, cheek: 44, chinW: 14, ex: 24, ey: 103, erx: 13.8, ery: 15, tilt: 0, brow: 3.6, nose: 1, mouth: 1 }
+    : { top: 35, chin: 158, cran: 53, cheek: 42, chinW: 12, ex: 24, ey: 103, erx: 14.6, ery: 16.5, tilt: 0, brow: 3.4, nose: 1, mouth: 1 };
   const little = k === 'baby' || k === 'kid';
   switch (w) {
     case 'fairytale': return { ...base, cheek: base.cheek - 4, chinW: base.chinW - (little ? 4 : 5), chin: base.chin + 2, tilt: 0 };
@@ -669,7 +669,7 @@ function coreFace(id: string, l: Look, w: WorldId): string {
   const [rawBack, rawFront] = hair(id, l);
   const back0 = !OPEN_HEADWEAR.includes(l.hat) && ['puff', 'topknot', 'bun'].includes(l.hairStyle) ? '' : rawBack;
   const vol = (s: string) => (w === 'adventure' && s ? `<g transform="translate(100 78) scale(1.06) translate(-100 -78)">${s}</g>` : s);
-  const back = vol(back0), front = vol(rawFront);
+  const back = vol(onHead(l, back0)), front = vol(onHead(l, rawFront));
   const S = faceSpec(l, w), skin = `url(#sk${id})`, head = coreHead(S, l);
   // every look shares the same friendly almond eyes (white at the sides, the lid resting on the iris)
   const TS = talesSpec(l), eyeS = { ...S, erx: TS.erx * 1.06, ery: TS.ery * 1.06, ey: S.ey + 1 };
@@ -707,7 +707,7 @@ function coreFace(id: string, l: Look, w: WorldId): string {
     ${facialHair(id, l)}
     ${around(100, 128, mw, 1, talesMouth(id, featS, l))}
     ${hairShadow(id, l, clip, front)}${back ? noInk(scalp) : scalp}${front}${scalpOn ? noInk(front) : ''}${seam}
-    ${worldHair(l)}
+    ${onHead(l, worldHair(l))}
     ${flair(l)}`;
 }
 
@@ -720,6 +720,37 @@ function coreFace(id: string, l: Look, w: WorldId): string {
  * blush; a warm brown line instead of black.
  */
 const femme = (l: Look) => !!l.lashes;
+/* ── the fitting model: hair, hats and glasses placed on this person's own head ──────────
+ * Hairstyles, hats and headwear are drawn once for a reference head (half-width ~60, crown at y 34,
+ * centred at y 94). Each person's head is measured from the same numbers that draw it (age, look, the
+ * face-width and face-length sliders), and everything that sits on the head is fitted to it: scaled to the
+ * head's width and height, so it hugs the head instead of floating round it or perching on top.
+ * Glasses go where the eyes actually are and are as wide as the eyes are apart.
+ */
+interface HeadGeom { top: number; cr: number; ey: number; ex: number }
+function headGeom(l: Look): HeadGeom {
+  const S = MODE === 'tales' ? talesSpec(l) : faceSpec(l, WORLD);
+  const fw = 1 + SHAPE_RANGE.faceWidth * shapeOf(l, 'faceWidth'), fl = 1 + SHAPE_RANGE.faceLength * shapeOf(l, 'faceLength');
+  const gap = SHAPE_RANGE.eyeGap * shapeOf(l, 'eyeGap');
+  return { top: 94 - (94 - S.top) * fl, cr: S.cran * fw, ey: MODE === 'tales' ? S.ey : S.ey + 1, ex: S.ex + gap };
+}
+const clampN = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
+/** The transform that fits anything drawn for the reference head onto this head. */
+function headFit(l: Look): string {
+  if (l.face || l.drawing || isPet(l.kind)) return '';
+  const g = headGeom(l);
+  const kx = clampN((g.cr + 3) / 63, 0.84, 1.06), ky = clampN((94 - g.top) / 60, 0.9, 1.08);
+  return Math.abs(kx - 1) < 0.005 && Math.abs(ky - 1) < 0.005 ? '' : `translate(100 94) scale(${kx.toFixed(3)} ${ky.toFixed(3)}) translate(-100 -94)`;
+}
+const onHead = (l: Look, svg: string) => { const t = headFit(l); return svg && t ? `<g transform="${t}">${svg}</g>` : svg; };
+/** Glasses sit on the eyes: moved to eye level and spaced to the eyes. */
+function glassesFit(l: Look, svg: string): string {
+  if (!svg || l.face || l.drawing || isPet(l.kind)) return svg;
+  const g = headGeom(l);
+  const kx = clampN(g.ex / 22, 0.88, 1.15), dy = g.ey - 101;
+  return `<g transform="translate(0 ${dy.toFixed(1)}) translate(100 101) scale(${kx.toFixed(3)} 1) translate(-100 -101)">${svg}</g>`;
+}
+
 /** The same shapes with no outline (the storybook line skips anything that already says stroke). */
 const noInk = (svg: string) => svg.replace(/<(path|ellipse|circle|rect|polygon)\b(?![^>]*\bstroke=)/g, '<$1 stroke="none"');
 /** Hairstyles that fall over the ears (the ears are tucked under the hair, not stuck on top of it). */
@@ -931,8 +962,7 @@ function talesFace(id: string, l: Look): string {
   const [rawBack, rawFront] = hair(id, l);
   const S = talesSpec(l), skin = `url(#sk${id})`, head = coreHead(S, l);
   // the hairstyles are drawn for a rounder head: fitted to this one so they hug it instead of floating round it
-  const k = Math.min(1, (S.cran + 6) / 62);
-  const fit = (x: string) => (x && k < 0.995 ? `<g transform="translate(100 ${S.ey}) scale(${k.toFixed(3)}) translate(-100 -${S.ey})">${x}</g>` : x);
+  const fit = (x: string) => onHead(l, x);
   const back = fit(!OPEN_HEADWEAR.includes(l.hat) && ['puff', 'topknot', 'bun'].includes(l.hairStyle) ? '' : rawBack), front = fit(rawFront);
   const gap = SHAPE_RANGE.eyeGap * shapeOf(l, 'eyeGap');
   const nose = 1 + SHAPE_RANGE.nose * shapeOf(l, 'nose'), mw = 1 + SHAPE_RANGE.mouth * shapeOf(l, 'mouth');
@@ -965,7 +995,7 @@ function talesFace(id: string, l: Look): string {
     ${facialHair(id, l)}
     ${around(100, S.ey + 34, mw, 1, talesMouth(id, S, l))}
     ${hairShadow(id, l, clip, front)}${back ? noInk(scalp) : scalp}${front}${scalpOn ? noInk(front) : ''}${seam}
-    ${worldHair(l)}
+    ${onHead(l, worldHair(l))}
     ${flair(l)}`;
 }
 
@@ -1103,7 +1133,7 @@ function humanFace(id: string, l: Look) {
     ${facialHair(id, l)}
     ${around(100, 128, mw, 1, mouth(id, l))}
     ${front}
-    ${worldHair(l)}
+    ${onHead(l, worldHair(l))}
     <ellipse cx="80" cy="64" rx="22" ry="9" fill="#fff" opacity=".12" transform="rotate(-16 80 64)"/>
     ${flair(l)}`;
 }
@@ -1571,7 +1601,7 @@ export function characterMarkup(l: Look, opts: { animated?: boolean; style?: Sty
     ${l.drawing ? '' : `<g class="bt-aura">${worldAura(id, headY)}</g><!--aura-->`}
     ${asleep ? shadow.replace('rx="56"', 'rx="96"').replace('rx="54"', 'rx="94"') : shadowNow}${speed}${boing}
     ${pose(`<g transform="${bodyT}"><g transform="translate(0 ${-E})">${pet ? petBody(id, l) : humanBody(id, l, E)}${l.outfit === 'drawn' ? wornImage(l, 'outfit') : ''}${pet ? '' : bodyRim}<g transform="translate(${pet ? 0 : BODY_SPEC[WORLD].sh[1] - 130} 0)">${prop}</g></g></g>
-      <g transform="${headT}${tiltDeg ? ` rotate(${tiltDeg} 100 ${CHIN})` : ''}"><g class="bt-head" transform="translate(0 ${dy}) translate(100 94) scale(${s}) translate(-100 -94)">${head}${rim}${headpiece(l)}${glasses(l)}${hat(l)}</g></g>
+      <g transform="${headT}${tiltDeg ? ` rotate(${tiltDeg} 100 ${CHIN})` : ''}"><g class="bt-head" transform="translate(0 ${dy}) translate(100 94) scale(${s}) translate(-100 -94)">${head}${rim}${onHead(l, headpiece(l))}${glassesFit(l, glasses(l))}${onHead(l, hat(l))}</g></g>
       ${pet ? '' : `<g transform="${bodyT}"><g transform="translate(${BODY_SPEC[WORLD].sh[0] - 70} ${-E})">${raisedArm(id, l)}${A && A.raised[1] && l.hold ? `<g transform="translate(${BODY_SPEC[WORLD].sh[1] - 130 - (BODY_SPEC[WORLD].sh[0] - 70)} 0)">${handThing(A.right.hand)}</g>` : ''}</g></g>`}
     `)}
   </g>`, l, id);
