@@ -152,6 +152,19 @@ export function BabyTalesDemo() {
   /** The page editor's tab, and the panel itself (scrolled into view when someone is picked in the picture). */
   const [pageTab, setPageTab] = useState<'people' | 'scene'>('people');
   const [allHair, setAllHair] = useState(false);
+  /** Phones: show a small live preview while the big one is scrolled away but the editor is on screen. */
+  const stageRef = useRef<HTMLDivElement>(null);
+  const [miniOn, setMiniOn] = useState(false);
+  useEffect(() => {
+    const st = stageRef.current, studio = studioRef.current;
+    if (!st || !studio || typeof IntersectionObserver === 'undefined') return;
+    let stageVis = true, studioVis = false;
+    const upd = () => setMiniOn(!stageVis && studioVis);
+    const o1 = new IntersectionObserver(([e]) => { stageVis = e.isIntersecting; upd(); });
+    const o2 = new IntersectionObserver(([e]) => { studioVis = e.isIntersecting; upd(); });
+    o1.observe(st); o2.observe(studio);
+    return () => { o1.disconnect(); o2.disconnect(); };
+  }, []);
   const panelRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!picked) return;
@@ -459,6 +472,16 @@ export function BabyTalesDemo() {
 
   /* ── story ─────────────────────────────────────────── */
   const page: StoryPage | undefined = view > 0 ? story.pages[view - 1] : undefined;
+  // on a wide screen the book sits beside the editor: show a page with the person being edited, so every change is visible right there
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia?.('(min-width: 900px)').matches) return;
+    const id = person?.member.id;
+    if (!id) return;
+    const onPage = view === 0 ? id === cast[0]?.member.id || cast.slice(1, 3).some((c) => c.member.id === id && c.member.inStory) : page?.cast.includes(id);
+    if (onPage) return;
+    const i = story.pages.findIndex((p) => p.cast.includes(id));
+    if (i >= 0) setView(i + 1);
+  }, [person?.member.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const setPage = (patch: Partial<StoryPage>) => setStory((s) => ({ ...s, edited: true, pages: s.pages.map((p, i) => (i === view - 1 ? { ...p, ...patch } : p)) }));
   /** Someone as they appear in the current world: their own look, dressed for it. Identity never changes. */
   const dressed = (who: Person, w: WorldId = world): Look => (w === 'everyday' || who.look.drawing ? who.look : { ...who.look, ...worldCostume(w, who.look, who.member.id === cast[0]?.member.id), ...worldWear[`${w}:${who.member.id}`], world: w });
@@ -970,7 +993,8 @@ export function BabyTalesDemo() {
               {busy === 'new' && <DrawingMagic variant="face" compact />}
 
               <div className="bt-studio" ref={studioRef}>
-                <div className="bt-stage" dangerouslySetInnerHTML={{ __html: characterSvg(shown, { animated: true, style: mode, label: `${person.member.name}’s character` }) }} />
+                <div className="bt-stage" ref={stageRef} dangerouslySetInnerHTML={{ __html: characterSvg(shown, { animated: true, style: mode, label: `${person.member.name}’s character` }) }} />
+                {miniOn && <div className="bt-mini" aria-hidden="true" dangerouslySetInnerHTML={{ __html: characterSvg(shown, { style: mode, viewBox: fitViewBox('6 -12 188 200', shown, mode) }) }} />}
 
                 <div className="bt-panel">
                   {person.member.id === pendingId && (
