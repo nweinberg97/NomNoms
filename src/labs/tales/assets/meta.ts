@@ -74,7 +74,7 @@ export function trimObject(base: AssetBase): AssetBase {
   const x0 = Math.max(0, box.x - pad), y0 = Math.max(0, box.y - pad);
   const x1 = Math.min(base.w, box.x + box.w + pad), y1 = Math.min(base.h, box.y + box.h + pad);
   const w = x1 - x0, h = y1 - y0;
-  const labels = new Uint8Array(w * h), alpha = new Uint8Array(w * h);
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { labels[y * w + x] = base.labels[(y0 + y) * base.w + x0 + x]; alpha[y * w + x] = base.alpha[(y0 + y) * base.w + x0 + x]; }
-  return { ...base, w, h, labels, alpha };
+  const labels = new Uint8Array(w * h), alpha = new Uint8Array(w * h), lines = base.lines ? new Uint8Array(w * h) : undefined;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const j = (y0 + y) * base.w + x0 + x; labels[y * w + x] = base.labels[j]; alpha[y * w + x] = base.alpha[j]; if (lines) lines[y * w + x] = base.lines![j]; }
+  return { ...base, w, h, labels, alpha, ...(lines ? { lines } : {}) };
 }

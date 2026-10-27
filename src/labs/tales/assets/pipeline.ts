@@ -326,6 +326,11 @@ export interface AssetBase {
   field?: { w: number; h: number; rgb: Uint8Array };
   /** The redrawn illustration (outlines and colours only). Assets saved before it existed don't have one. */
   vector?: VectorArt;
+  /**
+   * Detail lines (1 = a line): the strongest edges of the picture (window frames, railings, roof lines),
+   * traced once so the drawing styles keep small structures crisp. Lines only; never the photo.
+   */
+  lines?: Uint8Array;
   /** How it's drawn (paintRender.ts); assets made before this have none and draw as shapes. */
   drawStyle?: 'shapes' | 'cartoon' | 'painted' | 'blocks' | 'sketch' | 'watercolour';
 }
@@ -360,12 +365,60 @@ export function colourField(src: Raster, cols = FIELD_W, mask?: Uint8Array): { w
  * Reduce a photo to the simplified regions every mode redraws from. After
  * this the photo is not needed and should be released.
  */
+/**
+ * Thin lines along the picture's strongest edges: lightness gradient (Sobel) on a lightly smoothed
+ * picture, thinned to one pixel along the gradient (non-maximum suppression), weak and tiny bits dropped.
+ */
+export function detailLines(src: Raster, mask?: Uint8Array): Uint8Array {
+  const { w, h, data } = src, n = w * h;
+  const L = new Float32Array(n);
+  for (let i = 0; i < n; i++) L[i] = rgbToLab(data[i * 4], data[i * 4 + 1], data[i * 4 + 2])[0];
+  const mag = new Float32Array(n), dir = new Uint8Array(n);
+  for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
+    const i = y * w + x;
+    const gx = L[i - w + 1] + 2 * L[i + 1] + L[i + w + 1] - L[i - w - 1] - 2 * L[i - 1] - L[i + w - 1];
+    const gy = L[i + w - 1] + 2 * L[i + w] + L[i + w + 1] - L[i - w - 1] - 2 * L[i - w] - L[i - w + 1];
+    mag[i] = Math.hypot(gx, gy) / 8;
+    const a = ((Math.atan2(gy, gx) * 180) / Math.PI + 180) % 180;
+    dir[i] = a < 22.5 || a >= 157.5 ? 0 : a < 67.5 ? 1 : a < 112.5 ? 2 : 3;
+  }
+  // a threshold from the picture itself: the strongest ~9% of edges, and never faint texture
+  const sample: number[] = [];
+  for (let i = 0; i < n; i += 7) if (mag[i] > 1) sample.push(mag[i]);
+  sample.sort((a, b) => a - b);
+  const thr = Math.max(7, sample.length ? sample[Math.floor(sample.length * 0.91)] : 7);
+  const out = new Uint8Array(n);
+  const off = [[1, 0], [1, 1], [0, 1], [-1, 1]];
+  for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
+    const i = y * w + x, m = mag[i];
+    if (m < thr || (mask && !mask[i])) continue;
+    const [dx, dy] = off[dir[i]];
+    if (m >= mag[i + dy * w + dx] && m >= mag[i - dy * w - dx]) out[i] = 1;
+  }
+  // drop specks: keep connected runs of 10+ pixels (leaf texture makes short bits)
+  const seen = new Uint8Array(n), stack: number[] = [];
+  for (let s0 = 0; s0 < n; s0++) {
+    if (!out[s0] || seen[s0]) continue;
+    const comp: number[] = []; seen[s0] = 1; stack.push(s0);
+    while (stack.length) {
+      const p = stack.pop()!; comp.push(p);
+      const x = p % w, y = (p / w) | 0;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        const xx = x + dx, yy = y + dy; if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue;
+        const q = yy * w + xx; if (out[q] && !seen[q]) { seen[q] = 1; stack.push(q); }
+      }
+    }
+    if (comp.length < 10) for (const p of comp) out[p] = 0;
+  }
+  return out;
+}
+
 export function buildBase(src: Raster, kind: AssetKind, opts: { mask?: Uint8Array; horizon?: number; colours?: number; seed?: number } = {}): AssetBase {
   const smooth = kuwahara(kuwahara(src, 3), 2);
   const k = opts.colours ?? (kind === 'place' ? 16 : 14);
   const { palette, labels } = kmeans(smooth, k, { seed: opts.seed ?? 7, mask: opts.mask });
   const clean = majority(labels, src.w, src.h, kind === 'place' ? 3 : 2, k);
-  const base: AssetBase = { kind, w: src.w, h: src.h, palette, labels: clean, field: colourField(smooth, FIELD_W, opts.mask) };
+  const base: AssetBase = { kind, w: src.w, h: src.h, palette, labels: clean, field: colourField(smooth, FIELD_W, opts.mask), lines: detailLines(kuwahara(src, 1), opts.mask) };
   if (kind === 'object') base.alpha = opts.mask ? new Uint8Array(opts.mask) : new Uint8Array(src.w * src.h).fill(1);
   else base.horizon = opts.horizon ?? guessHorizon(smooth);
   return base;

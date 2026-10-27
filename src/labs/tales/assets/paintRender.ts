@@ -162,6 +162,25 @@ export function stylizeBase(base: AssetBase, style: Exclude<DrawStyle, 'shapes'>
   const clean = cleanLabels(base.labels, w, h, Math.max(16, Math.round(w * h * (style === 'clay' ? 0.0025 : style === 'sketch' || style === 'film' ? 0.0012 : 0.0007))), alpha);
   const L2 = upLabels(clean, w, h, S);
   const A2 = alpha ? upLabels(alpha, w, h, S) : null;
+  // detail lines, softened a touch then sampled smoothly at the bigger size, so they draw as clean anti-aliased strokes
+  const lineAmt = { cartoon: 0.8, film: 0.5, clay: 0.25, painted: 0.3, sketch: 0.85 }[style];
+  let lineMap: Float32Array | null = null;
+  if (base.lines && lineAmt) {
+    lineMap = new Float32Array(w * h);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const i = y * w + x; if (!base.lines[i]) continue;
+      lineMap[i] = Math.max(lineMap[i], 1);
+      if (x > 0) lineMap[i - 1] = Math.max(lineMap[i - 1], 0.35); if (x < w - 1) lineMap[i + 1] = Math.max(lineMap[i + 1], 0.35);
+      if (y > 0) lineMap[i - w] = Math.max(lineMap[i - w], 0.35); if (y < h - 1) lineMap[i + w] = Math.max(lineMap[i + w], 0.35);
+    }
+  }
+  const lineAt = (X: number, Y: number) => {
+    const fx = (X + 0.5) / S - 0.5, fy = (Y + 0.5) / S - 0.5;
+    const x0 = Math.max(0, Math.min(w - 1, Math.floor(fx))), y0 = Math.max(0, Math.min(h - 1, Math.floor(fy))), x1 = Math.min(w - 1, x0 + 1), y1 = Math.min(h - 1, y0 + 1);
+    const tx = Math.min(1, Math.max(0, fx - x0)), ty = Math.min(1, Math.max(0, fy - y0)), M = lineMap!;
+    const v = M[y0 * w + x0] * (1 - tx) * (1 - ty) + M[y0 * w + x1] * tx * (1 - ty) + M[y1 * w + x0] * (1 - tx) * ty + M[y1 * w + x1] * tx * ty;
+    return Math.min(1, Math.max(0, (v - 0.3) / 0.4));
+  };
   // a rounded volume for every shape (clay is puffier than film)
   const cap = Math.round(Math.max(W, H) * (style === 'clay' ? 0.03 : 0.022));
   const depth = sculpt ? shapeDepth(L2, W, H, cap) : null;
@@ -262,7 +281,7 @@ export function stylizeBase(base: AssetBase, style: Exclude<DrawStyle, 'shapes'>
         c = c.map((v, j) => shadow[j] + (Math.min(255, v * 1.06) - shadow[j]) * lit);
         if (ht < 0.12 && lam > 0.7) c = c.map((v, j) => v + (gl[j] - v) * 0.45);
         const fi = fieldAt(litField, X / W, Y / H);
-        if (fi) c = c.map((v, j) => v * 0.8 + fi[j] * 0.2);
+        if (fi) c = c.map((v, j) => v * 0.92 + fi[j] * 0.08);
         const g = Math.max(0, 1 - Math.hypot(X / W - 0.2, Y / H - 0.05) / 0.95) * 0.25;
         c = c.map((v, j) => v + (gl[j] - v) * g);
         const t = hash((x / 4) | 0, (y / 2) | 0) - 0.5;
@@ -290,6 +309,14 @@ export function stylizeBase(base: AssetBase, style: Exclude<DrawStyle, 'shapes'>
         const ink = inkOf(k, other);
         // the sketch line breaks now and then, like a hand-drawn one
         if (ink && (style !== 'sketch' || hash((X / 5) | 0, (Y / 5) | 0) > 0.1)) c = style === 'sketch' ? ink : c.map((v, j) => v * (style === 'film' ? 0.55 : 0.15) + ink[j] * (style === 'film' ? 0.45 : 0.85));
+      }
+    }
+    if (lineMap) {
+      const a = lineAt(X, Y) * lineAmt!;
+      if (a > 0.01) {
+        // the line in a deep shade of the colour under it (graphite for the sketch)
+        const ink = style === 'sketch' ? [60, 50, 44] : (shadeRgb(c.map(Math.round) as RGB, -38) as number[]);
+        c = c.map((v, j) => v + (ink[j] - v) * a);
       }
     }
     put(i, c);
