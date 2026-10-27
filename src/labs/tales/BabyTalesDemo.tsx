@@ -149,11 +149,21 @@ export function BabyTalesDemo() {
   const drag = useRef<{ key: string; sx: number; sy: number; ax: number; ay: number; k: number; moved: boolean; resize?: { s0: number; d0: number; ox: number; oy: number } } | null>(null);
   const artRef = useRef<HTMLDivElement>(null);
   const [writing, setWriting] = useState(false);
+  /** The page editor's tab, and the panel itself (scrolled into view when someone is picked in the picture). */
+  const [pageTab, setPageTab] = useState<'people' | 'scene'>('people');
+  const [allHair, setAllHair] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!picked) return;
+    const el = panelRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    if (r.top > window.innerHeight - 120 || r.bottom < 80) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [picked]);
   useEffect(() => { setPicked(null); setLive(null); setWriting(false); }, [view]);
   const [tab, setTab] = useState<WardrobeTab>('hat');
   const [editorTab, setEditorTab] = useState<EditorTab>('face');
   const [showAllTypes, setShowAllTypes] = useState(false);
-  const [editOpen, setEditOpen] = useState(false);
   const [busy, setBusy] = useState<string>();
   const [result, setResult] = useState<{ who: string; from: string; matched: { label: string; sure: boolean }[]; notes: string[]; kept: IdentityKey[]; accepted?: boolean } | null>(null);
   /** Identity traits a parent set by hand, per person: a new photo never overwrites these. */
@@ -693,9 +703,12 @@ export function BabyTalesDemo() {
             <div className="lab-h"><h2 id="bt-story-h" className="display">Your book</h2></div>
             <div className="bt-book">
               <div className="bt-spread">
+                <div className="bt-art-wrap">
                 <div className={cx('bt-art', page && 'bt-arrange-on', page && picked && 'is-picking')} ref={artRef} tabIndex={page ? 0 : undefined} aria-label={page ? 'Page picture: tap someone or something to move it' : undefined}
                   onPointerDown={onArtDown} onPointerMove={onArtMove} onPointerUp={onArtUp} onPointerCancel={onArtUp} onKeyDown={onArtKey}
                   dangerouslySetInnerHTML={{ __html: bigArt }} data-testid="page-art" />
+                {page && !picked && <span className="bt-art-hint" aria-hidden="true"><Icon name="pen" size={12} /> Tap anyone to change them</span>}
+                </div>
                 <div className="bt-words">
                   {view === 0 ? (
                     <>
@@ -733,24 +746,28 @@ export function BabyTalesDemo() {
                 const feels = pl?.mood ?? (who ? exprOf(lookFor(who.member.id, page) ?? who.look) : undefined);
                 const holdable = [...(page.focus && hasThing(page.focus.e) && !HOLDABLE.some(([e]) => e === page.focus!.e) ? [[page.focus.e, 'The thing on this page'] as [string, string]] : []), ...HOLDABLE];
                 const name = who ? who.member.name || 'them' : picked === 'focus' ? 'the thing on this page' : 'this';
+                const tab = picked ? 'people' : pageTab;
                 return (
-                  <div className="lab-card bt-arrange" data-testid="arrange">
-                    {!picked ? (
+                  <div className="lab-card bt-arrange" data-testid="arrange" ref={panelRef}>
+                    <div className="bt-tabs" role="tablist" aria-label="Edit this page">
+                      <button type="button" role="tab" aria-selected={tab === 'people'} onClick={() => { setPageTab('people'); }} data-testid="tab-people"><Icon name="sparkle" size={14} /> People</button>
+                      <button type="button" role="tab" aria-selected={tab === 'scene'} onClick={() => { setPicked(null); setPageTab('scene'); }} data-testid="tab-scene"><Icon name="pen" size={14} /> Scene & words</button>
+                    </div>
+                    {tab === 'people' ? (!picked ? (
                       <>
-                        <p className="lab-sub bt-arrange-hint">Pick someone to change how they feel, what they're doing and what they're holding, or tap them in the picture to drag and resize them.</p>
-                        <div className="lab-chips" data-testid="arrange-people">
-                          {page.cast.map((id) => { const c = cast.find((x) => x.member.id === id); return c ? <button key={id} type="button" className="lab-chip" onClick={() => setPicked(`char:${id}`)} data-testid={`arrange-pick-${id}`}>{c.member.call || c.member.name}</button> : null; })}
+                        <p className="lab-sub bt-arrange-hint">Who do you want to change?</p>
+                        <div className="bt-people" data-testid="arrange-people">
+                          {page.cast.map((id) => { const c = cast.find((x) => x.member.id === id); if (!c) return null; return (
+                            <button key={id} type="button" className="bt-person" onClick={() => setPicked(`char:${id}`)} data-testid={`arrange-pick-${id}`}>
+                              <span dangerouslySetInnerHTML={{ __html: characterSvg(lookFor(id, page) ?? c.look, { style: mode, viewBox: fitViewBox(FACE_VIEWBOX, lookFor(id, page) ?? c.look, mode) }) }} />
+                              <strong>{c.member.call || c.member.name}</strong><small>Feelings, action, size</small>
+                            </button>); })}
                         </div>
-                        <div className="bt-arrange-row">
-                          <label className="field bt-setting"><span>Setting</span>
-                            <select value={page.place} onChange={(e) => setSetting(e.target.value)} data-testid="arrange-setting">{placeOptions}</select>
-                          </label>
-                          {page.layout && <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPage({ layout: undefined })} data-testid="arrange-reset">Reset this picture</button>}
-                        </div>
+                        <p className="lab-hint">Or tap anyone in the picture, then drag to move them.</p>
                       </>
                     ) : (
                       <>
-                        <div className="bt-arrange-top"><strong>Arranging {name}</strong>
+                        <div className="bt-arrange-top"><button type="button" className="btn btn-ghost btn-sm" onClick={() => setPicked(null)} aria-label="Back to everyone">←</button><strong>{name}</strong>
                           <button type="button" className="btn btn-primary btn-sm" onClick={() => setPicked(null)} data-testid="arrange-done">Done</button>
                         </div>
                         <div className="bt-size">
@@ -796,22 +813,15 @@ export function BabyTalesDemo() {
                           <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setPage({ layout: undefined }); setPicked(null); }} data-testid="arrange-reset">Reset this picture</button>
                         </div>
                       </>
-                    )}
-                  </div>
-                );
-              })()}
-
-              {page && (
-                <details className="lab-card bt-edit" open={editOpen} onToggle={(e) => setEditOpen((e.target as HTMLDetailsElement).open)} data-testid="page-editor">
-                  <summary><Icon name="pen" size={15} /> Edit this page</summary>
-                  <label className="field"><span>Words</span>
-                    <textarea rows={3} value={fill(page.text, members)} onChange={(e) => setPage({ text: tokenize(e.target.value, members), edited: true })} data-testid="page-words" />
-                  </label>
-                  <div className="bt-edit-row">
-                    <label className="field"><span>Place</span>
-                      <select value={page.place} onChange={(e) => setSetting(e.target.value)} data-testid="page-place">{placeOptions}</select>
-                    </label>
-                    <div>
+                    )) : (
+                    <div className="bt-scene-tab" data-testid="page-editor">
+                      <label className="field"><span>Setting</span>
+                        <select value={page.place} onChange={(e) => setSetting(e.target.value)} data-testid="page-place">{placeOptions}</select>
+                      </label>
+                      <label className="field"><span>Words <small>(or tap them on the page)</small></span>
+                        <textarea rows={3} value={fill(page.text, members)} onChange={(e) => setPage({ text: tokenize(e.target.value, members), edited: true })} data-testid="page-words" />
+                      </label>
+                    <div className="bt-edit-row"><div>
                       <p className="lab-sub">In the picture (up to 3)</p>
                       <div className="lab-chips">
                         {cast.filter((p) => p.member.id !== pendingId).map((p) => (
@@ -841,8 +851,12 @@ export function BabyTalesDemo() {
                     </button>
                     <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPad({ mode: 'place' })}><Icon name="pen" size={15} /> Draw a place for this page</button>
                   </div>
-                </details>
-              )}
+                      {page.layout && <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setPage({ layout: undefined }); setPicked(null); }} data-testid="arrange-reset">Reset this picture</button>}
+                    </div>
+                    )}
+                  </div>
+                );
+              })()}
 
               <details className="bt-compare" data-testid="compare-styles">
                 <summary>Compare looks and worlds</summary>
@@ -867,6 +881,71 @@ export function BabyTalesDemo() {
           </section>
 
           <div className="bt-edits">
+            {/* ── the story ─────────────────────────────── */}
+            <section className="lab-section" aria-labelledby="bt-story">
+              <div className="lab-h"><h2 id="bt-story" className="display">The story</h2></div>
+              <div className="lab-card">
+                <div className="bt-types">
+                  {typesShown.map((t) => (
+                    <button key={t.id} type="button" className="bt-type" aria-pressed={type === t.id} onClick={() => { const w = WORLD_IDS.find((x) => WORLDS[x].story === t.id); if (w) chooseWorld(w); else setType(t.id); }} data-testid={`type-${t.id}`}>
+                      <strong>{t.name}</strong><small>{t.blurb}</small>
+                    </button>
+                  ))}
+                </div>
+                <div className="lab-row">
+                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShowAllTypes((v) => !v)} aria-expanded={showAllTypes} data-testid="more-types">{showAllTypes ? 'Fewer kinds of story' : `More kinds of story (${STORY_TYPES.length - typesShown.length})`}</button>
+                  <button type="button" className="btn btn-primary btn-sm" onClick={() => setSeed((s) => s + 1)} data-testid="new-story"><Icon name="refresh" size={15} /> New story</button>
+                </div>
+
+                <details className="bt-places" data-testid="places">
+                  <summary><span>Places & things</span><small>{placeSummary}</small></summary>
+                  <div className="lab-row">
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => setStudio({ kind: 'place' })} data-testid="add-photo-place"><Icon name="camera" size={15} /> A place from a photo</button>
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPad({ mode: 'place' })} data-testid="draw-place"><Icon name="pen" size={15} /> Draw a place</button>
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => setStudio({ kind: 'object' })} data-testid="add-photo-thing"><Icon name="camera" size={15} /> A thing from a photo</button>
+                    {places.length > 0 && <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPlaces([])}>Let NomNoms choose</button>}
+                  </div>
+                  <div className="lab-chips">
+                    {drawn.map((d) => (
+                      <button key={d.id} type="button" className="lab-chip is-drawn" aria-pressed={places.includes(d.id)} onClick={() => toggle(d.id)}>
+                        <img src={d.image} alt="" /> {d.name}
+                      </button>
+                    ))}
+                    {photoPlaces.map((a) => (
+                      <button key={a.meta.id} type="button" className="lab-chip is-drawn" aria-pressed={places.includes(a.meta.id)} onClick={() => toggle(a.meta.id)} data-testid="place-photo">
+                        <img src={art_.get(a.meta.id)} alt="" /> {a.meta.name}
+                      </button>
+                    ))}
+                    {[...PLACES.filter((p) => p.world && p.world === world), ...PLACES.filter((p) => p.id !== 'home' && !p.world)].map((p) => (
+                      <button key={p.id} type="button" className="lab-chip" aria-pressed={places.includes(p.id)} onClick={() => toggle(p.id)} data-testid={`place-${p.id}`}>{p.props[0]} {p.name}</button>
+                    ))}
+                  </div>
+                  <label className="lab-switch"><input type="checkbox" checked={dressUp} onChange={(e) => setDressUp(e.target.checked)} /> Dress for each place</label>
+                  {(library.length > 0 || drawn.length > 0) && (
+                    <div className="bt-library" data-testid="library">
+                      <p className="lab-sub">Your places and things <small>(tap a name to rename it)</small></p>
+                      {drawn.map((d) => (
+                        <div key={d.id} className="bt-asset">
+                          <img src={d.image} alt="" />
+                          <div><input className="bt-asset-name" value={d.name} onChange={(e) => renamePlace(d.id, e.target.value)} onBlur={() => { if (!d.name.trim()) renamePlace(d.id, uniqueName('Our place', d.id)); }} aria-label={`Rename ${d.name}`} data-testid="rename-place" /><small>Drawn place · This story only</small></div>
+                        </div>
+                      ))}
+                      {library.map((a) => (
+                        <div key={a.meta.id} className={cx('bt-asset', a.meta.kind === 'object' && 'is-thing')}>
+                          <img src={art_.get(a.meta.id)} alt="" />
+                          <div><input className="bt-asset-name" value={a.meta.name} onChange={(e) => renamePlace(a.meta.id, e.target.value)} onBlur={() => keepName(a.meta.id)} aria-label={`Rename ${a.meta.name}`} data-testid="rename-place" />
+                            <select className="bt-asset-style" value={drawStyleOf(a.base.drawStyle)} onChange={(e) => restyle(a.meta.id, e.target.value as DrawStyle)} aria-label={`How ${a.meta.name} is drawn`} data-testid="asset-style">
+                              {DRAW_STYLES.map((d) => <option key={d} value={d}>{DRAW_STYLE_NAMES[d]}</option>)}
+                            </select><small>{a.meta.kind === 'place' ? 'Place' : 'Thing'} · {saved.has(a.meta.id) ? 'Saved in this browser' : 'This story only'}</small></div>
+                          <button type="button" className="btn btn-danger-ghost btn-sm" onClick={() => void removeAsset(a.meta.id)} aria-label={`Delete ${a.meta.name}`} data-testid="asset-delete"><Icon name="x" size={14} /></button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </details>
+              </div>
+            </section>
+
             {/* ── the cast ─────────────────────────────── */}
             <section className="lab-section" aria-labelledby="bt-cast">
               <div className="lab-h"><h2 id="bt-cast" className="display">Who’s in it</h2></div>
@@ -1046,13 +1125,14 @@ export function BabyTalesDemo() {
                           <div className="bt-swatches">{HAIR_COLOURS.map((c) => <button key={c} type="button" className="bt-swatch" style={{ background: c }} aria-pressed={person.look.hair === c} aria-label={`Hair colour ${c}`} onClick={() => pick('hair', { hair: c })} />)}</div>
                           <p className="lab-sub">Hair</p>
                           <div className="bt-hairs">
-                            {(Object.keys(HAIR_STYLES) as HairStyle[]).map((h) => (
+                            {(Object.keys(HAIR_STYLES) as HairStyle[]).filter((h, i) => allHair || i < 12 || h === person.look.hairStyle).map((h) => (
                               <button key={h} type="button" className="bt-hair" aria-pressed={person.look.hairStyle === h} onClick={() => pick('hairStyle', { hairStyle: h })} data-testid={`hair-${h}`}>
                                 <span dangerouslySetInnerHTML={{ __html: characterSvg({ ...person.look, hairStyle: h, hat: 'none', glasses: 'none' }, { style: mode, viewBox: fitViewBox('10 -10 180 180', person.look, mode) }) }} />
                                 <small>{HAIR_STYLES[h]}</small>
                               </button>
                             ))}
                           </div>
+                          <button type="button" className="btn btn-ghost btn-sm bt-hair-more" onClick={() => setAllHair((v) => !v)} aria-expanded={allHair} data-testid="hair-more">{allHair ? 'Fewer hairstyles' : `All ${Object.keys(HAIR_STYLES).length} hairstyles`}</button>
                           <p className="lab-sub">Eyes</p>
                           <div className="bt-swatches">{EYE_COLOURS.map((c) => <button key={c} type="button" className="bt-swatch" style={{ background: c }} aria-pressed={person.look.eyes === c} aria-label={`Eye colour ${c}`} onClick={() => pick('eyes', { eyes: c })} />)}</div>
                           <details className="bt-shape" open={!!person.look.shape}>
@@ -1125,70 +1205,6 @@ export function BabyTalesDemo() {
               </div>
             </section>
 
-            {/* ── the story ─────────────────────────────── */}
-            <section className="lab-section" aria-labelledby="bt-story">
-              <div className="lab-h"><h2 id="bt-story" className="display">The story</h2></div>
-              <div className="lab-card">
-                <div className="bt-types">
-                  {typesShown.map((t) => (
-                    <button key={t.id} type="button" className="bt-type" aria-pressed={type === t.id} onClick={() => { const w = WORLD_IDS.find((x) => WORLDS[x].story === t.id); if (w) chooseWorld(w); else setType(t.id); }} data-testid={`type-${t.id}`}>
-                      <strong>{t.name}</strong><small>{t.blurb}</small>
-                    </button>
-                  ))}
-                </div>
-                <div className="lab-row">
-                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShowAllTypes((v) => !v)} aria-expanded={showAllTypes} data-testid="more-types">{showAllTypes ? 'Fewer kinds of story' : `More kinds of story (${STORY_TYPES.length - typesShown.length})`}</button>
-                  <button type="button" className="btn btn-primary btn-sm" onClick={() => setSeed((s) => s + 1)} data-testid="new-story"><Icon name="refresh" size={15} /> New story</button>
-                </div>
-
-                <details className="bt-places" data-testid="places">
-                  <summary><span>Places & things</span><small>{placeSummary}</small></summary>
-                  <div className="lab-row">
-                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => setStudio({ kind: 'place' })} data-testid="add-photo-place"><Icon name="camera" size={15} /> A place from a photo</button>
-                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPad({ mode: 'place' })} data-testid="draw-place"><Icon name="pen" size={15} /> Draw a place</button>
-                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => setStudio({ kind: 'object' })} data-testid="add-photo-thing"><Icon name="camera" size={15} /> A thing from a photo</button>
-                    {places.length > 0 && <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPlaces([])}>Let NomNoms choose</button>}
-                  </div>
-                  <div className="lab-chips">
-                    {drawn.map((d) => (
-                      <button key={d.id} type="button" className="lab-chip is-drawn" aria-pressed={places.includes(d.id)} onClick={() => toggle(d.id)}>
-                        <img src={d.image} alt="" /> {d.name}
-                      </button>
-                    ))}
-                    {photoPlaces.map((a) => (
-                      <button key={a.meta.id} type="button" className="lab-chip is-drawn" aria-pressed={places.includes(a.meta.id)} onClick={() => toggle(a.meta.id)} data-testid="place-photo">
-                        <img src={art_.get(a.meta.id)} alt="" /> {a.meta.name}
-                      </button>
-                    ))}
-                    {[...PLACES.filter((p) => p.world && p.world === world), ...PLACES.filter((p) => p.id !== 'home' && !p.world)].map((p) => (
-                      <button key={p.id} type="button" className="lab-chip" aria-pressed={places.includes(p.id)} onClick={() => toggle(p.id)} data-testid={`place-${p.id}`}>{p.props[0]} {p.name}</button>
-                    ))}
-                  </div>
-                  <label className="lab-switch"><input type="checkbox" checked={dressUp} onChange={(e) => setDressUp(e.target.checked)} /> Dress for each place</label>
-                  {(library.length > 0 || drawn.length > 0) && (
-                    <div className="bt-library" data-testid="library">
-                      <p className="lab-sub">Your places and things <small>(tap a name to rename it)</small></p>
-                      {drawn.map((d) => (
-                        <div key={d.id} className="bt-asset">
-                          <img src={d.image} alt="" />
-                          <div><input className="bt-asset-name" value={d.name} onChange={(e) => renamePlace(d.id, e.target.value)} onBlur={() => { if (!d.name.trim()) renamePlace(d.id, uniqueName('Our place', d.id)); }} aria-label={`Rename ${d.name}`} data-testid="rename-place" /><small>Drawn place · This story only</small></div>
-                        </div>
-                      ))}
-                      {library.map((a) => (
-                        <div key={a.meta.id} className={cx('bt-asset', a.meta.kind === 'object' && 'is-thing')}>
-                          <img src={art_.get(a.meta.id)} alt="" />
-                          <div><input className="bt-asset-name" value={a.meta.name} onChange={(e) => renamePlace(a.meta.id, e.target.value)} onBlur={() => keepName(a.meta.id)} aria-label={`Rename ${a.meta.name}`} data-testid="rename-place" />
-                            <select className="bt-asset-style" value={drawStyleOf(a.base.drawStyle)} onChange={(e) => restyle(a.meta.id, e.target.value as DrawStyle)} aria-label={`How ${a.meta.name} is drawn`} data-testid="asset-style">
-                              {DRAW_STYLES.map((d) => <option key={d} value={d}>{DRAW_STYLE_NAMES[d]}</option>)}
-                            </select><small>{a.meta.kind === 'place' ? 'Place' : 'Thing'} · {saved.has(a.meta.id) ? 'Saved in this browser' : 'This story only'}</small></div>
-                          <button type="button" className="btn btn-danger-ghost btn-sm" onClick={() => void removeAsset(a.meta.id)} aria-label={`Delete ${a.meta.name}`} data-testid="asset-delete"><Icon name="x" size={14} /></button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </details>
-              </div>
-            </section>
           </div>
         </div>
 

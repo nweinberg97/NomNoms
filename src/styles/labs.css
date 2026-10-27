@@ -490,3 +490,26 @@
 @keyframes bt-twinkle { 0%, 100% { opacity: .25; transform: scale(.7); } 50% { opacity: 1; transform: scale(1.1); } }
 .bt-char.is-animated .bt-twinkle, .bt-scene.is-animated .bt-twinkle { animation: bt-twinkle 2.4s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
 @media (prefers-reduced-motion: reduce) { .bt-twinkle { animation: none !important; } }
+
+/* ── the page editor: one card under the page, two tabs ── */
+.bt-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: 12px; background: var(--paper-2, #efe8de); }
+.bt-tabs button { font: inherit; font-size: 14px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 40px; border: 0; border-radius: 9px; background: transparent; color: var(--ink-2); cursor: pointer; }
+.bt-tabs button[aria-selected="true"] { background: #fff; color: var(--ink); box-shadow: 0 1px 3px rgba(40, 30, 20, .12); }
+.bt-people { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.bt-person { font: inherit; display: grid; grid-template-columns: 48px 1fr; grid-template-rows: auto auto; column-gap: 10px; align-items: center; text-align: left; padding: 8px 10px; border: 1px solid var(--line); border-radius: 14px; background: #fff; cursor: pointer; }
+.bt-person:hover { border-color: var(--accent, #c06a4a); }
+.bt-person span { grid-row: 1 / 3; width: 48px; height: 48px; border-radius: 50%; overflow: hidden; background: var(--paper-2, #efe8de); }
+.bt-person span svg { width: 100%; height: 100%; display: block; }
+.bt-person strong { font-size: 14px; color: var(--ink); align-self: end; }
+.bt-person small { font-size: 12px; color: var(--ink-3); align-self: start; }
+.bt-scene-tab { display: grid; gap: 12px; }
+.bt-arrange-top { gap: 8px; }
+.bt-arrange-top strong { flex: 1; font-size: 15px; }
+/* a hint on the picture itself, so nobody has to find the editor first */
+.bt-art-wrap { position: relative; }
+.bt-art-hint { position: absolute; left: 10px; bottom: 10px; z-index: 2; display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; padding: 6px 10px; border-radius: 999px; background: rgba(255, 255, 255, .92); color: var(--ink); box-shadow: 0 2px 8px rgba(40, 30, 20, .15); pointer-events: none; }
+@media (min-width: 900px) {
+  .bt-booksec .lab-h { display: none; }
+  .bt-booksec .bt-words { padding: 14px 22px 16px; gap: 6px; }
+  .bt-booksec .bt-text { font-size: clamp(18px, 1.7vw, 22px); }
+}
