@@ -68,7 +68,10 @@ test('turning a photo swaps its sides and turns back', () => {
 test('a stored asset holds regions and a tiny colour map, never the photo', () => {
   const r = garden();
   const base = buildBase(r, 'place');
-  assert.deepEqual(Object.keys(base).sort(), ['field', 'h', 'horizon', 'kind', 'labels', 'palette', 'w']);
+  assert.deepEqual(Object.keys(base).sort(), ['field', 'h', 'horizon', 'kind', 'labels', 'lines', 'palette', 'w']);
+  // detail lines are a one-bit line map: only 0 or 1, and only a small share of the picture
+  assert.ok(base.lines!.every((v) => v === 0 || v === 1));
+  assert.ok(base.lines!.reduce((a, v) => a + v, 0) < base.lines!.length * 0.15, 'lines, not a picture');
   assert.ok(base.palette.length <= 16);
   assert.equal(base.labels.length, r.w * r.h);
   assert.ok(base.field!.w <= 24, 'colour map is at most 24 cells wide');
