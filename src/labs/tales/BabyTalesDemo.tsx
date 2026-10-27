@@ -107,7 +107,6 @@ function placeFromDrawing(id: string, name: string, image: string): DrawnPlace {
   return { ...familyPlace(id, name), image, props: ['✨', '🎨'] };
 }
 
-const isAppleSafari = typeof navigator !== 'undefined' && /Safari/.test(navigator.userAgent) && !/Chrome|Chromium|CriOS|Edg|Firefox|FxiOS/.test(navigator.userAgent);
 const clampX = (x: number) => Math.round(Math.min(400, Math.max(0, x)));
 const clampY = (y: number) => Math.round(Math.min(300, Math.max(40, y)));
 const clampScale = (v: number) => Math.round(Math.min(1.7, Math.max(0.5, v)) * 100) / 100;
@@ -400,6 +399,13 @@ export function BabyTalesDemo() {
     setResult((r) => (r ? { ...r, matched: describeDNA(dna) } : r));
   };
   const photoFile = (e: React.DragEvent) => [...e.dataTransfer.files].find((x) => x.type.startsWith('image/') || /\.(heic|heif|jpe?g|png|webp)$/i.test(x.name));
+  const genFileRef = useRef<HTMLInputElement>(null);
+  /** A Genmoji (or any face image) pasted, dropped or chosen: kept as a small data image so it survives a reload. */
+  const useGenmojiFile = (f: File) => {
+    const r = new FileReader();
+    r.onload = () => { update({ look: { face: String(r.result), faceScale: 100, faceY: 0, glassesY: 0 } }); setStatus(`Got ${person.member.name || 'their'} Genmoji. It’s now their face in every picture.`); };
+    r.readAsDataURL(f);
+  };
   const onGenmoji = async () => {
     if (!genRef.current) return;
     const g = await catchGenmoji(genRef.current);
@@ -1107,16 +1113,23 @@ export function BabyTalesDemo() {
 
                       <details className="bt-genmoji">
                         <summary><span>Use a real Genmoji</span><small>iPhone, iPad or Mac with Apple Intelligence</small></summary>
+                        <p className="lab-hint">Apple only lets you <em>create</em> Genmoji inside its own apps (Messages, Notes, Mail), not on websites. So make it there, then bring it here:</p>
                         <ol>
-                          <li>On a Mac, open this page in <strong>Safari</strong> (other browsers can only insert Genmoji you’ve already made).</li>
-                          <li>Click the box below, then press <kbd>fn</kbd> <kbd>E</kbd> (or <kbd>Control</kbd> <kbd>Command</kbd> <kbd>Space</kbd>) to open the emoji viewer.</li>
-                          <li>Click the <strong>Genmoji</strong> button at its top right to make a <em>new</em> one: describe {person.member.name || 'them'} (“a toddler with red curls and a big smile”) or choose them from your Photos.</li>
-                          <li>Click <strong>Add</strong>, then pick the new Genmoji to drop it in the box. It becomes their face, and you can still dress them up.</li>
+                          <li>Open <strong>Notes</strong> (or Messages) on your iPhone, iPad or Mac and start a new note.</li>
+                          <li>Open the emoji keyboard (on Mac, <kbd>fn</kbd> <kbd>E</kbd>) and tap <strong>Genmoji</strong>. Describe {person.member.name || 'them'} (“a toddler with red curls and a big smile”) or choose them from your Photos, then tap <strong>Add</strong>.</li>
+                          <li>Select the Genmoji in the note and <strong>Copy</strong> it.</li>
+                          <li>Come back here and <strong>paste</strong> it into the box below (or save it as an image and choose it with the button). It becomes their face, and you can still dress them up.</li>
                         </ol>
-                        <p className="lab-hint">Apple makes Genmoji only inside its own emoji viewer, so a website can’t create one by itself; this box catches the one you make. The photo stays with Apple; NomNoms only keeps the finished face.{!isAppleSafari && <><br /><strong>You’re not in Safari, so the Genmoji button may not appear here.</strong></>}</p>
-                        <div ref={genRef} className="bt-genbox" contentEditable suppressContentEditableWarning data-placeholder="Tap here and insert a Genmoji…" aria-label="Insert a Genmoji here"
+                        <div ref={genRef} className="bt-genbox" contentEditable suppressContentEditableWarning data-placeholder="Tap here and paste your Genmoji…" aria-label="Paste a Genmoji here"
                           onInput={() => setTimeout(onGenmoji, 150)}
-                          onPaste={(e) => { const f = pastedImage(e); if (!f) return; e.preventDefault(); update({ look: { face: URL.createObjectURL(f), faceScale: 100, faceY: 0, glassesY: 0 } }); setStatus('Got it. Now dress them up.'); }} />
+                          onPaste={(e) => { const f = pastedImage(e); if (!f) return; e.preventDefault(); useGenmojiFile(f); }}
+                          onDragOver={(e) => e.preventDefault()}
+                          onDrop={(e) => { const f = [...e.dataTransfer.files].find((x) => x.type.startsWith('image/')); if (!f) return; e.preventDefault(); useGenmojiFile(f); }} />
+                        <div className="lab-row">
+                          <button type="button" className="btn btn-ghost btn-sm" onClick={() => genFileRef.current?.click()} data-testid="genmoji-file"><Icon name="camera" size={14} /> Choose a saved Genmoji image</button>
+                          <input ref={genFileRef} type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) useGenmojiFile(f); }} />
+                        </div>
+                        <p className="lab-hint">The photo stays with Apple; NomNoms only keeps the finished face, on this device.</p>
                       </details>
                       {person.look.face && (
                         <div className="bt-fit">
