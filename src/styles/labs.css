@@ -60,7 +60,13 @@
 .bt-photo:disabled { opacity: .6; }
 .bt-photo-busy { position: absolute; inset: 0; background: rgba(255, 252, 247, .55); }
 .bt-photo-busy::after { content: ''; position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; margin: -11px; border-radius: 50%; border: 2.5px solid var(--accent); border-right-color: transparent; animation: btSpin .8s linear infinite; }
-.bt-genbox { min-height: 64px; padding: 12px 14px; border-radius: 14px; border: 2px dashed var(--line); font-size: 40px; line-height: 1.2; outline: none; background: var(--paper); word-break: break-word; }
+.bt-gensteps { margin: 6px 0 4px; padding: 0; list-style: none; counter-reset: gs; display: grid; gap: 12px; }
+.bt-gensteps > li { counter-increment: gs; display: grid; gap: 6px; padding-left: 34px; position: relative; font-size: 13.5px; color: var(--ink-2); }
+.bt-gensteps > li::before { content: counter(gs); position: absolute; left: 0; top: 0; width: 24px; height: 24px; border-radius: 50%; background: var(--accent, #c06a4a); color: #fff; font-weight: 700; font-size: 13px; display: grid; place-items: center; }
+.bt-gensteps > li > strong { font-size: 14px; color: var(--ink); }
+.bt-genprompt { font: inherit; resize: vertical; width: 100%; font-size: 13.5px; padding: 8px 10px; border-radius: 10px; background: #fff; border: 1px solid var(--line); color: var(--ink); }
+.bt-gensteps .btn { justify-self: start; }
+.bt-genbox { min-height: 56px; padding: 12px 14px; border-radius: 14px; border: 2px dashed var(--line); font-size: 40px; line-height: 1.2; outline: none; background: var(--paper); word-break: break-word; }
 .bt-genbox:focus { border-color: var(--accent); border-style: solid; }
 .bt-genbox:empty::before { content: attr(data-placeholder); font-size: 14px; color: var(--ink-3); }
 .bt-genbox img { height: 1.2em; }

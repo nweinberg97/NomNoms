@@ -400,6 +400,34 @@ export function BabyTalesDemo() {
   };
   const photoFile = (e: React.DragEvent) => [...e.dataTransfer.files].find((x) => x.type.startsWith('image/') || /\.(heic|heif|jpe?g|png|webp)$/i.test(x.name));
   const genFileRef = useRef<HTMLInputElement>(null);
+  const [genText, setGenText] = useState<string | null>(null);
+  useEffect(() => setGenText(null), [sel]);
+  const onMac = typeof navigator !== 'undefined' && /Macintosh/.test(navigator.userAgent) && !(navigator.maxTouchPoints > 1);
+  /** A Genmoji description from the person's look, for the parent to paste into Apple's Genmoji maker. */
+  const genPrompt = (() => {
+    const l = person.look;
+    const age = { baby: 'a baby', kid: 'a young child', adult: 'an adult', elder: 'a grandparent' }[l.kind as 'baby'] ?? 'a cute pet';
+    const near = (list: string[], names: string[], c?: string) => { if (!c) return ''; const i = list.indexOf(c); return i >= 0 ? names[i] : ''; };
+    const hair = near(HAIR_COLOURS, ['black', 'dark brown', 'brown', 'brown', 'light brown', 'caramel', 'golden blonde', 'pale blonde', 'auburn', 'ginger', 'grey', 'white'], l.hair);
+    const skin = near(SKIN_TONES, ['very fair', 'fair', 'light', 'light', 'medium', 'medium tan', 'tan', 'brown', 'dark brown', 'deep brown'], l.skin);
+    const eyes = near(EYE_COLOURS, ['brown', 'dark brown', 'hazel', 'green', 'blue', 'grey'], l.eyes);
+    const style = l.hairStyle === 'bald' ? 'no hair' : l.hairStyle === 'tuft' ? `a little curl of ${hair} hair` : `${hair} ${HAIR_STYLES[l.hairStyle].toLowerCase()} hair`;
+    const bits = [`${age} with ${skin} skin`, style, eyes && `${eyes} eyes`, l.glasses !== 'none' && 'glasses', l.facial && l.facial !== 'none' && 'a beard', 'a big happy smile'].filter(Boolean);
+    return bits.join(', ');
+  })();
+  const pasteGenmoji = async () => {
+    try {
+      const items = await navigator.clipboard.read();
+      for (const it of items) {
+        const t = it.types.find((x) => x.startsWith('image/'));
+        if (t) { const blob = await it.getType(t); useGenmojiFile(new File([blob], 'genmoji', { type: t })); return; }
+      }
+      setStatus('No Genmoji on the clipboard yet. Copy it in Notes first, or paste it into the box.');
+    } catch {
+      genRef.current?.focus();
+      setStatus(onMac ? 'Click the box and press Command V to paste your Genmoji.' : 'Tap the box and choose Paste.');
+    }
+  };
   /** A Genmoji (or any face image) pasted, dropped or chosen: kept as a small data image so it survives a reload. */
   const useGenmojiFile = (f: File) => {
     const r = new FileReader();
@@ -1113,23 +1141,34 @@ export function BabyTalesDemo() {
 
                       <details className="bt-genmoji">
                         <summary><span>Use a real Genmoji</span><small>iPhone, iPad or Mac with Apple Intelligence</small></summary>
-                        <p className="lab-hint">Apple only lets you <em>create</em> Genmoji inside its own apps (Messages, Notes, Mail), not on websites. So make it there, then bring it here:</p>
-                        <ol>
-                          <li>Open <strong>Notes</strong> (or Messages) on your iPhone, iPad or Mac and start a new note.</li>
-                          <li>Open the emoji keyboard (on Mac, <kbd>fn</kbd> <kbd>E</kbd>) and tap <strong>Genmoji</strong>. Describe {person.member.name || 'them'} (“a toddler with red curls and a big smile”) or choose them from your Photos, then tap <strong>Add</strong>.</li>
-                          <li>Select the Genmoji in the note and <strong>Copy</strong> it.</li>
-                          <li>Come back here and <strong>paste</strong> it into the box below (or save it as an image and choose it with the button). It becomes their face, and you can still dress them up.</li>
+                        <p className="lab-hint">Apple only lets you <em>make</em> a Genmoji in its own apps, like Notes or Messages. Make it there, copy it, and bring it back here.</p>
+                        <ol className="bt-gensteps">
+                          <li>
+                            <strong>Copy a description</strong>
+                            <span>We wrote one from {person.member.name || 'their'}’s look. Change it if you like.</span>
+                            <textarea className="bt-genprompt" rows={2} value={genText ?? genPrompt} onChange={(e) => setGenText(e.target.value)} aria-label="Genmoji description" data-testid="genmoji-prompt" />
+                            <button type="button" className="btn btn-ghost btn-sm" onClick={() => { void navigator.clipboard?.writeText(genText ?? genPrompt).then(() => toast('Description copied', { icon: 'check', ms: 1400 }), () => undefined); }} data-testid="genmoji-copy"><Icon name="check" size={14} /> Copy description</button>
+                          </li>
+                          <li>
+                            <strong>Make it in Notes or Messages</strong>
+                            <span>{onMac ? <>Open <b>Notes</b>, press <kbd>fn</kbd> <kbd>E</kbd>, click <b>Genmoji</b> at the top right, paste the description (or choose {person.member.name || 'them'} from Photos) and click <b>Add</b>.</> : <>Open <b>Notes</b>, tap the emoji key on the keyboard, tap <b>Genmoji</b>, paste the description (or choose {person.member.name || 'them'} from Photos) and tap <b>Add</b>.</>}</span>
+                          </li>
+                          <li>
+                            <strong>Copy it and bring it here</strong>
+                            <span>{onMac ? 'Select the Genmoji in the note, press Command C, then come back and click Paste below.' : 'Touch and hold the Genmoji in the note, tap Copy, then come back and tap Paste below.'}</span>
+                            <div className="lab-row">
+                              <button type="button" className="btn btn-primary btn-sm" onClick={() => void pasteGenmoji()} data-testid="genmoji-paste"><Icon name="check" size={14} /> Paste Genmoji</button>
+                              <button type="button" className="btn btn-ghost btn-sm" onClick={() => genFileRef.current?.click()} data-testid="genmoji-file"><Icon name="camera" size={14} /> Choose an image</button>
+                              <input ref={genFileRef} type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) useGenmojiFile(f); }} />
+                            </div>
+                            <div ref={genRef} className="bt-genbox" contentEditable suppressContentEditableWarning data-placeholder={onMac ? 'Or click here and press Command V' : 'Or tap here and paste'} aria-label="Paste a Genmoji here"
+                              onInput={() => setTimeout(onGenmoji, 150)}
+                              onPaste={(e) => { const f = pastedImage(e); if (!f) return; e.preventDefault(); useGenmojiFile(f); }}
+                              onDragOver={(e) => e.preventDefault()}
+                              onDrop={(e) => { const f = [...e.dataTransfer.files].find((x) => x.type.startsWith('image/')); if (!f) return; e.preventDefault(); useGenmojiFile(f); }} />
+                          </li>
                         </ol>
-                        <div ref={genRef} className="bt-genbox" contentEditable suppressContentEditableWarning data-placeholder="Tap here and paste your Genmoji…" aria-label="Paste a Genmoji here"
-                          onInput={() => setTimeout(onGenmoji, 150)}
-                          onPaste={(e) => { const f = pastedImage(e); if (!f) return; e.preventDefault(); useGenmojiFile(f); }}
-                          onDragOver={(e) => e.preventDefault()}
-                          onDrop={(e) => { const f = [...e.dataTransfer.files].find((x) => x.type.startsWith('image/')); if (!f) return; e.preventDefault(); useGenmojiFile(f); }} />
-                        <div className="lab-row">
-                          <button type="button" className="btn btn-ghost btn-sm" onClick={() => genFileRef.current?.click()} data-testid="genmoji-file"><Icon name="camera" size={14} /> Choose a saved Genmoji image</button>
-                          <input ref={genFileRef} type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) useGenmojiFile(f); }} />
-                        </div>
-                        <p className="lab-hint">The photo stays with Apple; NomNoms only keeps the finished face, on this device.</p>
+                        <p className="lab-hint">Needs an iPhone, iPad or Mac with Apple Intelligence. Any photo stays with Apple; NomNoms keeps only the finished face, on this device.</p>
                       </details>
                       {person.look.face && (
                         <div className="bt-fit">
