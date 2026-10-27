@@ -246,7 +246,7 @@ function eye(id: string, cx: number, cy: number, l: Look, side: -1 | 1) {
   if (ex === 'silly' && side === -1) return `<path d="M${cx - 9} ${cy - 8} L${cx + 8} ${cy} L${cx - 9} ${cy + 8}" stroke="${INK}" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
 
   const size = l.kind === 'baby' ? [13, 14, 11] : l.kind === 'kid' ? [12.5, 13, 10] : l.kind === 'adult' ? [11.5, 11, 8.6] : [10.5, 9.5, 7.6];
-  const big = ex === 'wow' || ex === 'starry' || ex === 'worried' || (ex === 'silly' && side === 1);
+  const big = ex === 'wow' || ex === 'starry' || (ex === 'silly' && side === 1);
   let [w, h, r] = big ? [size[0] + 1, size[1] + 2, size[2] + 0.6] : size;
   const es = 1 + SHAPE_RANGE.eyeSize * shapeOf(l, 'eyeSize');
   w *= es; h *= es; r *= es;
@@ -516,9 +516,10 @@ function facialHair(id: string, l: Look) {
  */
 type ArtWorld = Exclude<WorldId, 'everyday'>;
 const isArt = (w: WorldId): w is ArtWorld => w !== 'everyday';
+const lum = (h: string) => { const [r, g, b] = hexToRgb(h); return (0.299 * r + 0.587 * g + 0.114 * b) / 255; };
 const mixHex = (a: string, b: string, t: number) => { const x = hexToRgb(a), y = hexToRgb(b); return rgbToHex(x.map((v, i) => v + (y[i] - v) * t)); };
 /** The storybook treatment is the default look and every story world. */
-const storybook = () => MODE === 'pocketlight';
+const storybook = () => MODE === 'pocketlight' || MODE === 'tales';
 const LINE = 0.36; // how much darker an outline is than its fill
 
 function coreDefs(id: string, l: Look, skin: string, fur: string): string {
@@ -572,12 +573,14 @@ function coreEye(id: string, s: FaceSpec, l: Look, side: -1 | 1, gap: number, w:
   }
   if (ex === 'sleepy') return `<path d="M${cx - rx} ${cy} Q${cx} ${cy + ry0 * 0.5} ${cx + rx} ${cy}" stroke="${ink}" stroke-width="${lw}" fill="none" stroke-linecap="round"/>${lashOut ? `<path d="M${cx + side * rx} ${cy} l${side * 4} 2" stroke="${ink}" stroke-width="2.2" stroke-linecap="round"/>` : ''}`;
   if (ex === 'silly' && side === -1) return `<path d="M${cx - rx * 0.7} ${cy - ry0 * 0.6} L${cx + rx * 0.6} ${cy} L${cx - rx * 0.7} ${cy + ry0 * 0.6}" stroke="${ink}" stroke-width="${lw + 0.4}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
-  const big = ex === 'wow' || ex === 'starry' || ex === 'worried' || (ex === 'silly' && side === 1);
+  const big = ex === 'wow' || ex === 'starry' || (ex === 'silly' && side === 1);
   const ry = ry0 * (big ? 1.1 : 1);
   // a round eye (the Adventure eye, in every world and look)
   const shape = `M${cx - rx} ${cy} C${cx - rx} ${cy - ry * 1.33} ${cx + rx} ${cy - ry * 1.33} ${cx + rx} ${cy} C${cx + rx} ${cy + ry * 1.33} ${cx - rx} ${cy + ry * 1.33} ${cx - rx} ${cy} Z`;
   const [gx, gy] = ex === 'shy' ? [-2.4, 2] : ex === 'dreamy' ? [1.5, -1.5] : ex === 'worried' ? [0, -1] : [0, 0];
-  const ir = Math.min(rx, ry) * 0.84, ix = cx + gx, iy = cy + ry * 0.04 + gy;
+  // the iris rests on the lower lid with the upper lid just over its top: white shows only at the sides,
+  // never under or all round the iris (that reads as a stare)
+  const ir = Math.min(rx, ry) * 0.88, ix = cx + gx, iy = cy + ry * 0.16 + gy;
   const eyeCol = l.eyes ?? EYE_COLOURS[0];
   const clip = `ce${id}${side}`;
   // the upper eyelid: a soft lid of skin resting over the top of the iris, as real eyes do
@@ -600,7 +603,7 @@ function coreEye(id: string, s: FaceSpec, l: Look, side: -1 | 1, gap: number, w:
     <path d="${shape}" fill="#fffdf8" stroke="none"/>
     <g clip-path="url(#${clip})">
       <circle cx="${ix}" cy="${iy}" r="${ir}" fill="url(#ir${id})" stroke="${shade(eyeCol, -0.45)}" stroke-width="1.2"/>
-      <circle cx="${ix}" cy="${iy + ir * 0.04}" r="${ir * 0.46}" fill="#1a110e" stroke="none"/>
+      <circle cx="${ix}" cy="${iy + ir * 0.04}" r="${ir * 0.4}" fill="#1a110e" stroke="none"/>
       ${shine}${glint}
       <path d="${lidFill}" fill="${lidCol}" stroke="none"/>
       <path d="M${cx - rx} ${endY + 2.2} Q${cx} ${ctrlY + 2.6} ${cx + rx} ${endY + 2.2}" stroke="#000" stroke-width="2.4" fill="none" opacity=".07"/>
@@ -668,6 +671,10 @@ function coreFace(id: string, l: Look, w: WorldId): string {
   const vol = (s: string) => (w === 'adventure' && s ? `<g transform="translate(100 78) scale(1.06) translate(-100 -78)">${s}</g>` : s);
   const back = vol(back0), front = vol(rawFront);
   const S = faceSpec(l, w), skin = `url(#sk${id})`, head = coreHead(S, l);
+  // every look shares the same friendly almond eyes (white at the sides, the lid resting on the iris)
+  const TS = talesSpec(l), eyeS = { ...S, erx: TS.erx * 1.06, ery: TS.ery * 1.06, ey: S.ey + 1 };
+  // …and the same real nose, mouth and brows, placed for these rounder heads
+  const featS = { ...S, ey: S.ey - (l.kind === 'baby' ? 2 : l.kind === 'kid' ? 3 : 6) };
   // the scalp: hair that fills the whole top of the head down to the hairline, so no style leaves a bald
   // crown or a band of skin between the fringe and the hair behind (the fringe's own shape sits on top)
   const scalpOn = !['bald', 'tuft', 'buzz', 'sides'].includes(l.hairStyle) && !l.face && !l.drawing;
@@ -694,11 +701,216 @@ function coreFace(id: string, l: Look, w: WorldId): string {
     <g clip-path="url(#${clip})"><path d="${head}" fill="${skin}" transform="translate(-7 -8)" stroke="none"/></g>
     <ellipse cx="80" cy="60" rx="11" ry="5.5" fill="#fff" opacity=".18" transform="rotate(-20 80 60)"/>
     ${[-1, 1].map((sd) => `<ellipse cx="${100 + sd * blushX}" cy="${blushY}" rx="${l.kind === 'baby' ? 12 : 11}" ry="${l.kind === 'baby' ? 8 : 7}" fill="url(#bl${id})"/>`).join('')}${fr}
-    <g class="bt-eyes">${coreEye(id, S, l, -1, gap, w)}${coreEye(id, S, l, 1, gap, w)}</g>
-    ${coreBrows(S, l, gap, w)}
-    ${around(100, 112, nose, 1 + (nose - 1) * 0.35, coreNose(S, l, w))}
+    <g class="bt-eyes">${talesEye(id, eyeS, l, -1, gap)}${talesEye(id, eyeS, l, 1, gap)}</g>
+    ${talesBrows(eyeS, l, gap)}
+    ${around(100, 112, nose, 1 + (nose - 1) * 0.35, talesNose(featS, l))}
     ${facialHair(id, l)}
-    ${around(100, 128, mw, 1, coreMouth(id, S, l, w))}
+    ${around(100, 128, mw, 1, talesMouth(id, featS, l))}
+    ${scalp}${front}${seam}
+    ${worldHair(l)}
+    ${flair(l)}`;
+}
+
+/* ── Tales: hand-drawn film characters, the NomNoms way ──────────────────
+ * Principles (not any one character): an egg- or heart-shaped head with a soft,
+ * round "dumpling" chin; almond eyes that do the acting (a confident upper lash
+ * line, a big iris tucked under the lid, one bright highlight plus the NomNoms
+ * second sparkle); thin, high, curved brows that never glare; a nose that is
+ * only a hint; a wide mouth with a defined upper lip; full cheeks with a warm
+ * blush; a warm brown line instead of black.
+ */
+const femme = (l: Look) => !!l.lashes;
+function talesSpec(l: Look): FaceSpec {
+  const k = l.kind, f = femme(l);
+  switch (k) {
+    case 'baby': return { top: 36, chin: 152, cran: 60, cheek: 58, chinW: 28, ex: 23, ey: 107, erx: 14.6, ery: 10.2, tilt: 0, brow: 1.6, nose: 0, mouth: 0 };
+    case 'kid': return { top: 35, chin: 154, cran: 56, cheek: 50, chinW: f ? 19 : 21, ex: 22.5, ey: 103, erx: 14.8, ery: 9.6, tilt: 0, brow: f ? 2 : 2.4, nose: 0, mouth: 0 };
+    case 'elder': return { top: 33, chin: 158, cran: 53, cheek: f ? 43 : 46, chinW: f ? 14 : 18, ex: 21.5, ey: 100, erx: 13.4, ery: 8.2, tilt: 0, brow: f ? 2.2 : 3.2, nose: 1, mouth: 1 };
+    default: return { top: 32, chin: f ? 160 : 161, cran: f ? 51 : 53, cheek: f ? 40 : 46, chinW: f ? 11 : 18, ex: 22, ey: 99, erx: f ? 14.6 : 13.8, ery: f ? 8.9 : 8.4, tilt: 0, brow: f ? 2.1 : 3.4, nose: 1, mouth: 1 };
+  }
+}
+
+function talesEye(id: string, s: FaceSpec, l: Look, side: -1 | 1, gap: number): string {
+  const ex = exprOf(l);
+  const es = 1 + SHAPE_RANGE.eyeSize * shapeOf(l, 'eyeSize');
+  const cx = 100 + side * (s.ex + gap), cy = s.ey;
+  const rx = s.erx * es, big = ex === 'wow' || ex === 'starry' || (ex === 'silly' && side === 1);
+  const ry = s.ery * es * (big ? 1.14 : ex === 'dreamy' ? 0.8 : ex === 'shy' ? 0.9 : 1);
+  // delicate: a fine warm-brown lash line, never a heavy black rim
+  const ink = '#4a2f26', f = femme(l), little = l.kind === 'baby' || l.kind === 'kid';
+  const lw = l.kind === 'baby' ? 1.8 : l.kind === 'kid' ? 2 : f ? 2.3 : 2;
+  const n = (v: number) => v.toFixed(1);
+  // corners: the outer corner sits a touch higher than the inner (a lifted, friendly almond)
+  const xi = cx - side * rx, yi = cy + ry * 0.12, xo = cx + side * rx, yo = cy - ry * (little ? 0.02 : 0.1);
+  const upper = `M${n(xi)} ${n(yi)} C${n(xi + side * rx * 0.12)} ${n(cy - ry * 1.3)} ${n(xo - side * rx * 0.42)} ${n(cy - ry * 1.42)} ${n(xo)} ${n(yo)}`;
+  const lower = `C${n(xo - side * rx * 0.18)} ${n(cy + ry * (little ? 1.2 : 1.0))} ${n(xi + side * rx * 0.34)} ${n(cy + ry * (little ? 1.22 : 1.06))} ${n(xi)} ${n(yi)}`;
+  // closed eyes follow the same almond: a happy upward curve, a wink, sleep
+  if (ex === 'laugh' || ex === 'proud' || (ex === 'wink' && side === 1)) {
+    return `<path d="M${n(xi)} ${n(cy + 2)} Q${n(cx)} ${n(cy - ry * 1.1)} ${n(xo)} ${n(cy + 1)}" stroke="${ink}" stroke-width="${lw + 0.3}" fill="none" stroke-linecap="round"/>${f ? `<path d="M${n(xo)} ${n(cy + 1)} q${side * 2} -0.5 ${side * 3} -2.4" stroke="${ink}" stroke-width="1.4" fill="none" stroke-linecap="round"/>` : ''}`;
+  }
+  if (ex === 'sleepy') return `<path d="M${n(xi)} ${n(cy)} Q${n(cx)} ${n(cy + ry * 0.7)} ${n(xo)} ${n(cy - 1)}" stroke="${ink}" stroke-width="${lw}" fill="none" stroke-linecap="round"/>`;
+  if (ex === 'silly' && side === -1) return `<path d="M${n(cx - rx * 0.7)} ${n(cy - ry * 0.7)} L${n(cx + rx * 0.6)} ${n(cy)} L${n(cx - rx * 0.7)} ${n(cy + ry * 0.7)}" stroke="${ink}" stroke-width="${lw}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
+  const shape = `${upper} ${lower} Z`;
+  const [gx, gy] = ex === 'shy' ? [-side * 2.2 - 1, 1.6] : ex === 'dreamy' ? [1.2, -1] : [0, 0];
+  // the upper lid overlaps the top of the iris and the lower lid crosses its bottom: white only at the sides
+  // (the eye's width sets how much white shows at the sides: about a third of it)
+  // the iris is about 60% of the eye's width, so clear white shows on both sides (a bigger iris looks possessed)
+  const ir = Math.min(rx * (l.kind === 'baby' ? 0.66 : l.kind === 'kid' ? 0.62 : 0.58), ry * 1.02), ix = cx + gx + side * 0.4, iy = cy - ry * 1.02 + ir * 0.9 + gy;
+  const eyeCol = l.eyes ?? EYE_COLOURS[0];
+  const clip = `te${id}${side}`;
+  const starry = ex === 'starry';
+  // one bright highlight up and to the left, and the NomNoms second sparkle below it
+  const shine = starry
+    ? sparkle(ix - ir * 0.28, iy - ir * 0.28, ir * 0.42, '#fff') + `<circle cx="${n(ix + ir * 0.34)}" cy="${n(iy + ir * 0.36)}" r="${n(ir * 0.09)}" fill="#fff" opacity=".7"/>`
+    : `<ellipse cx="${n(ix - ir * 0.32)}" cy="${n(iy - ir * 0.32)}" rx="${n(ir * 0.24)}" ry="${n(ir * 0.2)}" fill="#fff" opacity=".92"/><circle cx="${n(ix + ir * 0.34)}" cy="${n(iy + ir * 0.36)}" r="${n(ir * 0.09)}" fill="#fff" opacity=".7"/>`;
+  // the lash line: one tapered stroke, fine at the inner corner, fullest toward the outer corner,
+  // ending (for lashes) in a soft upward wing; never separate spiky lashes
+  const P0 = [xi, yi], P1 = [xi + side * rx * 0.12, cy - ry * 1.3], P2 = [xo - side * rx * 0.42, cy - ry * 1.42], P3 = [xo, yo];
+  const bez = (t: number, k: 0 | 1) => (1 - t) ** 3 * P0[k] + 3 * (1 - t) ** 2 * t * P1[k] + 3 * (1 - t) * t * t * P2[k] + t ** 3 * P3[k];
+  const outerPts: string[] = [], innerPts: string[] = [];
+  const thick = (t: number) => lw * (0.3 + 0.7 * Math.sin(Math.PI * Math.min(1, t * 0.85)) + (f ? 0.3 * t * t : 0.1 * t));
+  for (let i = 0; i <= 16; i++) {
+    const t = i / 16, x = bez(t, 0), y = bez(t, 1);
+    const ta = Math.max(0, t - 0.01), tb = Math.min(1, t + 0.01);
+    let tx = bez(tb, 0) - bez(ta, 0), ty = bez(tb, 1) - bez(ta, 1); const L = Math.hypot(tx, ty) || 1; tx /= L; ty /= L;
+    // the normal that points up, away from the eye
+    let nx = ty, ny = -tx; if (ny > 0) { nx = -nx; ny = -ny; }
+    const h = thick(t);
+    outerPts.push(`${n(x + nx * h * 0.7)} ${n(y + ny * h * 0.7)}`); innerPts.push(`${n(x - nx * h * 0.3)} ${n(y - ny * h * 0.3)}`);
+  }
+  const wing = f ? `${n(xo + side * 3)} ${n(yo - 2.2)}` : `${n(xo + side * 0.8)} ${n(yo - 0.3)}`;
+  const lashLine = `<path d="M${outerPts.join(' L')} L${wing} L${innerPts.reverse().join(' L')} Z" fill="${ink}" stroke="none"/>`;
+  const flick = '';
+  // the lid crease: a faint, soft line just above, only a suggestion
+  const crease = l.kind === 'baby' ? '' : `<path d="M${n(xi + side * rx * 0.28)} ${n(cy - ry * 1.18)} Q${n(cx + side * rx * 0.15)} ${n(cy - ry * 1.5)} ${n(xo - side * rx * 0.12)} ${n(cy - ry * 1.02)}" stroke="${shade(l.skin, -0.28)}" stroke-width="1" fill="none" stroke-linecap="round" opacity="${l.kind === 'kid' ? 0.22 : 0.38}"/>`;
+  const lowerLine = `<path d="M${n(xo - side * rx * 0.1)} ${n(yo + ry * 0.4)} C${n(xo - side * rx * 0.28)} ${n(cy + ry * 1.0)} ${n(cx)} ${n(cy + ry * 1.06)} ${n(cx - side * rx * 0.2)} ${n(cy + ry * 0.98)}" stroke="${ink}" stroke-width=".9" fill="none" stroke-linecap="round" opacity=".28"/>`;
+  return `<clipPath id="${clip}"><path d="${shape}"/></clipPath>
+    <path d="${shape}" fill="#fffdf8" stroke="none"/>
+    <g clip-path="url(#${clip})">
+      <circle cx="${n(ix)}" cy="${n(iy)}" r="${n(ir)}" fill="url(#ir${id})" stroke="${shade(eyeCol, -0.5)}" stroke-width="1.3"/>
+      <circle cx="${n(ix)}" cy="${n(iy + ir * 0.04)}" r="${n(ir * 0.38)}" fill="#170e0b" stroke="none"/>
+      ${shine}
+      <path d="${upper}" stroke="#000" stroke-width="4" fill="none" opacity=".06" transform="translate(0 2)"/>
+    </g>
+    ${crease}${lowerLine}${lashLine}${flick}`;
+}
+
+function talesBrows(s: FaceSpec, l: Look, gap: number): string {
+  const ex = exprOf(l), f = femme(l);
+  const [lift, tilt] = BROWS[ex] ?? [0, 0];
+  const up = -SHAPE_RANGE.browHeight * shapeOf(l, 'browHeight'), weight = 1 + SHAPE_RANGE.browWeight * shapeOf(l, 'browWeight');
+  // real brows: the hair colour, deepened so fair and grey brows still read
+  const c = l.kind === 'baby' ? mixHex(l.hair, l.skin, 0.35) : mixHex(shade(l.hair, -0.22), '#3a2a22', lum(l.hair) > 0.6 ? 0.35 : 0.1);
+  const [thIn, thPk] = (l.kind === 'baby' ? [1.9, 1.5] : l.kind === 'kid' ? [3, 2.4] : f ? [3.3, 2.6] : [4.4, 3.6]).map((v) => v * weight);
+  const n = (v: number) => v.toFixed(1);
+  return ([-1, 1] as const).map((sd) => {
+    // high above the eye with a soft arch: brows carry the expression, and never glare
+    const base = s.ey - s.ery * 1.42 - (l.kind === 'baby' ? 7 : 8.5) + up + (ex === 'wink' ? (sd === -1 ? lift - 3 : lift + 2) : lift);
+    const t = Math.max(-6, Math.min(1.2, tilt * 0.7)); // inner end: up for worry, only a hair down for bravery
+    const inX = 100 + sd * (s.ex + gap - s.erx * 0.8), outX = 100 + sd * (s.ex + gap + s.erx * 1.15);
+    const pkX = 100 + sd * (s.ex + gap + s.erx * 0.42), pk = base - (l.kind === 'baby' ? 2.6 : 3.8);
+    const inY = base + 1.2 + t, outY = base + 3;
+    // a rounded head at the inner end, fullest there, tapering through the arch to a fine tail
+    return `<path d="M${n(inX)} ${n(inY - thIn * 0.5)} Q${n(pkX - sd * 4)} ${n(pk - thPk * 0.75)} ${n(pkX)} ${n(pk - thPk * 0.5)} Q${n(pkX + sd * 5)} ${n(pk - thPk * 0.3)} ${n(outX)} ${n(outY)} Q${n(pkX + sd * 4)} ${n(pk + thPk * 0.35)} ${n(pkX)} ${n(pk + thPk * 0.5)} Q${n(pkX - sd * 4)} ${n(pk + thPk * 0.6)} ${n(inX)} ${n(inY + thIn * 0.5)} Q${n(inX - sd * thIn * 0.55)} ${n(inY)} ${n(inX)} ${n(inY - thIn * 0.5)} Z" fill="${c}" stroke="none" opacity=".94"/>`;
+  }).join('');
+}
+
+function talesNose(s: FaceSpec, l: Look): string {
+  const d = shade(l.skin, -0.3), ny = s.ey + (l.kind === 'baby' ? 16 : l.kind === 'kid' ? 18 : 21);
+  const n = (v: number) => v.toFixed(1);
+  const hi = `<ellipse cx="100.6" cy="${n(ny - 1.4)}" rx="2.2" ry="1.3" fill="#fff" opacity=".35"/>`;
+  if (l.kind === 'baby') {
+    // a button nose: a soft round tip and two tiny nostrils
+    return `<ellipse cx="100" cy="${n(ny)}" rx="4.6" ry="3.3" fill="${shade(l.skin, -0.06)}" stroke="none"/><path d="M96.4 ${n(ny + 1.4)} Q100 ${n(ny + 3.8)} 103.6 ${n(ny + 1.4)}" stroke="${d}" stroke-width="1.3" fill="none" stroke-linecap="round" opacity=".7"/>${hi}`;
+  }
+  // a real little nose, as if turned a touch: the bridge's shadow side, the tip, both nostril wings
+  const k = l.kind === 'kid' ? 0.82 : femme(l) ? 0.95 : 1.12;
+  const g = (x: number, y: number) => `${n(100 + (x - 100) * k)} ${n(ny + y * k)}`;
+  const bridge = l.kind === 'kid' ? '' : `<path d="M${g(104, -17)} Q${g(106, -9)} ${g(105.6, -4)}" stroke="${d}" stroke-width="1.2" fill="none" stroke-linecap="round" opacity=".35"/>`;
+  return `${bridge}<ellipse cx="${n(100.5)}" cy="${n(ny + 5.6 * k)}" rx="${n(5 * k)}" ry="1.4" fill="${shade(l.skin, -0.16)}" opacity=".35" stroke="none"/>
+    <path d="M${g(94.6, -1.6)} C${g(92.6, 0.6)} ${g(93.4, 3.4)} ${g(96.6, 3)}" stroke="${d}" stroke-width="1.4" fill="none" stroke-linecap="round"/>
+    <path d="M${g(97.4, 3.6)} Q${g(100.8, 5.2)} ${g(104.4, 3.4)}" stroke="${d}" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    <path d="M${g(105.8, -1.4)} C${g(108, 0.6)} ${g(107.2, 3.2)} ${g(104.4, 3.4)}" stroke="${d}" stroke-width="1.4" fill="none" stroke-linecap="round"/>
+    <ellipse cx="${n(100 + (97.8 - 100) * k)}" cy="${n(ny + 2.5 * k)}" rx="1.2" ry=".7" fill="${shade(l.skin, -0.45)}" opacity=".5" stroke="none"/><ellipse cx="${n(100 + (103.2 - 100) * k)}" cy="${n(ny + 2.5 * k)}" rx="1.2" ry=".7" fill="${shade(l.skin, -0.45)}" opacity=".5" stroke="none"/>${hi}`;
+}
+
+function talesMouth(id: string, s: FaceSpec, l: Look): string {
+  const ex = exprOf(l), f = femme(l), grown = l.kind === 'adult' || l.kind === 'elder';
+  const my = s.ey + (l.kind === 'baby' ? 26 : l.kind === 'kid' ? 30 : 35);
+  const lineC = mixHex(shade(l.skin, -0.55), '#7a2430', 0.35);
+  // lips: a natural rose for grown women, the skin's own warmth for everyone else
+  const lipC = f && grown ? mixHex(l.skin, '#c24a5c', 0.55) : mixHex(l.skin, '#cf6f78', l.kind === 'baby' ? 0.3 : 0.38);
+  const wd = l.kind === 'baby' ? 8 : l.kind === 'kid' ? 10 : f ? 12 : 12.5;
+  const n = (v: number) => v.toFixed(1);
+  const line = (d: string, sw = 1.8) => `<path d="${d}" stroke="${lineC}" stroke-width="${sw}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
+  const chin = l.kind === 'baby' ? '' : `<path d="M${n(100 - 3.5)} ${n(my + 13.5)} Q100 ${n(my + 14.6)} ${n(100 + 3.5)} ${n(my + 13.5)}" stroke="${shade(l.skin, -0.2)}" stroke-width="1.2" fill="none" stroke-linecap="round" opacity=".35"/>`;
+  // the lower lip: a soft full shape with a little light on it
+  const lowerLip = (w: number, y: number, k = 1) => `<path d="M${n(100 - w * 0.62)} ${n(y)} Q100 ${n(y + 6.8 * k)} ${n(100 + w * 0.62)} ${n(y)} Q100 ${n(y + 1.6)} ${n(100 - w * 0.62)} ${n(y)} Z" fill="${lipC}" stroke="none" opacity="${f && grown ? 0.95 : 0.7}"/><ellipse cx="${n(100 + 1)}" cy="${n(y + 3.2 * k)}" rx="${n(w * 0.18)}" ry=".9" fill="#fff" opacity=".28"/>`;
+  // the upper lip with a soft cupid's bow, sitting on the line where the lips meet
+  const upperLip = (w: number, y: number, mid: number) => `<path d="M${n(100 - w)} ${n(y)} Q${n(100 - w * 0.5)} ${n(y - 2.6)} ${n(100 - 3)} ${n(mid - 3.2)} Q100 ${n(mid - 2.2)} ${n(100 + 3)} ${n(mid - 3.2)} Q${n(100 + w * 0.5)} ${n(y - 2.6)} ${n(100 + w)} ${n(y)} Q${n(100 + w * 0.5)} ${n(mid + 0.4)} 100 ${n(mid)} Q${n(100 - w * 0.5)} ${n(mid + 0.4)} ${n(100 - w)} ${n(y)} Z" fill="${lipC}" stroke="none" opacity="${f && grown ? 0.9 : 0.45}"/>`;
+  const corners = (w: number, y: number) => `<path d="M${n(100 - w - 1.6)} ${n(y - 1.6)} q.9 1.5 2.1 1.9 M${n(100 + w + 1.6)} ${n(y - 1.6)} q-.9 1.5 -2.1 1.9" stroke="${lineC}" stroke-width="1.2" fill="none" stroke-linecap="round" opacity=".55"/>`;
+  const smile = (w: number, curve: number) => {
+    // where the lips meet: curving up at the corners, a slight dip in the middle
+    const mid = my + curve;
+    return upperLip(w, my - 1, mid) + lowerLip(w, mid + 0.4) + line(`M${n(100 - w)} ${n(my - 1)} C${n(100 - w * 0.55)} ${n(mid - 0.2)} ${n(100 - w * 0.2)} ${n(mid + 0.4)} 100 ${n(mid)} C${n(100 + w * 0.2)} ${n(mid + 0.4)} ${n(100 + w * 0.55)} ${n(mid - 0.2)} ${n(100 + w)} ${n(my - 1)}`) + corners(w, my - 1) + chin;
+  };
+  const open = (h: number, wf = 1, teeth = l.kind !== 'baby') => {
+    const W = wd * 1.05 * wf;
+    const d = `M${n(100 - W)} ${n(my - 1)} C${n(100 - W * 0.5)} ${n(my + 1.4)} ${n(100 - W * 0.15)} ${n(my + 1.8)} 100 ${n(my + 1.4)} C${n(100 + W * 0.15)} ${n(my + 1.8)} ${n(100 + W * 0.5)} ${n(my + 1.4)} ${n(100 + W)} ${n(my - 1)} Q${n(100 + W * 0.78)} ${n(my + h)} 100 ${n(my + h)} Q${n(100 - W * 0.78)} ${n(my + h)} ${n(100 - W)} ${n(my - 1)} Z`;
+    const teethD = `M${n(100 - W)} ${n(my - 1)} C${n(100 - W * 0.5)} ${n(my + 1.4)} ${n(100 - W * 0.15)} ${n(my + 1.8)} 100 ${n(my + 1.4)} C${n(100 + W * 0.15)} ${n(my + 1.8)} ${n(100 + W * 0.5)} ${n(my + 1.4)} ${n(100 + W)} ${n(my - 1)} L${n(100 + W)} ${n(my + h * 0.32)} Q100 ${n(my + h * 0.44)} ${n(100 - W)} ${n(my + h * 0.32)} Z`;
+    return `<clipPath id="tm${id}"><path d="${d}"/></clipPath><path d="${d}" fill="#5c1e26" stroke="${lineC}" stroke-width="1.4"/><g clip-path="url(#tm${id})">${teeth ? `<path d="${teethD}" fill="#fffaf4" stroke="none"/>` : ''}<ellipse cx="100" cy="${n(my + h + 0.5)}" rx="${n(W * 0.55)}" ry="${n(h * 0.42)}" fill="#d9616e" stroke="none"/></g>`
+      + upperLip(W, my - 1, my + 1.4) + `<path d="M${n(100 - W * 0.62)} ${n(my + h + 0.6)} Q100 ${n(my + h + 3.6)} ${n(100 + W * 0.62)} ${n(my + h + 0.6)}" stroke="${lipC}" stroke-width="2.4" fill="none" stroke-linecap="round" opacity="${f && grown ? 0.9 : 0.55}"/>` + corners(W, my - 1) + chin;
+  };
+  switch (ex) {
+    case 'laugh': case 'starry': return open(l.kind === 'baby' ? 11 : 13, 1.06);
+    case 'grin': return open(l.kind === 'baby' ? 9 : 10);
+    case 'silly': return open(8) + `<path d="M96 ${my + 4} Q96 ${my + 13} 102 ${my + 13} Q108 ${my + 13} 108 ${my + 4} Z" fill="#e2707c" stroke="${shade('#e2707c', -0.3)}" stroke-width="1.3"/>`;
+    case 'wow': return `<ellipse cx="100" cy="${my + 3}" rx="${n(wd * 0.36)}" ry="${n(wd * 0.46)}" fill="#5c1e26" stroke="${lipC}" stroke-width="2.2"/><ellipse cx="100" cy="${n(my + 3 + wd * 0.22)}" rx="${n(wd * 0.22)}" ry="${n(wd * 0.14)}" fill="#d9616e"/>` + chin;
+    case 'worried': return lowerLip(wd * 0.7, my + 2.4, 0.7) + line(`M${n(100 - wd * 0.7)} ${my + 2.5} Q${n(100 - wd * 0.35)} ${my} 100 ${my + 1.6} Q${n(100 + wd * 0.35)} ${my + 3.2} ${n(100 + wd * 0.7)} ${my + 1.2}`) + chin;
+    case 'sleepy': return `<ellipse cx="100" cy="${my + 2}" rx="${n(wd * 0.26)}" ry="${n(wd * 0.3)}" fill="#5c1e26" stroke="${lipC}" stroke-width="1.8"/>` + chin;
+    case 'shy': return smile(wd * 0.62, 2.6);
+    case 'dreamy': return smile(wd * 0.78, 3.4);
+    case 'brave': return upperLip(wd, my - 1, my + 3) + lowerLip(wd, my + 3.4) + line(`M${n(100 - wd)} ${my} Q${n(100 + 2)} ${my + 5} ${n(100 + wd)} ${my - 2.4}`) + corners(wd, my - 1) + chin;
+    case 'wink': return smile(wd * 1.02, 4.6);
+    case 'proud': return smile(wd * 1.08, 5.2);
+    default: return smile(wd, 4.4);
+  }
+}
+
+function talesFace(id: string, l: Look): string {
+  const [rawBack, front] = hair(id, l);
+  const back = !OPEN_HEADWEAR.includes(l.hat) && ['puff', 'topknot', 'bun'].includes(l.hairStyle) ? '' : rawBack;
+  const S = talesSpec(l), skin = `url(#sk${id})`, head = coreHead(S, l);
+  const gap = SHAPE_RANGE.eyeGap * shapeOf(l, 'eyeGap');
+  const nose = 1 + SHAPE_RANGE.nose * shapeOf(l, 'nose'), mw = 1 + SHAPE_RANGE.mouth * shapeOf(l, 'mouth');
+  const around = (x: number, y: number, sx: number, sy: number, inner: string) => (sx === 1 && sy === 1 ? inner : `<g transform="translate(${x} ${y}) scale(${+sx.toFixed(3)} ${+sy.toFixed(3)}) translate(${-x} ${-y})">${inner}</g>`);
+  const neckW = l.kind === 'baby' ? 13 : l.kind === 'kid' ? 11 : femme(l) ? 9 : 12.5;
+  const earX = S.cran - 1.5;
+  const ears = [-1, 1].map((sd) => `<ellipse cx="${100 + sd * earX}" cy="${S.ey + 2}" rx="${l.kind === 'baby' ? 7.5 : 6.5}" ry="${l.kind === 'baby' ? 9 : 9.5}" fill="${skin}"/><path d="M${100 + sd * (earX + 1.5)} ${S.ey - 3} q${sd * 3.6} 5 0 10" stroke="${shade(l.skin, -0.25)}" stroke-width="1.6" fill="none" stroke-linecap="round" opacity=".6"/>`).join('');
+  const clip = `th${id}`;
+  const blushX = S.ex + gap + (l.kind === 'baby' ? 11 : 10), blushY = S.ey + (l.kind === 'baby' ? 16 : 17);
+  const fr = l.freckles ? [[-blushX + 2, blushY - 2], [-blushX + 8, blushY + 2], [-blushX - 4, blushY + 3], [blushX - 2, blushY - 2], [blushX - 8, blushY + 2], [blushX + 4, blushY + 3]].map(([x, y]) => `<circle cx="${100 + x}" cy="${y}" r="1.4" fill="${shade(l.skin, -0.32)}" opacity=".8"/>`).join('') : '';
+  // hair fills the top of the head right down to the hairline (see coreFace)
+  const scalpOn = !['bald', 'tuft', 'buzz', 'sides'].includes(l.hairStyle);
+  const T = S.ey - 14, cr = S.cran * (1 + SHAPE_RANGE.faceWidth * shapeOf(l, 'faceWidth'));
+  const bigHead = coreHead({ ...S, top: S.top - 2.5, cran: S.cran + 2.5 }, l);
+  const scalp = scalpOn ? `<clipPath id="tsc${id}"><path d="M-20 -60 H220 V${T} H${(100 + cr + 4).toFixed(1)} Q100 ${(2 * (S.top + 22) - T).toFixed(1)} ${(100 - cr - 4).toFixed(1)} ${T} H-20 Z"/></clipPath><path d="${bigHead}" fill="url(#hr${id})" clip-path="url(#tsc${id})"/>` : '';
+  const seam = scalpOn ? `<clipPath id="trg${id}"><path clip-rule="evenodd" d="${bigHead} ${coreHead({ ...S, top: S.top + 7.5, cran: S.cran - 7.5 }, l)}"/></clipPath><g clip-path="url(#tsc${id})"><path d="${bigHead}" fill="url(#hr${id})" stroke="none" clip-path="url(#trg${id})"/></g>` : '';
+  // cel shading: one shadow tone down the far side of the face and under the hairline
+  const shadowTone = mixHex(shade(l.skin, -0.13), '#b4524a', 0.12);
+  return `${back}
+    <path d="M${100 - neckW} 134 L${100 + neckW} 134 L${100 + neckW - 1} 160 L${100 - neckW + 1} 160 Z" fill="${shade(l.skin, -0.14)}"/>
+    ${ears}
+    <clipPath id="${clip}"><path d="${head}"/></clipPath>
+    <path d="${head}" fill="${shadowTone}"/>
+    <g clip-path="url(#${clip})"><path d="${head}" fill="${skin}" transform="translate(-6 -5)" stroke="none"/>${scalpOn ? `<path d="M30 ${S.top + 30} Q100 ${S.top + 18} 170 ${S.top + 30} L170 ${S.top + 40} Q100 ${S.top + 30} 30 ${S.top + 40} Z" fill="${shadowTone}" opacity=".6" stroke="none"/>` : ''}</g>
+    <ellipse cx="82" cy="${S.top + 26}" rx="11" ry="5" fill="#fff" opacity=".16" transform="rotate(-18 82 ${S.top + 26})"/>
+    ${[-1, 1].map((sd) => `<ellipse cx="${100 + sd * blushX}" cy="${blushY}" rx="${l.kind === 'baby' ? 11 : 10}" ry="${l.kind === 'baby' ? 7.5 : 6}" fill="url(#bl${id})"/>`).join('')}${fr}
+    <g class="bt-eyes">${talesEye(id, S, l, -1, gap)}${talesEye(id, S, l, 1, gap)}</g>
+    ${talesBrows(S, l, gap)}
+    ${around(100, S.ey + 20, nose, 1 + (nose - 1) * 0.35, talesNose(S, l))}
+    ${facialHair(id, l)}
+    ${around(100, S.ey + 34, mw, 1, talesMouth(id, S, l))}
     ${scalp}${front}${seam}
     ${worldHair(l)}
     ${flair(l)}`;
@@ -1255,7 +1467,7 @@ export function characterMarkup(l: Look, opts: { animated?: boolean; style?: Sty
   MODE = opts.style ?? 'pocketlight';
   // in a story world, people are drawn in the world's own style (pets keep the book's look)
   WORLD = isPet(l.kind) || l.face || l.drawing ? 'everyday' : l.world ?? 'everyday';
-  if (isArt(WORLD)) MODE = 'pocketlight';
+  if (isArt(WORLD) && MODE !== 'tales') MODE = 'pocketlight';
   const id = `c${++uid}`;
   const motion = l.personality ? ` m-${PERSONALITIES[l.personality].motion}` : '';
   const cls = `${opts.animated ? 'bt-char is-animated' : 'bt-char'}${motion} st-${MODE}`;
@@ -1269,7 +1481,7 @@ export function characterMarkup(l: Look, opts: { animated?: boolean; style?: Sty
   const dy = l.face ? l.faceY ?? 0 : 0;
   const head = l.face
     ? `<image href="${l.face.replace(/"/g, '&quot;')}" x="34" y="29" width="132" height="132" preserveAspectRatio="xMidYMid meet"/>`
-    : pet ? petFace(id, l) : coreFace(id, l, WORLD);
+    : pet ? petFace(id, l) : MODE === 'tales' ? talesFace(id, l) : coreFace(id, l, WORLD);
   // Pocketlight 3D: a warm rim light along the shadow side of the head
   const rim = false ? `<path d="M152 66 Q166 94 152 126" stroke="#fff4dc" stroke-width="4" fill="none" stroke-linecap="round" opacity="${STYLES.pocketlight.lighting.rim}"/>` : '';
   const shadow = MODE === 'wondercut'
@@ -1323,11 +1535,14 @@ const PROPORTIONS: Record<StyleMode, Record<'baby' | 'kid' | 'adult' | 'elder', 
   gouache: { baby: { head: 0.94, body: 1.06, slim: 1 }, kid: { head: 0.86, body: 1.16, slim: 0.96 }, adult: { head: 0.8, body: 1.26, slim: 0.94 }, elder: { head: 0.82, body: 1.2, slim: 0.98 } },
   wondercut: { baby: { head: 0.96, body: 1.04, slim: 1.04 }, kid: { head: 0.9, body: 1.1, slim: 1.02 }, adult: { head: 0.84, body: 1.2, slim: 1 }, elder: { head: 0.86, body: 1.16, slim: 1.04 } },
   inked: { baby: { head: 0.92, body: 1.08, slim: 1 }, kid: { head: 0.8, body: 1.2, slim: 0.94 }, adult: { head: 0.66, body: 1.42, slim: 0.86 }, elder: { head: 0.7, body: 1.34, slim: 0.9 } },
+  // Tales: real film proportions, grown-ups tall and slim, little ones round
+  tales: { baby: { head: 0.98, body: 1.02, slim: 1 }, kid: { head: 0.8, body: 1.12, slim: 0.92 }, adult: { head: 0.6, body: 1.28, slim: 0.86 }, elder: { head: 0.64, body: 1.22, slim: 0.9 } },
 };
 const FEET = 252, BODY_TOP = 146, CHIN = 150;
 /** Grown-ups get longer legs (not just a bigger body), so they stand clearly taller than kids. */
 const LEG_EXTRA: Record<'baby' | 'kid' | 'adult' | 'elder', number> = { baby: 0, kid: 8, adult: 20, elder: 14 };
-const legExtraOf = (l: Look, storyLook: boolean) => (storyLook && !isPet(l.kind) && !l.drawing ? LEG_EXTRA[l.kind as 'baby' | 'kid' | 'adult' | 'elder'] ?? 0 : 0);
+const LEG_EXTRA_TALES: Record<'baby' | 'kid' | 'adult' | 'elder', number> = { baby: 0, kid: 22, adult: 48, elder: 36 };
+const legExtraOf = (l: Look, storyLook: boolean, mode: StyleMode = MODE) => (storyLook && !isPet(l.kind) && !l.drawing ? (mode === 'tales' ? LEG_EXTRA_TALES : LEG_EXTRA)[l.kind as 'baby' | 'kid' | 'adult' | 'elder'] ?? 0 : 0);
 
 /**
  * A close-up viewBox (written for the Pocketlight head) moved and scaled to
@@ -1335,11 +1550,12 @@ const legExtraOf = (l: Look, storyLook: boolean) => (storyLook && !isPet(l.kind)
  */
 export function fitViewBox(vb: string, l: Look, mode: StyleMode = 'pocketlight'): string {
   if (isPet(l.kind) || l.drawing) return vb;
-  const art = !l.face && (l.world ?? 'everyday') !== 'everyday';
-  const b = PROPORTIONS[art ? 'pocketlight' : mode][l.kind as 'baby' | 'kid' | 'adult' | 'elder'], wb = worldBody(l.world, l.kind);
+  const art = !l.face && (l.world ?? 'everyday') !== 'everyday' && mode !== 'tales';
+  const m: StyleMode = art ? 'pocketlight' : mode;
+  const b = PROPORTIONS[m][l.kind as 'baby' | 'kid' | 'adult' | 'elder'], wb = worldBody(l.world, l.kind);
   const pr = buildOf(b, wb);
   const [x, y, w, h] = vb.split(/\s+/).map(Number);
-  const E = legExtraOf(l, art || mode === 'pocketlight');
+  const E = legExtraOf(l, m === 'pocketlight' || m === 'tales', m);
   const lift = FEET - (FEET - BODY_TOP) * pr.body - BODY_TOP - E * pr.body;
   const nx = 100 + (x - 100) * pr.head, ny = CHIN + (y - CHIN) * pr.head + lift;
   return `${nx.toFixed(1)} ${ny.toFixed(1)} ${(w * pr.head).toFixed(1)} ${(h * pr.head).toFixed(1)}`;

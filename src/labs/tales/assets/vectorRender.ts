@@ -1,4 +1,4 @@
-import { STYLES, type StyleMode } from '../styles';
+import { softLook, STYLES, type StyleMode } from '../styles';
 import { labToRgb, rgbToLab } from './pipeline';
 import { modePalette } from './render';
 import type { VectorArt, VShape } from './vector';
@@ -48,7 +48,7 @@ function clouds(art: VectorArt, seed: number, fill: string, shade: string, mode:
     const cx = ((i + 0.25 + r() * 0.5) / n) * art.w, cy = band * (0.22 + r() * 0.4), s = Math.min(band * 0.22, art.w * (0.022 + r() * 0.018));
     const puffs = [[-1.3, 0.25, 0.7], [-0.55, -0.2, 0.95], [0.3, -0.35, 1.1], [1.15, 0.05, 0.8], [0.4, 0.3, 0.75]];
     const body = puffs.map(([dx, dy, k]) => `<circle cx="${(cx + dx * s).toFixed(1)}" cy="${(cy + dy * s).toFixed(1)}" r="${(k * s).toFixed(1)}"/>`).join('') + `<rect x="${(cx - 1.6 * s).toFixed(1)}" y="${cy.toFixed(1)}" width="${(3.2 * s).toFixed(1)}" height="${(0.85 * s).toFixed(1)}" rx="${(0.42 * s).toFixed(1)}"/>`;
-    const under = mode === 'inked' || mode === 'pocketlight' ? `<g fill="${shade}" opacity=".5" transform="translate(0 ${(0.22 * s).toFixed(1)})">${body}</g>` : '';
+    const under = mode === 'inked' || softLook(mode) ? `<g fill="${shade}" opacity=".5" transform="translate(0 ${(0.22 * s).toFixed(1)})">${body}</g>` : '';
     const dx = (art.w * (0.02 + r() * 0.02)).toFixed(1), dur = (40 + r() * 30).toFixed(0);
     out += `<g><animateTransform attributeName="transform" type="translate" values="0 0;${dx} 0;0 0" dur="${dur}s" repeatCount="indefinite"/>${under}<g fill="${fill}"${mode === 'inked' ? ` stroke="${shade}" stroke-width="1.2"` : ''}>${body}</g></g>`;
   }
@@ -82,7 +82,7 @@ export function vectorSvg(art: VectorArt, mode: StyleMode, opts: { id?: string; 
   const drawn = art.shapes.filter((x) => !x.sky);
   // colours, through the look's palette
   // storybook colour: livelier than a hazy photo, then through the look's palette
-  const SAT = { pocketlight: 1.3, gouache: 1.15, wondercut: 1.35, inked: 1.25 }[mode];
+  const SAT = { pocketlight: 1.3, tales: 1.3, gouache: 1.15, wondercut: 1.35, inked: 1.25 }[mode];
   const tune = (c: RGB) => modePalette([adjust(c, 0, SAT)], mode)[0] as RGB;
   const paper = mode === 'wondercut' ? paperColours(drawn, 9) : null;
   const sky = skyColours(art.sky);
@@ -93,14 +93,14 @@ export function vectorSvg(art: VectorArt, mode: StyleMode, opts: { id?: string; 
   if (art.sky && !opts.transparent) {
     defs += `<linearGradient id="${id}sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${hex(skyTop)}"/><stop offset="${Math.min(0.95, (art.skyLine ?? 0.5) + 0.1).toFixed(2)}" stop-color="${hex(skyBottom)}"/></linearGradient>`;
     body += `<rect width="${w}" height="${h}" fill="${mode === 'wondercut' ? hex(skyTop.map((v, i) => (v + skyBottom[i]) / 2)) : `url(#${id}sky)`}"/>`;
-    if (mode === 'pocketlight') body += `<circle cx="${(w * 0.82).toFixed(0)}" cy="${(h * 0.08).toFixed(0)}" r="${(w * 0.22).toFixed(0)}" fill="url(#${id}sun)"/>`;
+    if (softLook(mode)) body += `<circle cx="${(w * 0.82).toFixed(0)}" cy="${(h * 0.08).toFixed(0)}" r="${(w * 0.22).toFixed(0)}" fill="url(#${id}sun)"/>`;
     body += clouds(art, hashArt(art), sky.mood === 'sunset' ? hex(adjust(skyBottom, 6)) : '#ffffff', hex(adjust(skyTop, -6)), mode);
   } else if (!opts.transparent) {
     // no sky: start from the biggest shape's colour so seams never show white
     const big = drawn[0];
     if (big) body += `<rect width="${w}" height="${h}" fill="${hex(tune(big.bottom))}"/>`;
   }
-  if (mode === 'pocketlight') defs += `<radialGradient id="${id}sun"><stop offset="0" stop-color="#fff6dc" stop-opacity=".75"/><stop offset="1" stop-color="#fff6dc" stop-opacity="0"/></radialGradient>`;
+  if (softLook(mode)) defs += `<radialGradient id="${id}sun"><stop offset="0" stop-color="#fff6dc" stop-opacity=".75"/><stop offset="1" stop-color="#fff6dc" stop-opacity="0"/></radialGradient>`;
 
   // the shapes
   let shapes = '';
@@ -116,7 +116,7 @@ export function vectorSvg(art: VectorArt, mode: StyleMode, opts: { id?: string; 
       top = base; bottom = base;
       fill = hex(base);
     } else {
-      const lift = mode === 'pocketlight' ? 10 : 2;
+      const lift = softLook(mode) ? 10 : 2;
       if (Math.abs(lum(top) - lum(bottom)) < 1.5 && lift < 3) fill = hex(top);
       else { defs += `<linearGradient id="${id}g${i}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${hex(adjust(top, lift))}"/><stop offset="1" stop-color="${hex(bottom)}"/></linearGradient>`; fill = `url(#${id}g${i})`; }
     }
@@ -134,7 +134,7 @@ export function vectorSvg(art: VectorArt, mode: StyleMode, opts: { id?: string; 
 
   // finishing light and paper, over the whole picture (no warping, no blur of the picture)
   if (!opts.transparent) {
-    if (mode === 'pocketlight') {
+    if (softLook(mode)) {
       defs += `<radialGradient id="${id}vig" cx=".5" cy=".42" r=".75"><stop offset=".6" stop-color="#2b1c14" stop-opacity="0"/><stop offset="1" stop-color="#2b1c14" stop-opacity=".22"/></radialGradient><linearGradient id="${id}warm" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff1d6" stop-opacity=".22"/><stop offset=".6" stop-color="#fff1d6" stop-opacity="0"/></linearGradient>`;
       body += `<rect width="${w}" height="${h}" fill="url(#${id}warm)"/><rect width="${w}" height="${h}" fill="url(#${id}vig)"/>`;
     }

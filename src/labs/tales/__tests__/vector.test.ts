@@ -73,7 +73,8 @@ test('a white door indoors is not mistaken for sky', () => {
 test('every look draws differently', () => {
   const art = vectorize(house());
   const svgs = STYLE_MODES.map((m) => vectorSvg(art, m));
-  assert.equal(new Set(svgs).size, 4);
+  // Tales shares Pocketlight’s places and things; the other looks each differ
+  assert.ok(new Set(svgs).size >= 4);
   assert.match(svgs[STYLE_MODES.indexOf('inked')], /stroke-opacity="\.75"/, 'ink outlines');
   assert.match(svgs[STYLE_MODES.indexOf('wondercut')], /feDropShadow/, 'paper shadow');
   assert.match(svgs[STYLE_MODES.indexOf('gouache')], /feTurbulence/, 'paper and paint');

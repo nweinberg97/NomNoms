@@ -8,7 +8,9 @@
  * scene renderer and the photo-asset renderer.
  */
 
-export type StyleMode = 'pocketlight' | 'gouache' | 'wondercut' | 'inked';
+export type StyleMode = 'pocketlight' | 'gouache' | 'wondercut' | 'inked' | 'tales';
+/** Looks that share the soft, lit storybook backgrounds. */
+export const softLook = (m: StyleMode) => m === 'pocketlight' || m === 'tales';
 
 export interface StyleConfig {
   id: StyleMode;
@@ -29,9 +31,23 @@ export interface StyleConfig {
   asset: { colours: number; smoothing: number; edges: 'none' | 'wet-edge' | 'paper-cut' | 'ink'; simplify: number };
 }
 
-export const STYLE_MODES: StyleMode[] = ['pocketlight', 'gouache', 'wondercut', 'inked'];
+export const STYLE_MODES: StyleMode[] = ['tales', 'pocketlight', 'gouache', 'wondercut', 'inked'];
 
 export const STYLES: Record<StyleMode, StyleConfig> = {
+  tales: {
+    id: 'tales',
+    name: 'Tales',
+    blurb: 'Hand-drawn film characters with a soft NomNoms glow',
+    palette: { swatches: ['#f6c9a8', '#e8907a', '#f2c14e', '#8fbf9f', '#7fa8d1', '#b9a5e3', '#fbf3e6', '#4a2e24'], ink: '#4a2e24', shadow: '#5a3f3a', paper: '#fbf7f0', light: '#fff1d6' },
+    colour: { pull: 0.15, saturation: 1.05, brightness: 1.03, warmth: 0.06 },
+    materials: { shading: 'cel', contrast: 1, gloss: 0.3 },
+    outline: { kind: 'ink', width: 1.9, darken: 0.5 },
+    texture: { kind: 'none', intensity: 0 },
+    lighting: { key: 'top-left', rim: 0.2, vignette: 0.16, bloom: 0.2 },
+    shadow: { kind: 'contact', opacity: 0.16, offset: [0, 2], blur: 3 },
+    background: { treatment: 'soft-depth', blur: 0.4, displacement: 0 },
+    asset: { colours: 14, smoothing: 3, edges: 'none', simplify: 1 },
+  },
   pocketlight: {
     id: 'pocketlight',
     name: 'Pocketlight 3D',
@@ -152,7 +168,7 @@ export function styleFilters(mode: StyleMode, id: string): string {
  * this works on the string that is about to be drawn.
  */
 export function stylizeShapes(svg: string, mode: StyleMode, id: string, inkFor: (fill: string) => string | null): string {
-  if (mode === 'pocketlight') return svg.replace(/<image\b(?![^>]*\bfilter=)/g, `<image filter="url(#img${id})"`);
+  if (softLook(mode)) return svg.replace(/<image\b(?![^>]*\bfilter=)/g, `<image filter="url(#img${id})"`);
   const parts = svg.split(/(<defs>[\s\S]*?<\/defs>|<clipPath[\s\S]*?<\/clipPath>)/);
   const s = STYLES[mode];
   return parts.map((part, i) => {

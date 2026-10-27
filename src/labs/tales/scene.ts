@@ -3,7 +3,7 @@ import type { WorldId } from './character';
 import { PLACES, type Place } from './catalog';
 import { characterMarkup, isPet, type Look } from './character';
 import { rng } from './generator';
-import { STYLES, darken, styleFilters, stylizeShapes, type StyleMode } from './styles';
+import { softLook, STYLES, darken, styleFilters, stylizeShapes, type StyleMode } from './styles';
 import { askMark, hasThing, thingArt } from './things';
 
 /**
@@ -176,6 +176,6 @@ export function sceneSvg(opts: {
     }
     s += box('focus', cx - (bw * k) / 2, cy - (bh * k) / 2, bw * k, bh * k, `<g transform="${at}">${inner}</g>`, cx, cy);
   }
-  if (mode === 'pocketlight') s += `<rect width="400" height="300" fill="url(#glow${id})"/><rect width="400" height="300" fill="url(#vig${id})"/>`;
+  if (softLook(mode)) s += `<rect width="400" height="300" fill="url(#glow${id})"/><rect width="400" height="300" fill="url(#vig${id})"/>`;
   return `<svg viewBox="0 0 400 300" class="bt-scene st-${mode}${opts.animated ? ' is-animated' : ''}" ${opts.label ? `role="img" aria-label="${opts.label.replace(/"/g, '&quot;')}"` : 'aria-hidden="true"'}>${s}</svg>`;
 }

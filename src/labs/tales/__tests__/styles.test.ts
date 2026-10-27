@@ -7,7 +7,7 @@ import { STYLE_MODES, STYLES, stylizeShapes } from '../styles';
 const look: Look = { kind: 'kid', skin: '#a06b46', hair: '#b5532b', hairStyle: 'curly', eyes: '#4f7a4a', outfit: 'stripes', hat: 'none', glasses: 'round', extra: 'none', personality: 'silly' };
 
 test('every mode has a complete configuration', () => {
-  assert.deepEqual(STYLE_MODES, ['pocketlight', 'gouache', 'wondercut', 'inked']);
+  assert.deepEqual(STYLE_MODES, ['tales', 'pocketlight', 'gouache', 'wondercut', 'inked']);
   for (const m of STYLE_MODES) {
     const s = STYLES[m];
     assert.equal(s.id, m);

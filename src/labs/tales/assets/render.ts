@@ -1,4 +1,4 @@
-import { STYLES, hexToRgb, type StyleMode } from '../styles';
+import { softLook, STYLES, hexToRgb, type StyleMode } from '../styles';
 import { deltaE, labToRgb, majority, makeRaster, rgbToLab, type AssetBase, type Raster } from './pipeline';
 
 /**
@@ -75,7 +75,7 @@ export function renderBase(base: AssetBase, mode: StyleMode): Raster {
   for (let i = 0; i < labels.length; i++) area[labels[i]]++;
   const ink = hexToRgb(s.palette.ink), shadow = hexToRgb(s.palette.shadow), light = hexToRgb(s.palette.light);
   // soft light and gradients from the tiny colour map, in the mode's colours (Wondercut stays flat paper)
-  const blend = { pocketlight: 0.55, gouache: 0.42, inked: 0.28, wondercut: 0 }[mode];
+  const blend = { pocketlight: 0.55, tales: 0.5, gouache: 0.42, inked: 0.28, wondercut: 0 }[mode];
   const F = base.field;
   const fcols = F && blend ? modePalette(Array.from({ length: F.w * F.h }, (_, i) => [F.rgb[i * 3], F.rgb[i * 3 + 1], F.rgb[i * 3 + 2]]), mode) : null;
   const fieldAt = (x: number, y: number): number[] => {
@@ -127,7 +127,7 @@ export function renderBase(base: AssetBase, mode: StyleMode): Raster {
     out.data[o + 3] = base.alpha ? (base.alpha[i] ? 255 : 0) : 255;
   }
 
-  if (mode === 'pocketlight') softLight(out, light, s.lighting.vignette, base.kind === 'place');
+  if (softLook(mode)) softLight(out, light, s.lighting.vignette, base.kind === 'place');
   if (base.alpha) featherAlpha(out, base.alpha, mode === 'wondercut' ? 0 : 1);
   return out;
 }
