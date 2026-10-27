@@ -72,7 +72,7 @@ export function AssetStudio({ open, kind: startKind, mode: startMode, star, onCl
   const reset = () => {
     wipe(photo); wipe(work.current);
     setStep('pick'); setPhoto(null); setCrop(null); setHides([]); setAutoFound(0); setLooked(false); setTool('frame'); setKeep(0);
-    setMask(null); setMaskEdited(false); setResult(null); setConfirm(false); setError(undefined); setName(''); setHorizon(null); setSeed(7); setDrawStyle('cartoon');
+    setMask(null); setMaskEdited(false); setResult(null); setConfirm(false); setError(undefined); setName(''); setHorizon(null); setSeed(7); setDrawStyle('film');
   };
   useEffect(() => { if (open) { setKind(startKind); setMode(startMode); setHeight(startKind === 'object' ? 0.35 : 1); } else reset(); }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -227,7 +227,7 @@ export function AssetStudio({ open, kind: startKind, mode: startMode, star, onCl
   };
 
   /* ── 3. review ───────────────────────────────────────── */
-  const [drawStyle, setDrawStyle] = useState<DrawStyle>('cartoon');
+  const [drawStyle, setDrawStyle] = useState<DrawStyle>('film');
   const preview = useMemo(() => (result ? assetArtUrl({ ...result.base, drawStyle }, mode) : ''), [result, mode, drawStyle]);
   const beforeUrl = useMemo(() => (step === 'review' && work.current ? rasterToUrl(work.current, 'image/jpeg') : ''), [step, workVersion]); // eslint-disable-line react-hooks/exhaustive-deps
   const inScene = useMemo(() => {

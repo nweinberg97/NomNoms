@@ -18,18 +18,20 @@
 import { STYLES, type StyleMode } from '../styles';
 import { labToRgb, makeRaster, rgbToLab, type AssetBase, type Raster } from './pipeline';
 
-export type DrawStyle = 'shapes' | 'cartoon' | 'painted' | 'blocks' | 'sketch';
-export const DRAW_STYLES: DrawStyle[] = ['cartoon', 'painted', 'blocks', 'sketch', 'shapes'];
+export type DrawStyle = 'shapes' | 'cartoon' | 'film' | 'clay' | 'painted' | 'blocks' | 'sketch';
+export const DRAW_STYLES: DrawStyle[] = ['film', 'clay', 'cartoon', 'painted', 'blocks', 'sketch', 'shapes'];
 export const DRAW_STYLE_NAMES: Record<DrawStyle, string> = {
+  film: 'Storybook film',
+  clay: 'Clay',
   cartoon: 'Cartoon',
-  painted: 'Painted film',
+  painted: 'Soft paint',
   blocks: 'Block world',
   sketch: 'Ink & wash',
   shapes: 'Paper shapes',
 };
 /** Older saved assets may name a style that was replaced; map it to the nearest one. */
 export const drawStyleOf = (s: string | undefined): DrawStyle =>
-  s === 'cartoon' || s === 'painted' || s === 'blocks' || s === 'sketch' || s === 'shapes' ? s : s === 'watercolour' ? 'painted' : 'shapes';
+  s === 'cartoon' || s === 'film' || s === 'clay' || s === 'painted' || s === 'blocks' || s === 'sketch' || s === 'shapes' ? s : s === 'watercolour' ? 'painted' : 'shapes';
 
 type RGB = [number, number, number];
 
@@ -104,8 +106,25 @@ function fieldAt(base: AssetBase, u: number, v: number): RGB | null {
   return [0, 1, 2].map((c) => at(x0, y0, c) * (1 - tx) * (1 - ty) + at(x1, y0, c) * tx * (1 - ty) + at(x0, y1, c) * (1 - tx) * ty + at(x1, y1, c) * tx * ty) as RGB;
 }
 
+/**
+ * How far each pixel is from the edge of its own shape (in pixels, capped): a height map that
+ * turns every flat shape into a rounded volume, so it can be lit like a sculpted or painted form.
+ */
+function shapeDepth(L: Uint8Array, W: number, H: number, cap: number): Float32Array {
+  const d = new Float32Array(W * H).fill(cap);
+  for (let i = 0; i < W * H; i++) {
+    const x = i % W, y = (i / W) | 0, k = L[i];
+    if ((x > 0 && L[i - 1] !== k) || (x < W - 1 && L[i + 1] !== k) || (y > 0 && L[i - W] !== k) || (y < H - 1 && L[i + W] !== k)) d[i] = 0;
+  }
+  // two-pass chamfer distance (within each shape)
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = y * W + x; if (x > 0 && L[i - 1] === L[i]) d[i] = Math.min(d[i], d[i - 1] + 1); if (y > 0 && L[i - W] === L[i]) d[i] = Math.min(d[i], d[i - W] + 1); if (x > 0 && y > 0 && L[i - W - 1] === L[i]) d[i] = Math.min(d[i], d[i - W - 1] + 1.414); if (x < W - 1 && y > 0 && L[i - W + 1] === L[i]) d[i] = Math.min(d[i], d[i - W + 1] + 1.414); }
+  for (let y = H - 1; y >= 0; y--) for (let x = W - 1; x >= 0; x--) { const i = y * W + x; if (x < W - 1 && L[i + 1] === L[i]) d[i] = Math.min(d[i], d[i + 1] + 1); if (y < H - 1 && L[i + W] === L[i]) d[i] = Math.min(d[i], d[i + W] + 1); if (x < W - 1 && y < H - 1 && L[i + W + 1] === L[i]) d[i] = Math.min(d[i], d[i + W + 1] + 1.414); if (x > 0 && y < H - 1 && L[i + W - 1] === L[i]) d[i] = Math.min(d[i], d[i + W - 1] + 1.414); }
+  return d;
+}
+
 /** The finished picture for a style (other than 'shapes'), at twice the asset's size. */
 export function stylizeBase(base: AssetBase, style: Exclude<DrawStyle, 'shapes'>, mode: StyleMode): Raster {
+  const sculpt = style === 'clay' || style === 'film';
   const { w, h } = base, S = 2, W = w * S, H = h * S;
   const alpha = base.alpha;
   const out = makeRaster(W, H);
@@ -140,10 +159,33 @@ export function stylizeBase(base: AssetBase, style: Exclude<DrawStyle, 'shapes'>
     return out;
   }
 
-  const clean = cleanLabels(base.labels, w, h, Math.max(16, Math.round(w * h * (style === 'sketch' ? 0.0012 : 0.0007))), alpha);
+  const clean = cleanLabels(base.labels, w, h, Math.max(16, Math.round(w * h * (style === 'clay' ? 0.0025 : style === 'sketch' || style === 'film' ? 0.0012 : 0.0007))), alpha);
   const L2 = upLabels(clean, w, h, S);
   const A2 = alpha ? upLabels(alpha, w, h, S) : null;
-  const pal = base.palette.map((c) => illustrate(c, mode, style === 'sketch' ? 0.9 : style === 'painted' ? 1.15 : 1.3));
+  // a rounded volume for every shape (clay is puffier than film)
+  const cap = Math.round(Math.max(W, H) * (style === 'clay' ? 0.03 : 0.022));
+  const depth = sculpt ? shapeDepth(L2, W, H, cap) : null;
+  const profile = (i: number) => { const t = Math.min(1, depth![i] / cap); return Math.sqrt(t * (2 - t)); }; // a round profile
+  // the distance map is faceted (it makes ridges like a pyramid); blurred, it's a smooth rounded surface
+  let hm: Float32Array | null = null;
+  if (depth) {
+    hm = new Float32Array(W * H);
+    for (let i = 0; i < W * H; i++) hm[i] = profile(i);
+    const r = Math.max(2, Math.round(cap * 0.35)), tmp = new Float32Array(W * H);
+    const pre = new Float64Array(Math.max(W, H) + 1);
+    for (let pass = 0; pass < 2; pass++) {
+      for (let y = 0; y < H; y++) {
+        const row = y * W; pre[0] = 0; for (let x = 0; x < W; x++) pre[x + 1] = pre[x] + hm[row + x];
+        for (let x = 0; x < W; x++) { const a0 = Math.max(0, x - r), a1 = Math.min(W, x + r + 1); tmp[row + x] = (pre[a1] - pre[a0]) / (a1 - a0); }
+      }
+      for (let x = 0; x < W; x++) {
+        pre[0] = 0; for (let y = 0; y < H; y++) pre[y + 1] = pre[y] + tmp[y * W + x];
+        for (let y = 0; y < H; y++) { const a0 = Math.max(0, y - r), a1 = Math.min(H, y + r + 1); hm[y * W + x] = (pre[a1] - pre[a0]) / (a1 - a0); }
+      }
+    }
+  }
+  const heightAt = (i: number) => hm![i];
+  const pal = base.palette.map((c) => illustrate(c, mode, style === 'sketch' ? 0.9 : style === 'painted' ? 1.15 : style === 'clay' ? 1.35 : style === 'film' ? 1.2 : 1.3));
   // ink only between colours that really differ; the ink is a deep version of the darker side
   const inks = new Map<number, RGB | null>();
   const inkOf = (a: number, b: number): RGB | null => {
@@ -189,11 +231,44 @@ export function stylizeBase(base: AssetBase, style: Exclude<DrawStyle, 'shapes'>
       const u = X / W, v = Y / H, cl = inCloud(u, v * (H / W));
       c = skyAt(v);
       if (cl >= 0) c = style === 'cartoon' && cl > 0.9 ? shadeRgb([250, 250, 252], -22) : [253, 253, 255];
+      if (cl >= 0 && sculpt) c = [253, 252, 250].map((v, j) => v * (0.8 + 0.2 * Math.sqrt(1 - cl * cl)) + (j === 2 ? 6 : 0) * cl);
       if (style === 'sketch') c = c.map((x) => x * 0.45 + 251 * 0.55);
       put(i, c);
       continue;
     }
-    if (style === 'painted') {
+    if (sculpt) {
+      // light from the top left on each rounded shape: the slope of the height map is the surface normal
+      const x = i % W, y = (i / W) | 0;
+      const hx = (x < W - 1 && L2[i + 1] === k ? heightAt(i + 1) : heightAt(i)) - (x > 0 && L2[i - 1] === k ? heightAt(i - 1) : heightAt(i));
+      const hy = (y < H - 1 && L2[i + W] === k ? heightAt(i + W) : heightAt(i)) - (y > 0 && L2[i - W] === k ? heightAt(i - W) : heightAt(i));
+      const sc = cap / 3, nx = -hx * sc, ny = -hy * sc, nz = 1, nl = Math.hypot(nx, ny, nz);
+      const lx = -0.5, ly = -0.62, lz = 0.6, ll = Math.hypot(lx, ly, lz);
+      const lam = Math.max(0, (nx * lx + ny * ly + nz * lz) / (nl * ll));
+      const ht = profile(i);
+      if (style === 'clay') {
+        // matte clay: strong soft shading, a gentle sheen near the top, dark creases where pieces press together
+        const shade = 0.58 + 0.55 * lam;
+        c = c.map((v) => v * shade);
+        const spec = Math.pow(Math.max(0, (nx * 0.2 + ny * -0.3 + nz * 1) / nl), 24) * 0.18 * ht;
+        c = c.map((v) => v + (255 - v) * spec);
+        if (ht < 0.18) c = c.map((v) => v * (0.62 + ht * 2));
+        // fingerprints and tool marks in the clay
+        const t = hash((x / 3) | 0, (y / 3) | 0) - 0.5, t2 = hash((x / 9) | 0, (y / 7) | 0) - 0.5;
+        c = c.map((v) => v * (1 + t * 0.05 + t2 * 0.06));
+      } else {
+        // storybook film: painted light (two soft tones, not a gradient), a warm glow, a cool shadow and a rim of light
+        const lit = 0.5 + 0.5 * Math.tanh((lam - 0.62) * 6);
+        const shadow = c.map((v, j) => v * 0.72 + [70, 80, 140][j] * 0.08);
+        c = c.map((v, j) => shadow[j] + (Math.min(255, v * 1.06) - shadow[j]) * lit);
+        if (ht < 0.12 && lam > 0.7) c = c.map((v, j) => v + (gl[j] - v) * 0.45);
+        const fi = fieldAt(litField, X / W, Y / H);
+        if (fi) c = c.map((v, j) => v * 0.8 + fi[j] * 0.2);
+        const g = Math.max(0, 1 - Math.hypot(X / W - 0.2, Y / H - 0.05) / 0.95) * 0.25;
+        c = c.map((v, j) => v + (gl[j] - v) * g);
+        const t = hash((x / 4) | 0, (y / 2) | 0) - 0.5;
+        c = c.map((v) => v * (1 + t * 0.035));
+      }
+    } else if (style === 'painted') {
       // colour and light moving inside each shape, from the picture's own soft colour map
       const fi = fieldAt(litField, X / W, Y / H);
       if (fi) c = c.map((v, j) => v * 0.62 + fi[j] * 0.38);
@@ -208,13 +283,13 @@ export function stylizeBase(base: AssetBase, style: Exclude<DrawStyle, 'shapes'>
     } else {
       c = c.map((v) => v * (1.03 - 0.06 * (Y / H)));
     }
-    if (style !== 'painted') {
+    if (style !== 'painted' && style !== 'clay') {
       const r = X < W - 1 ? L2[i + 1] : k, d = Y < H - 1 ? L2[i + W] : k, l = X > 0 ? L2[i - 1] : k, u = Y > 0 ? L2[i - W] : k;
       const other = r !== k ? r : d !== k ? d : l !== k ? l : u !== k ? u : -1;
       if (other >= 0) {
         const ink = inkOf(k, other);
         // the sketch line breaks now and then, like a hand-drawn one
-        if (ink && (style !== 'sketch' || hash((X / 5) | 0, (Y / 5) | 0) > 0.1)) c = style === 'sketch' ? ink : c.map((v, j) => v * 0.15 + ink[j] * 0.85);
+        if (ink && (style !== 'sketch' || hash((X / 5) | 0, (Y / 5) | 0) > 0.1)) c = style === 'sketch' ? ink : c.map((v, j) => v * (style === 'film' ? 0.55 : 0.15) + ink[j] * (style === 'film' ? 0.45 : 0.85));
       }
     }
     put(i, c);
