@@ -327,5 +327,113 @@ export function stylizeBase(base: AssetBase, style: Exclude<DrawStyle, 'shapes'>
     }
     put(i, c);
   }
+  if (style === 'film' || style === 'cartoon' || style === 'clay') drawGreenery(out, base, clean, sky, style, mode, S);
   return out;
+}
+
+
+/**
+ * Greenery, drawn the way an animated film draws it instead of traced from the photo: trees and bushes
+ * become clusters of round, lit leaf puffs (scalloped against the sky), and lawns become one smooth
+ * painted green with a few grass strokes. Where the greenery is and its colours come from the photo's
+ * simplified colours; the shapes are ours.
+ */
+function drawGreenery(out: Raster, base: AssetBase, labels: Uint8Array, sky: Uint8Array, style: DrawStyle, mode: StyleMode, S: number) {
+  const { w, h } = base, W = w * S, H = h * S;
+  // which colours are greenery: green to yellow-green, not too pale
+  const green = base.palette.map((c) => { const [L, a, b] = rgbToLab(c[0], c[1], c[2]); return a < -3 && b > 6 && L > 12 && L < 88; });
+  const isG = new Uint8Array(w * h);
+  let nG = 0, sumL = 0;
+  for (let i = 0; i < w * h; i++) if (green[labels[i]] && (!base.alpha || base.alpha[i])) { isG[i] = 1; nG++; sumL += rgbToLab(...(base.palette[labels[i]] as [number, number, number]))[0]; }
+  if (nG < w * h * 0.04) return;
+  const meanL = sumL / nG;
+  const hz = (base.horizon ?? 0.62) * h;
+  // lawn: light greenery low in the picture and connected to the bottom; everything else is trees and bushes
+  const lawn = new Uint8Array(w * h);
+  const stack: number[] = [];
+  for (let x = 0; x < w; x++) { const i = (h - 1) * w + x; if (isG[i]) { lawn[i] = 1; stack.push(i); } }
+  while (stack.length) {
+    const p = stack.pop()!, x = p % w, y = (p / w) | 0;
+    for (const q of [x > 0 ? p - 1 : -1, x < w - 1 ? p + 1 : -1, y > 0 ? p - w : -1, y < h - 1 ? p + w : -1]) {
+      if (q < 0 || lawn[q] || !isG[q] || (q / w) < hz) continue;
+      const c = base.palette[labels[q]];
+      if (rgbToLab(c[0], c[1], c[2])[0] < meanL - 15) continue; // much darker = a bush, not lawn
+      lawn[q] = 1; stack.push(q);
+    }
+  }
+  const tree = new Uint8Array(w * h);
+  for (let i = 0; i < w * h; i++) if (isG[i] && !lawn[i]) tree[i] = 1;
+  const put = (i: number, c: number[]) => { out.data[i * 4] = c[0]; out.data[i * 4 + 1] = c[1]; out.data[i * 4 + 2] = c[2]; out.data[i * 4 + 3] = 255; };
+  const get = (i: number) => [out.data[i * 4], out.data[i * 4 + 1], out.data[i * 4 + 2]];
+  const avg = (mask: Uint8Array, x0: number, y0: number, x1: number, y1: number) => {
+    let r = 0, g = 0, b = 0, n = 0;
+    for (let y = Math.max(0, y0); y < Math.min(h, y1); y++) for (let x = Math.max(0, x0); x < Math.min(w, x1); x++) { const i = y * w + x; if (!mask[i]) continue; const c = base.palette[labels[i]]; r += c[0]; g += c[1]; b += c[2]; n++; }
+    return n ? [r / n, g / n, b / n] : null;
+  };
+
+  // 1. lawn: smooth painted green, lighter toward the back, with sparse grass strokes
+  const lc = avg(lawn, 0, 0, w, h);
+  if (lc) {
+    const base0 = illustrate(lc, mode, 1.25);
+    for (let Y = 0; Y < H; Y++) for (let X = 0; X < W; X++) {
+      if (!lawn[((Y / S) | 0) * w + ((X / S) | 0)]) continue;
+      const t = Math.min(1, Math.max(0, (Y / S - hz) / Math.max(1, h - hz)));
+      let c = shadeRgb(base0, 6 - t * 10) as number[];
+      // grass strokes: short slanted dark ticks on a loose grid
+      const gx = (X / (7 * S)) | 0, gy = (Y / (9 * S)) | 0, hh = hash(gx, gy);
+      if (hh > 0.72) {
+        const lx = X - gx * 7 * S - hh * 4 * S, ly = Y - gy * 9 * S;
+        if (ly >= 0 && ly < 5 * S && Math.abs(lx - (5 * S - ly) * 0.35) < 0.7 * S) c = shadeRgb(base0, -14 - t * 6);
+      }
+      put(Y * W + X, c);
+    }
+  }
+
+  // 2. trees and bushes: round leaf puffs, back to front (top to bottom), each lit from the top left
+  const g = Math.max(7, Math.round(Math.max(w, h) / 24));
+  const puffs: [number, number, number, number[]][] = [];
+  for (let gy = 0; gy * g < h; gy++) for (let gx = 0; gx * g < w; gx++) {
+    const jx = (hash(gx, gy * 3) - 0.5) * g * 0.6, jy = (hash(gx * 5, gy) - 0.5) * g * 0.6;
+    const cx = gx * g + g / 2 + jx, cy = gy * g + g / 2 + jy;
+    const r = g * (0.7 + hash(gx + 11, gy + 7) * 0.55);
+    let inside = 0, tot = 0;
+    for (let y = Math.round(cy - r); y <= cy + r; y += 2) for (let x = Math.round(cx - r); x <= cx + r; x += 2) {
+      if (x < 0 || y < 0 || x >= w || y >= h || (x - cx) ** 2 + (y - cy) ** 2 > r * r) continue;
+      tot++; if (tree[y * w + x]) inside++;
+    }
+    if (!tot || inside / tot < 0.55) continue;
+    const col = avg(tree, Math.round(cx - r), Math.round(cy - r), Math.round(cx + r), Math.round(cy + r));
+    if (col) puffs.push([cx, cy, r, illustrate(col, mode, 1.3)]);
+  }
+  // a darker leafy mass underneath, so gaps between puffs read as depth
+  for (let Y = 0; Y < H; Y++) for (let X = 0; X < W; X++) {
+    const j = ((Y / S) | 0) * w + ((X / S) | 0);
+    if (!tree[j]) continue;
+    const c = base.palette[labels[j]];
+    put(Y * W + X, shadeRgb(illustrate(c, mode, 1.2), -16));
+  }
+  const ink = style === 'cartoon' ? 0.9 : style === 'film' ? 0.45 : 0;
+  for (const [cx, cy, r, col] of puffs) {
+    const R = r * S, CX = cx * S, CY = cy * S;
+    const hi = shadeRgb(col as RGB, 12), lo = shadeRgb(col as RGB, -14), line = shadeRgb(col as RGB, -36);
+    for (let Y = Math.max(0, Math.floor(CY - R - 1)); Y < Math.min(H, CY + R + 1); Y++) for (let X = Math.max(0, Math.floor(CX - R - 1)); X < Math.min(W, CX + R + 1); X++) {
+      const d = Math.hypot(X - CX, Y - CY) / R;
+      if (d > 1) continue;
+      const j = ((Y / S) | 0) * w + ((X / S) | 0);
+      // stays on greenery, but may spill a little onto the sky for a scalloped treetop
+      if (!tree[j] && !(sky[labels[j]] && d < 0.92)) continue;
+      // light from the top left on a dome
+      const nx = (X - CX) / R, ny = (Y - CY) / R, nz = Math.sqrt(Math.max(0, 1 - nx * nx - ny * ny));
+      const lam = Math.max(0, -0.5 * nx - 0.6 * ny + 0.62 * nz);
+      let c: number[];
+      if (style === 'film') { const t = 0.5 + 0.5 * Math.tanh((lam - 0.55) * 7); c = lo.map((v, k) => v + (hi[k] - v) * t); }
+      else if (style === 'clay') { c = (col as number[]).map((v) => v * (0.62 + 0.5 * lam)); const tt = hash(X >> 2, Y >> 2) - 0.5; c = c.map((v) => v * (1 + tt * 0.05)); }
+      else { c = lam > 0.62 ? hi : lam < 0.3 ? lo : col; }
+      // an outline around each puff's lower edge, like drawn foliage
+      const edge = d > 1 - 1.6 / R * S && (ny > -0.2 || !tree[j]);
+      if (edge && ink) c = c.map((v, k) => v + (line[k] - v) * ink);
+      put(Y * W + X, c);
+    }
+  }
+  void get;
 }
