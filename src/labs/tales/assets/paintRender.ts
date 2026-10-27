@@ -50,6 +50,11 @@ function cleanLabels(labels: Uint8Array, w: number, h: number, minArea: number, 
       for (const q of nb(p)) if (q >= 0 && !seen[q] && out[q] === lab && (!alpha || alpha[q])) { seen[q] = 1; stack.push(q); }
     }
     if (pix.length >= minArea) continue;
+    // keep thin, long pieces (posts, railings, frames): small in area but clearly a structure
+    let x0 = w, x1 = 0, y0 = h, y1 = 0;
+    for (const p of pix) { const x = p % w, y = (p / w) | 0; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    const long = Math.max(x1 - x0, y1 - y0) + 1, short = Math.min(x1 - x0, y1 - y0) + 1;
+    if (long >= 14 && long / short >= 4 && pix.length >= long * 1.2) continue;
     const votes = new Map<number, number>();
     for (const p of pix) for (const q of nb(p)) if (q >= 0 && out[q] !== lab && (!alpha || alpha[q])) votes.set(out[q], (votes.get(out[q]) ?? 0) + 1);
     let best = -1, bc = 0;
@@ -110,11 +115,11 @@ function fieldAt(base: AssetBase, u: number, v: number): RGB | null {
  * How far each pixel is from the edge of its own shape (in pixels, capped): a height map that
  * turns every flat shape into a rounded volume, so it can be lit like a sculpted or painted form.
  */
-function shapeDepth(L: Uint8Array, W: number, H: number, cap: number): Float32Array {
+function shapeDepth(L: Uint8Array, W: number, H: number, cap: number, edge?: (i: number) => boolean): Float32Array {
   const d = new Float32Array(W * H).fill(cap);
   for (let i = 0; i < W * H; i++) {
     const x = i % W, y = (i / W) | 0, k = L[i];
-    if ((x > 0 && L[i - 1] !== k) || (x < W - 1 && L[i + 1] !== k) || (y > 0 && L[i - W] !== k) || (y < H - 1 && L[i + W] !== k)) d[i] = 0;
+    if (edge?.(i) || (x > 0 && L[i - 1] !== k) || (x < W - 1 && L[i + 1] !== k) || (y > 0 && L[i - W] !== k) || (y < H - 1 && L[i + W] !== k)) d[i] = 0;
   }
   // two-pass chamfer distance (within each shape)
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = y * W + x; if (x > 0 && L[i - 1] === L[i]) d[i] = Math.min(d[i], d[i - 1] + 1); if (y > 0 && L[i - W] === L[i]) d[i] = Math.min(d[i], d[i - W] + 1); if (x > 0 && y > 0 && L[i - W - 1] === L[i]) d[i] = Math.min(d[i], d[i - W - 1] + 1.414); if (x < W - 1 && y > 0 && L[i - W + 1] === L[i]) d[i] = Math.min(d[i], d[i - W + 1] + 1.414); }
@@ -183,7 +188,8 @@ export function stylizeBase(base: AssetBase, style: Exclude<DrawStyle, 'shapes'>
   };
   // a rounded volume for every shape (clay is puffier than film)
   const cap = Math.round(Math.max(W, H) * (style === 'clay' ? 0.03 : 0.022));
-  const depth = sculpt ? shapeDepth(L2, W, H, cap) : null;
+  // detail lines count as edges too: the house and the bush behind it become separate volumes even in one colour
+  const depth = sculpt ? shapeDepth(L2, W, H, cap, lineMap ? (i) => lineAt(i % W, (i / W) | 0) > 0.5 : undefined) : null;
   const profile = (i: number) => { const t = Math.min(1, depth![i] / cap); return Math.sqrt(t * (2 - t)); }; // a round profile
   // the distance map is faceted (it makes ridges like a pyramid); blurred, it's a smooth rounded surface
   let hm: Float32Array | null = null;

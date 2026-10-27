@@ -408,7 +408,26 @@ export function detailLines(src: Raster, mask?: Uint8Array): Uint8Array {
         const q = yy * w + xx; if (out[q] && !seen[q]) { seen[q] = 1; stack.push(q); }
       }
     }
-    if (comp.length < 10) for (const p of comp) out[p] = 0;
+    if (comp.length < 10) { for (const p of comp) out[p] = 0; continue; }
+    // straighten: a run that is nearly straight (posts, roof edges, window frames) is redrawn as a true straight line
+    let mx = 0, my = 0;
+    for (const p of comp) { mx += p % w; my += (p / w) | 0; }
+    mx /= comp.length; my /= comp.length;
+    let sxx = 0, syy = 0, sxy = 0;
+    for (const p of comp) { const dx = (p % w) - mx, dy = ((p / w) | 0) - my; sxx += dx * dx; syy += dy * dy; sxy += dx * dy; }
+    sxx /= comp.length; syy /= comp.length; sxy /= comp.length;
+    const tr = sxx + syy, det = sxx * syy - sxy * sxy, disc = Math.sqrt(Math.max(0, tr * tr / 4 - det));
+    const l1 = tr / 2 + disc, l2 = Math.max(0, tr / 2 - disc);
+    if (Math.sqrt(l2) < 1.1 && Math.sqrt(l1) * 3.4 >= 12) {
+      const ang = 0.5 * Math.atan2(2 * sxy, sxx - syy), ux = Math.cos(ang), uy = Math.sin(ang);
+      let lo = Infinity, hi = -Infinity;
+      for (const p of comp) { const t = ((p % w) - mx) * ux + (((p / w) | 0) - my) * uy; lo = Math.min(lo, t); hi = Math.max(hi, t); }
+      for (const p of comp) out[p] = 0;
+      // snap near-vertical and near-horizontal lines exactly (buildings are square to the picture)
+      let vx = ux, vy = uy;
+      if (Math.abs(vx) < 0.08) { vx = 0; vy = Math.sign(vy) || 1; } else if (Math.abs(vy) < 0.08) { vy = 0; vx = Math.sign(vx) || 1; }
+      for (let t = lo; t <= hi; t += 0.5) { const x = Math.round(mx + vx * t), y = Math.round(my + vy * t); if (x >= 0 && y >= 0 && x < w && y < h) out[y * w + x] = 1; }
+    }
   }
   return out;
 }
@@ -416,8 +435,19 @@ export function detailLines(src: Raster, mask?: Uint8Array): Uint8Array {
 export function buildBase(src: Raster, kind: AssetKind, opts: { mask?: Uint8Array; horizon?: number; colours?: number; seed?: number } = {}): AssetBase {
   const smooth = kuwahara(kuwahara(src, 3), 2);
   const k = opts.colours ?? (kind === 'place' ? 16 : 14);
-  const { palette, labels } = kmeans(smooth, k, { seed: opts.seed ?? 7, mask: opts.mask });
-  const clean = majority(labels, src.w, src.h, kind === 'place' ? 3 : 2, k);
+  const { palette } = kmeans(smooth, k, { seed: opts.seed ?? 7, mask: opts.mask });
+  // colours come from the well-smoothed picture, but each pixel is matched on a lightly smoothed one,
+  // so thin things (posts, railings, window frames) keep their own colour instead of melting away
+  const light = kuwahara(src, 2);
+  const pl = palette.map((c) => rgbToLab(c[0], c[1], c[2]));
+  const labels = new Uint8Array(src.w * src.h);
+  for (let i = 0; i < labels.length; i++) {
+    const q = rgbToLab(light.data[i * 4], light.data[i * 4 + 1], light.data[i * 4 + 2]);
+    let bi = 0, bd = Infinity;
+    for (let c = 0; c < pl.length; c++) { const d = (q[0] - pl[c][0]) ** 2 + (q[1] - pl[c][1]) ** 2 + (q[2] - pl[c][2]) ** 2; if (d < bd) { bd = d; bi = c; } }
+    labels[i] = bi;
+  }
+  const clean = majority(labels, src.w, src.h, 1, k);
   const base: AssetBase = { kind, w: src.w, h: src.h, palette, labels: clean, field: colourField(smooth, FIELD_W, opts.mask), lines: detailLines(kuwahara(src, 1), opts.mask) };
   if (kind === 'object') base.alpha = opts.mask ? new Uint8Array(opts.mask) : new Uint8Array(src.w * src.h).fill(1);
   else base.horizon = opts.horizon ?? guessHorizon(smooth);
