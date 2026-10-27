@@ -837,43 +837,75 @@ function talesNose(s: FaceSpec, l: Look): string {
 function talesMouth(id: string, s: FaceSpec, l: Look): string {
   const ex = exprOf(l), f = femme(l), grown = l.kind === 'adult' || l.kind === 'elder';
   const my = s.ey + (l.kind === 'baby' ? 26 : l.kind === 'kid' ? 30 : 35);
-  const lineC = mixHex(shade(l.skin, -0.55), '#7a2430', 0.35);
-  // lips: a natural rose for grown women, the skin's own warmth for everyone else
-  const lipC = f && grown ? mixHex(l.skin, '#c24a5c', 0.55) : mixHex(l.skin, '#cf6f78', l.kind === 'baby' ? 0.3 : 0.38);
-  const wd = l.kind === 'baby' ? 8 : l.kind === 'kid' ? 10 : f ? 12 : 12.5;
   const n = (v: number) => v.toFixed(1);
-  const line = (d: string, sw = 1.8) => `<path d="${d}" stroke="${lineC}" stroke-width="${sw}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
-  const chin = l.kind === 'baby' ? '' : `<path d="M${n(100 - 3.5)} ${n(my + 13.5)} Q100 ${n(my + 14.6)} ${n(100 + 3.5)} ${n(my + 13.5)}" stroke="${shade(l.skin, -0.2)}" stroke-width="1.2" fill="none" stroke-linecap="round" opacity=".35"/>`;
-  // the lower lip: a soft full shape with a little light on it
-  const lowerLip = (w: number, y: number, k = 1) => `<path d="M${n(100 - w * 0.62)} ${n(y)} Q100 ${n(y + 6.8 * k)} ${n(100 + w * 0.62)} ${n(y)} Q100 ${n(y + 1.6)} ${n(100 - w * 0.62)} ${n(y)} Z" fill="${lipC}" stroke="none" opacity="${f && grown ? 0.95 : 0.7}"/><ellipse cx="${n(100 + 1)}" cy="${n(y + 3.2 * k)}" rx="${n(w * 0.18)}" ry=".9" fill="#fff" opacity=".28"/>`;
-  // the upper lip with a soft cupid's bow, sitting on the line where the lips meet
-  const upperLip = (w: number, y: number, mid: number) => `<path d="M${n(100 - w)} ${n(y)} Q${n(100 - w * 0.5)} ${n(y - 2.6)} ${n(100 - 3)} ${n(mid - 3.2)} Q100 ${n(mid - 2.2)} ${n(100 + 3)} ${n(mid - 3.2)} Q${n(100 + w * 0.5)} ${n(y - 2.6)} ${n(100 + w)} ${n(y)} Q${n(100 + w * 0.5)} ${n(mid + 0.4)} 100 ${n(mid)} Q${n(100 - w * 0.5)} ${n(mid + 0.4)} ${n(100 - w)} ${n(y)} Z" fill="${lipC}" stroke="none" opacity="${f && grown ? 0.9 : 0.45}"/>`;
-  const corners = (w: number, y: number) => `<path d="M${n(100 - w - 1.6)} ${n(y - 1.6)} q.9 1.5 2.1 1.9 M${n(100 + w + 1.6)} ${n(y - 1.6)} q-.9 1.5 -2.1 1.9" stroke="${lineC}" stroke-width="1.2" fill="none" stroke-linecap="round" opacity=".55"/>`;
-  const smile = (w: number, curve: number) => {
-    // where the lips meet: curving up at the corners, a slight dip in the middle
-    const mid = my + curve;
-    return upperLip(w, my - 1, mid) + lowerLip(w, mid + 0.4) + line(`M${n(100 - w)} ${n(my - 1)} C${n(100 - w * 0.55)} ${n(mid - 0.2)} ${n(100 - w * 0.2)} ${n(mid + 0.4)} 100 ${n(mid)} C${n(100 + w * 0.2)} ${n(mid + 0.4)} ${n(100 + w * 0.55)} ${n(mid - 0.2)} ${n(100 + w)} ${n(my - 1)}`) + corners(w, my - 1) + chin;
+  // lips in the person's own colouring: a natural rose for grown women, a soft flush of the skin for everyone else
+  const lower = f && grown ? mixHex(l.skin, '#c95a68', 0.5) : mixHex(l.skin, '#c96f78', l.kind === 'baby' ? 0.26 : 0.24);
+  const upper = shade(lower, f && grown ? -0.14 : -0.1);
+  const seam = mixHex(shade(l.skin, -0.58), '#6e2230', 0.35);
+  const wd = l.kind === 'baby' ? 7.5 : l.kind === 'kid' ? 9.5 : f ? 11.5 : 12;
+  // lip thickness at the middle: the upper lip thinner than the lower, both fuller for grown women
+  const tu = l.kind === 'baby' ? 1.3 : l.kind === 'kid' ? 1.8 : f ? 3.2 : 2.1;
+  const tl = l.kind === 'baby' ? 2.4 : l.kind === 'kid' ? 2.9 : f ? 4.2 : 3;
+  const X = (dx: number) => n(100 + dx);
+  const chin = ''; // the soft shadow under the lower lip is enough
+  const corners = (w: number, y: number) => `<path d="M${X(-w - 1.3)} ${n(y - 1.4)} q.8 1.3 1.8 1.6 M${X(w + 1.3)} ${n(y - 1.4)} q-.8 1.3 -1.8 1.6" stroke="${seam}" stroke-width="1.1" fill="none" stroke-linecap="round" opacity=".5"/>`;
+  /**
+   * The lips around a mouth line that runs from the corners (±w, y0) down to y0 + c in the middle.
+   * The upper lip follows that line, a little thicker in the middle with a soft cupid's bow; the lower lip
+   * is the fuller one, with a small shine (the NomNoms touch) and a soft shadow underneath.
+   */
+  const lips = (w: number, y0: number, c: number, k = 1) => {
+    const line = `M${X(-w)} ${n(y0)} Q100 ${n(y0 + 2 * c)} ${X(w)} ${n(y0)}`;
+    const up = tu * k, lo = tl * k;
+    const upperLip = `<path d="M${X(-w)} ${n(y0)} Q${X(-w * 0.55)} ${n(y0 + c * 0.9 - up * 0.95)} ${X(-2.6)} ${n(y0 + c - up)} Q${X(-1.1)} ${n(y0 + c - up * 0.98)} 100 ${n(y0 + c - up * 0.66)} Q${X(1.1)} ${n(y0 + c - up * 0.98)} ${X(2.6)} ${n(y0 + c - up)} Q${X(w * 0.55)} ${n(y0 + c * 0.9 - up * 0.95)} ${X(w)} ${n(y0)} Q100 ${n(y0 + 2 * c)} ${X(-w)} ${n(y0)} Z" fill="${upper}" stroke="none"/>`;
+    // the lower lip sits under the middle three-quarters of the line
+    const ex0 = w * 0.78, ey0 = y0 + c * (1 - 0.78 * 0.78), cy = y0 + 1.56 * c + 2 * lo;
+    const lowerLip = `<path d="M${X(-ex0)} ${n(ey0)} Q100 ${n(cy)} ${X(ex0)} ${n(ey0)} Q100 ${n(y0 + 2 * c)} ${X(-ex0)} ${n(ey0)} Z" fill="${lower}" stroke="none"/>`;
+    const shine = `<ellipse cx="${X(1.6)}" cy="${n(y0 + c + lo * 0.42)}" rx="${n(w * 0.17)}" ry="${n(Math.max(0.7, lo * 0.18))}" fill="#fff" opacity="${f && grown ? 0.38 : 0.22}"/>`;
+    const under = `<path d="M${X(-ex0 * 0.6)} ${n(y0 + c + lo + 1.8)} Q100 ${n(y0 + c + lo + 3)} ${X(ex0 * 0.6)} ${n(y0 + c + lo + 1.8)}" stroke="${shade(l.skin, -0.16)}" stroke-width="1.6" fill="none" stroke-linecap="round" opacity=".26"/>`;
+    return { line, upperLip, lowerLip, shine, under };
+  };
+  const smile = (w: number, c: number) => {
+    const L = lips(w, my - 1, c);
+    return L.under + L.lowerLip + L.shine + L.upperLip + `<path d="${L.line}" stroke="${seam}" stroke-width="1.5" fill="none" stroke-linecap="round"/>` + corners(w, my - 1) + chin;
   };
   const open = (h: number, wf = 1, teeth = l.kind !== 'baby') => {
-    const W = wd * 1.05 * wf;
-    const d = `M${n(100 - W)} ${n(my - 1)} C${n(100 - W * 0.5)} ${n(my + 1.4)} ${n(100 - W * 0.15)} ${n(my + 1.8)} 100 ${n(my + 1.4)} C${n(100 + W * 0.15)} ${n(my + 1.8)} ${n(100 + W * 0.5)} ${n(my + 1.4)} ${n(100 + W)} ${n(my - 1)} Q${n(100 + W * 0.78)} ${n(my + h)} 100 ${n(my + h)} Q${n(100 - W * 0.78)} ${n(my + h)} ${n(100 - W)} ${n(my - 1)} Z`;
-    const teethD = `M${n(100 - W)} ${n(my - 1)} C${n(100 - W * 0.5)} ${n(my + 1.4)} ${n(100 - W * 0.15)} ${n(my + 1.8)} 100 ${n(my + 1.4)} C${n(100 + W * 0.15)} ${n(my + 1.8)} ${n(100 + W * 0.5)} ${n(my + 1.4)} ${n(100 + W)} ${n(my - 1)} L${n(100 + W)} ${n(my + h * 0.32)} Q100 ${n(my + h * 0.44)} ${n(100 - W)} ${n(my + h * 0.32)} Z`;
-    return `<clipPath id="tm${id}"><path d="${d}"/></clipPath><path d="${d}" fill="#5c1e26" stroke="${lineC}" stroke-width="1.4"/><g clip-path="url(#tm${id})">${teeth ? `<path d="${teethD}" fill="#fffaf4" stroke="none"/>` : ''}<ellipse cx="100" cy="${n(my + h + 0.5)}" rx="${n(W * 0.55)}" ry="${n(h * 0.42)}" fill="#d9616e" stroke="none"/></g>`
-      + upperLip(W, my - 1, my + 1.4) + `<path d="M${n(100 - W * 0.62)} ${n(my + h + 0.6)} Q100 ${n(my + h + 3.6)} ${n(100 + W * 0.62)} ${n(my + h + 0.6)}" stroke="${lipC}" stroke-width="2.4" fill="none" stroke-linecap="round" opacity="${f && grown ? 0.9 : 0.55}"/>` + corners(W, my - 1) + chin;
+    const W = wd * 1.06 * wf, c = 2.2, y0 = my - 1;
+    const L = lips(W, y0, c, 0.85);
+    // the opening: its top follows the smile line, its bottom a soft round curve
+    const d = `M${X(-W)} ${n(y0)} Q100 ${n(y0 + 2 * c)} ${X(W)} ${n(y0)} Q${X(W * 0.78)} ${n(y0 + h)} 100 ${n(y0 + h)} Q${X(-W * 0.78)} ${n(y0 + h)} ${X(-W)} ${n(y0)} Z`;
+    const teethD = `M${X(-W)} ${n(y0)} Q100 ${n(y0 + 2 * c)} ${X(W)} ${n(y0)} L${X(W)} ${n(y0 + h * 0.36)} Q100 ${n(y0 + 2 * c + h * 0.42)} ${X(-W)} ${n(y0 + h * 0.36)} Z`;
+    const lo = tl * 0.8, bot = y0 + h;
+    const lowerLip = `<path d="M${X(-W * 0.66)} ${n(bot - h * 0.32)} Q${X(-W * 0.36)} ${n(bot + 0.4)} 100 ${n(bot + 0.2)} Q${X(W * 0.36)} ${n(bot + 0.4)} ${X(W * 0.66)} ${n(bot - h * 0.32)} Q${X(W * 0.5)} ${n(bot + lo * 1.1)} 100 ${n(bot + lo)} Q${X(-W * 0.5)} ${n(bot + lo * 1.1)} ${X(-W * 0.66)} ${n(bot - h * 0.32)} Z" fill="${lower}" stroke="none"/>`;
+    const shine = `<ellipse cx="${X(1.6)}" cy="${n(bot + lo * 0.5)}" rx="${n(W * 0.15)}" ry=".8" fill="#fff" opacity="${f && grown ? 0.36 : 0.2}"/>`;
+    return `<clipPath id="tm${id}"><path d="${d}"/></clipPath><path d="${d}" fill="#5a1d26" stroke="${seam}" stroke-width="1.2"/>
+      <g clip-path="url(#tm${id})">${teeth ? `<path d="${teethD}" fill="#fffaf3" stroke="none"/>` : ''}<ellipse cx="100" cy="${n(bot + 1)}" rx="${n(W * 0.5)}" ry="${n(h * 0.36)}" fill="#d65f6c" stroke="none"/></g>
+      ${lowerLip}${shine}${L.upperLip}${corners(W, y0)}${chin}`;
   };
+  const line = (d: string, sw = 1.6) => `<path d="${d}" stroke="${seam}" stroke-width="${sw}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
   switch (ex) {
-    case 'laugh': case 'starry': return open(l.kind === 'baby' ? 11 : 13, 1.06);
-    case 'grin': return open(l.kind === 'baby' ? 9 : 10);
-    case 'silly': return open(8) + `<path d="M96 ${my + 4} Q96 ${my + 13} 102 ${my + 13} Q108 ${my + 13} 108 ${my + 4} Z" fill="#e2707c" stroke="${shade('#e2707c', -0.3)}" stroke-width="1.3"/>`;
-    case 'wow': return `<ellipse cx="100" cy="${my + 3}" rx="${n(wd * 0.36)}" ry="${n(wd * 0.46)}" fill="#5c1e26" stroke="${lipC}" stroke-width="2.2"/><ellipse cx="100" cy="${n(my + 3 + wd * 0.22)}" rx="${n(wd * 0.22)}" ry="${n(wd * 0.14)}" fill="#d9616e"/>` + chin;
-    case 'worried': return lowerLip(wd * 0.7, my + 2.4, 0.7) + line(`M${n(100 - wd * 0.7)} ${my + 2.5} Q${n(100 - wd * 0.35)} ${my} 100 ${my + 1.6} Q${n(100 + wd * 0.35)} ${my + 3.2} ${n(100 + wd * 0.7)} ${my + 1.2}`) + chin;
-    case 'sleepy': return `<ellipse cx="100" cy="${my + 2}" rx="${n(wd * 0.26)}" ry="${n(wd * 0.3)}" fill="#5c1e26" stroke="${lipC}" stroke-width="1.8"/>` + chin;
-    case 'shy': return smile(wd * 0.62, 2.6);
-    case 'dreamy': return smile(wd * 0.78, 3.4);
-    case 'brave': return upperLip(wd, my - 1, my + 3) + lowerLip(wd, my + 3.4) + line(`M${n(100 - wd)} ${my} Q${n(100 + 2)} ${my + 5} ${n(100 + wd)} ${my - 2.4}`) + corners(wd, my - 1) + chin;
-    case 'wink': return smile(wd * 1.02, 4.6);
-    case 'proud': return smile(wd * 1.08, 5.2);
-    default: return smile(wd, 4.4);
+    case 'laugh': case 'starry': return open(l.kind === 'baby' ? 10 : 12.5, 1.06);
+    case 'grin': return open(l.kind === 'baby' ? 8.5 : 10);
+    case 'silly': return open(8) + `<path d="M96 ${my + 4} Q96 ${my + 13} 102 ${my + 13} Q108 ${my + 13} 108 ${my + 4} Z" fill="#e2707c" stroke="${shade('#e2707c', -0.3)}" stroke-width="1.2"/>`;
+    case 'wow': {
+      // a small round "oh": the lips make a soft ring
+      const rx = wd * 0.36, ry = wd * 0.46;
+      return `<ellipse cx="100" cy="${n(my + 3)}" rx="${n(rx + tl * 0.45)}" ry="${n(ry + tl * 0.45)}" fill="${lower}"/><ellipse cx="100" cy="${n(my + 3)}" rx="${n(rx)}" ry="${n(ry)}" fill="#5a1d26" stroke="${seam}" stroke-width="1.1"/><ellipse cx="100" cy="${n(my + 3 + ry * 0.5)}" rx="${n(rx * 0.6)}" ry="${n(ry * 0.3)}" fill="#d65f6c"/>` + chin;
+    }
+    case 'worried': {
+      const L = lips(wd * 0.72, my + 2, -0.6, 0.85);
+      return L.under + L.lowerLip + L.upperLip + line(`M${X(-wd * 0.72)} ${my + 2} Q${X(-wd * 0.36)} ${my + 0.4} 100 ${my + 1.6} Q${X(wd * 0.36)} ${my + 2.8} ${X(wd * 0.72)} ${my + 1.4}`) + chin;
+    }
+    case 'sleepy': return `<ellipse cx="100" cy="${n(my + 2)}" rx="${n(wd * 0.3)}" ry="${n(wd * 0.34)}" fill="${lower}"/><ellipse cx="100" cy="${n(my + 2)}" rx="${n(wd * 0.2)}" ry="${n(wd * 0.24)}" fill="#5a1d26"/>` + chin;
+    case 'shy': return smile(wd * 0.68, 1.8);
+    case 'dreamy': return smile(wd * 0.82, 2.4);
+    case 'brave': {
+      const L = lips(wd, my - 1, 2.2);
+      return L.under + L.lowerLip + L.shine + L.upperLip + line(`M${X(-wd)} ${my} Q${X(2)} ${my + 4.6} ${X(wd)} ${my - 2.6}`) + corners(wd, my - 1) + chin;
+    }
+    case 'wink': return smile(wd * 1.02, 3.4);
+    case 'proud': return smile(wd * 1.08, 3.8);
+    default: return smile(wd, 3.2);
   }
 }
 
