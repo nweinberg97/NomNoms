@@ -104,6 +104,15 @@
 .bt-title { font-family: var(--serif); font-size: clamp(26px, 4vw, 38px); line-height: 1.1; color: #26221f; border: 0; border-bottom: 1.5px dashed #d8cdbd; background: transparent; padding: 2px 0 6px; width: 100%; outline: none; }
 .bt-title:focus { border-bottom-color: var(--accent); }
 .bt-by { font-size: 13.5px; color: #8f857b; }
+.bt-about { font-family: var(--serif, Lora, serif); font-size: 17px; line-height: 1.45; color: #4a423b; border: 0; border-bottom: 1.5px dashed transparent; background: transparent; resize: none; padding: 2px 0; width: 100%; outline: none; field-sizing: content; min-height: 2.9em; }
+.bt-dedication { font-family: var(--serif, Lora, serif); font-style: italic; font-size: 15px; color: #8f857b; border: 0; border-bottom: 1.5px dashed transparent; background: transparent; padding: 2px 0; width: 100%; outline: none; }
+.bt-heading { font-family: var(--serif, Lora, serif); font-weight: 600; font-size: clamp(18px, 2.2vw, 22px); color: #26221f; border: 0; border-bottom: 1.5px dashed transparent; background: transparent; padding: 0 0 2px; width: 100%; outline: none; }
+.bt-about:hover, .bt-dedication:hover, .bt-heading:hover { border-bottom-color: #e4dacb; }
+.bt-about:focus, .bt-dedication:focus, .bt-heading:focus, .bt-text-edit:focus { border-bottom-color: var(--accent); }
+.bt-text-tap { cursor: text; border-radius: 8px; margin: 0 -6px; padding: 2px 6px; }
+.bt-text-tap:hover { background: rgba(0,0,0,.035); }
+.bt-text-edit { border: 0; border-bottom: 1.5px dashed var(--accent); background: transparent; resize: none; width: 100%; outline: none; padding: 0; field-sizing: content; }
+.bt-setting { flex: 1 1 200px; }
 .bt-tagline { font-family: var(--serif, Lora, serif); font-style: italic; font-size: 16px; color: #6f655c; margin: 0; }
 .bt-pager { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
 .bt-dots { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }

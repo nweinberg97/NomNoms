@@ -132,7 +132,8 @@ export function BabyTalesDemo() {
   const [live, setLive] = useState<{ key: string; x: number; y: number } | null>(null);
   const drag = useRef<{ key: string; sx: number; sy: number; ax: number; ay: number; k: number; moved: boolean } | null>(null);
   const artRef = useRef<HTMLDivElement>(null);
-  useEffect(() => { setPicked(null); setLive(null); }, [view]);
+  const [writing, setWriting] = useState(false);
+  useEffect(() => { setPicked(null); setLive(null); setWriting(false); }, [view]);
   const [tab, setTab] = useState<WardrobeTab>('hat');
   const [editorTab, setEditorTab] = useState<EditorTab>('face');
   const [showAllTypes, setShowAllTypes] = useState(false);
@@ -494,6 +495,27 @@ export function BabyTalesDemo() {
     };
     if (m[e.key]) { e.preventDefault(); m[e.key](); }
   };
+  const placeName = (id: string) => extraPlaces.find((p) => p.id === id)?.name ?? PLACES.find((p) => p.id === id)?.name ?? '';
+  /** A new setting for this page; a heading that was just the old place's name follows along. */
+  const setSetting = (id: string) => {
+    if (!page) return;
+    setPage({ place: id, ...(!page.heading || page.heading === placeName(page.place) ? { heading: placeName(id) } : {}) });
+  };
+  /** Put someone else in a person's spot on this page, keeping where they stood and what they were doing. */
+  const swapPerson = (from: string, to: string) => {
+    if (!page || from === to) return;
+    const L = page.layout;
+    const chars = L?.chars?.[from] ? { ...L.chars, [to]: L.chars[from] } : L?.chars;
+    if (chars) delete chars[from];
+    setPage({ cast: page.cast.map((x) => (x === from ? to : x)), ...(L ? { layout: { ...L, chars } } : {}) });
+    setPicked(`char:${to}`);
+  };
+  const editPerson = (id: string) => {
+    const i = cast.findIndex((c) => c.member.id === id);
+    if (i < 0) return;
+    setSel(i);
+    setTimeout(() => studioRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
+  };
   const drawnPlace = (id?: string) => drawn.find((d) => d.id === id);
   const photoPlace = (id?: string) => {
     const a = photoPlaces.find((x) => x.meta.id === id);
@@ -564,6 +586,14 @@ export function BabyTalesDemo() {
     return characterSvg({ ...person.look, [mode]: 'none', expression: undefined }, { viewBox: `${x} ${y} ${w} ${h}` });
   };
 
+  const placeOptions = (
+    <>
+      {photoPlaces.length > 0 && <optgroup label="Your photos">{photoPlaces.map((a) => <option key={a.meta.id} value={a.meta.id}>{a.meta.name}</option>)}</optgroup>}
+      {drawn.length > 0 && <optgroup label="Your drawings">{drawn.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</optgroup>}
+      {world !== 'everyday' && <optgroup label={WORLDS[world].name}>{WORLDS[world].places.map((id) => { const p = PLACES.find((x) => x.id === id)!; return <option key={id} value={id}>{p.name}</option>; })}</optgroup>}
+      <optgroup label="Places">{PLACES.filter((p) => !p.world).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</optgroup>
+    </>
+  );
   const FEATURED: StoryType[] = ['fairytale', 'expedition', 'legend', 'lost', 'animals', 'bedtime'];
   const typesShown = showAllTypes ? STORY_TYPES : STORY_TYPES.filter((t) => FEATURED.includes(t.id) || t.id === type);
   const placeSummary = places.length ? `${places.length} chosen` : 'Let NomNoms choose';
@@ -612,13 +642,20 @@ export function BabyTalesDemo() {
                     <>
                       <small>The Adventures of {cast[0].member.name}</small>
                       <input className="bt-title" value={fill(story.title, members)} onChange={(e) => setStory((s) => ({ ...s, title: tokenize(e.target.value, members) }))} aria-label="Story title" data-testid="story-title" />
+                      <textarea className="bt-about" rows={2} value={fill(story.about ?? '', members)} placeholder="What this book is about" onChange={(e) => setStory((s) => ({ ...s, about: tokenize(e.target.value, members) }))} aria-label="What this book is about" data-testid="story-about" />
+                      <input className="bt-dedication" value={fill(story.dedication ?? '', members)} placeholder="For…" onChange={(e) => setStory((s) => ({ ...s, dedication: tokenize(e.target.value, members) }))} aria-label="Dedication" data-testid="story-dedication" />
                       {cast[0].look.personality && <p className="bt-tagline">{PERSONALITIES[cast[0].look.personality].line.replace(/\{H\}/g, cast[0].member.call || cast[0].member.name)}</p>}
                       <p className="bt-by">A NomNoms Baby Tale starring {members.filter((m) => m.inStory || m.role === 'baby').map((m) => m.call).join(', ')}</p>
                     </>
                   ) : (
                     <>
                       <small>Page {view} of {story.pages.length}</small>
-                      <p className="bt-text" data-testid="page-text">{fill(page!.text, members)}</p>
+                      <input className="bt-heading" value={fill(page!.heading ?? '', members)} placeholder="Add a heading" onChange={(e) => setPage({ heading: tokenize(e.target.value, members) })} aria-label="Page heading" data-testid="page-heading" />
+                      {writing ? (
+                        <textarea className="bt-text bt-text-edit" autoFocus rows={4} value={fill(page!.text, members)} onChange={(e) => setPage({ text: tokenize(e.target.value, members), edited: true })} onBlur={() => setWriting(false)} aria-label="Page words" data-testid="page-text-edit" />
+                      ) : (
+                        <p className="bt-text bt-text-tap" role="button" tabIndex={0} title="Tap to change the words" onClick={() => setWriting(true)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); setWriting(true); } }} data-testid="page-text">{fill(page!.text, members)}</p>
+                      )}
                     </>
                   )}
                 </div>
@@ -639,12 +676,31 @@ export function BabyTalesDemo() {
                 return (
                   <div className="lab-card bt-arrange" data-testid="arrange">
                     {!picked ? (
-                      <p className="lab-sub bt-arrange-hint">Tap someone or something in the picture to move it, resize it, or change what they're doing.{page.layout && <> <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPage({ layout: undefined })} data-testid="arrange-reset">Reset this picture</button></>}</p>
+                      <>
+                        <p className="lab-sub bt-arrange-hint">Tap someone or something in the picture to move it, resize it, swap them, or change what they're doing.</p>
+                        <div className="bt-arrange-row">
+                          <label className="field bt-setting"><span>Setting</span>
+                            <select value={page.place} onChange={(e) => setSetting(e.target.value)} data-testid="arrange-setting">{placeOptions}</select>
+                          </label>
+                          {page.layout && <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPage({ layout: undefined })} data-testid="arrange-reset">Reset this picture</button>}
+                        </div>
+                      </>
                     ) : (
                       <>
                         <div className="bt-arrange-top"><strong>Arranging {name}</strong>
                           <button type="button" className="btn btn-primary btn-sm" onClick={() => setPicked(null)} data-testid="arrange-done">Done</button>
                         </div>
+                        {who && (
+                          <div className="bt-arrange-row">
+                            <label className="field"><span>Swap for</span>
+                              <select value={who.member.id} onChange={(e) => swapPerson(who.member.id, e.target.value)} data-testid="arrange-swap">
+                                {cast.filter((c) => c.member.id !== pendingId && (c.member.id === who.member.id || !page.cast.includes(c.member.id))).map((c) => <option key={c.member.id} value={c.member.id}>{c.member.call || c.member.name}</option>)}
+                              </select>
+                            </label>
+                            <button type="button" className="btn btn-ghost btn-sm" onClick={() => editPerson(who.member.id)} data-testid="arrange-edit-look"><Icon name="pen" size={14} /> Edit {name}'s look</button>
+                            {!isStar && page.cast.length > 1 && <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setPage({ cast: page.cast.filter((x) => x !== who.member.id) }); setPicked(null); }} data-testid="arrange-remove">Take out of this picture</button>}
+                          </div>
+                        )}
                         {who && who.member.role !== 'pet' && (
                           <>
                             <p className="lab-sub">What {name} is doing</p>
@@ -683,12 +739,7 @@ export function BabyTalesDemo() {
                   </label>
                   <div className="bt-edit-row">
                     <label className="field"><span>Place</span>
-                      <select value={page.place} onChange={(e) => setPage({ place: e.target.value })} data-testid="page-place">
-                        {photoPlaces.length > 0 && <optgroup label="Your photos">{photoPlaces.map((a) => <option key={a.meta.id} value={a.meta.id}>{a.meta.name}</option>)}</optgroup>}
-                        {drawn.length > 0 && <optgroup label="Your drawings">{drawn.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</optgroup>}
-                        {world !== 'everyday' && <optgroup label={WORLDS[world].name}>{WORLDS[world].places.map((id) => { const p = PLACES.find((x) => x.id === id)!; return <option key={id} value={id}>{p.name}</option>; })}</optgroup>}
-                        <optgroup label="Places">{PLACES.filter((p) => !p.world).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</optgroup>
-                      </select>
+                      <select value={page.place} onChange={(e) => setSetting(e.target.value)} data-testid="page-place">{placeOptions}</select>
                     </label>
                     <div>
                       <p className="lab-sub">In the picture (up to 3)</p>

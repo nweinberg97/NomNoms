@@ -1,5 +1,5 @@
 import type { Action, Expression, Pose } from './character';
-import { ANIMALS, COLOURS, COUNTABLES, FOODS, LOST, LOVES, NUMBER_WORDS, PLACES, YUCKS, type Place, type Role, type StoryType } from './catalog';
+import { ANIMALS, COLOURS, COUNTABLES, FOODS, LOST, LOVES, NUMBER_WORDS, PLACES, STORY_TYPES, YUCKS, type Place, type Role, type StoryType } from './catalog';
 
 /**
  * The Baby Tales story generator.
@@ -26,6 +26,8 @@ export interface CastMember {
 export interface StoryPage {
   id: string;
   place: string;
+  /** The page's heading (defaults to the place's name). */
+  heading?: string;
   text: string;
   /** Who's in the picture (cast ids), the star first. */
   cast: string[];
@@ -80,6 +82,10 @@ export interface Story {
   type: StoryType;
   seed: number;
   title: string;
+  /** The title page: what the book is about, in the parent's words if they changed it. */
+  about?: string;
+  /** "For Maya, with love": a line on the title page. */
+  dedication?: string;
   pages: StoryPage[];
 }
 
@@ -156,6 +162,29 @@ const FEELINGS: { mood: Expression; word: string; why: string }[] = [
   { mood: 'worried', word: 'a little worried', why: 'a loud noise goes BOOM' }, { mood: 'sleepy', word: 'sleepy', why: '{H} yawns a great big yawn' },
 ];
 const SPLASH = ['Splash!', 'Whoosh!', 'Sploosh!', 'Wheee!', 'Splish splash!'];
+
+/** What each kind of story is about, for the title page ({H} is the star). */
+const ABOUT: Partial<Record<StoryType, string>> = {
+  fairytale: 'A fairytale about {H}, a wishing lantern and the kindness that lights the way',
+  expedition: 'An expedition over mountains and through jungles, following {H}’s map with no edges',
+  legend: 'A legend of {H}’s brave quest to wake the morning sun',
+  lost: 'Something precious is missing, and {H} searches high and low to find it',
+  water: 'A splashy, sunny day of pools and slides for {H}',
+  treasure: 'A treasure hunt where {H} follows the clues to X marks the spot',
+  dinos: 'A stomping, roaring day among the dinosaurs for {H}',
+  animals: '{H} says hello to all kinds of animals',
+  hero: '{H} puts on a cape and saves the day',
+  fair: 'A day at the fun fair, round and round with {H}',
+  space: '{H} counts down and blasts off into space',
+  feelings: '{H} meets big feelings: happy, silly, shy and proud',
+  adventure: 'A big day out, with so many places to see for {H}',
+  foods: '{H} is brave enough to try something new to eat',
+  hats: 'A parade of funny hats, and {H} tries on every one',
+  hide: 'A game of hide and seek with {H}',
+  counting: '{H} counts all the things along the way',
+  colours: '{H} finds every colour of the rainbow',
+  bedtime: 'A gentle goodnight story for {H}',
+};
 
 export function generateStory(type: StoryType, cast: CastMember[], opts: { seed: number; places?: string[]; extraPlaces?: Place[]; heroLine?: string }): Story {
   const r = rng(opts.seed);
@@ -416,15 +445,21 @@ export function generateStory(type: StoryType, cast: CastMember[], opts: { seed:
   // the star's personality, in their own words, on the first page
   if (opts.heroLine && pages[0]) pages[0].text += ` ${opts.heroLine.replace(/\{H\}/g, H)}`;
   // every page gets an action from its words, so the star isn't standing still on every page
-  for (const p of pages) if (!p.action) p.action = actionFromText(p.text, p.mood);
-  return { type, seed: opts.seed, title, pages };
+  for (const p of pages) {
+    if (!p.action) p.action = actionFromText(p.text, p.mood);
+    p.heading ??= place(p.place).name;
+  }
+  const friends = others.slice(0, 3).map(tok);
+  const withWho = friends.length ? `. Featuring ${friends.length > 1 ? `${friends.slice(0, -1).join(', ')} and ${friends[friends.length - 1]}` : friends[0]}` : '';
+  const about = `${(ABOUT[type] ?? 'A story about {H}').replace(/\{H\}/g, H)}${withWho}.`;
+  return { type, seed: opts.seed, title, about, dedication: `For ${H}, with love`, pages };
 }
 
 /** A fresh version of one page, keeping its place and the story's pattern. */
 export function regeneratePage(story: Story, index: number, cast: CastMember[], seed: number, extraPlaces?: Place[]): StoryPage {
   const again = generateStory(story.type, cast, { seed, places: [story.pages[index].place], extraPlaces });
   const candidate = again.pages[Math.min(index, again.pages.length - 1)];
-  return { ...candidate, id: story.pages[index].id, place: story.pages[index].place };
+  return { ...candidate, id: story.pages[index].id, place: story.pages[index].place, heading: story.pages[index].heading };
 }
 
 /** Replace {@id} tokens with names. */

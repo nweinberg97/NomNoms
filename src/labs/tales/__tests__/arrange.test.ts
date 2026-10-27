@@ -11,7 +11,7 @@ import { sceneSvg } from '../scene';
  * who someone is.
  */
 
-const kid: Look = { kind: 'kid', skin: '#e8b48f', hair: '#5a3a24', hairStyle: 'curly', eyes: '#5b3a1f', outfit: 'tee', top: '#4f7bd8', bottom: '#2f4f8c' } as Look;
+const kid: Look = { kind: 'kid', skin: '#efc19f', hair: '#7a5236', hairStyle: 'messy', eyes: '#4a7fb5', outfit: 'tee', hat: 'none', glasses: 'none', extra: 'none', personality: 'silly' };
 
 test('the words pick an action', () => {
   assert.equal(actionFromText('{H} runs to the gate'), 'run');
@@ -24,7 +24,7 @@ test('the words pick an action', () => {
 });
 
 test('every story page gets an action, and not all the same', () => {
-  const cast: CastMember[] = [{ id: 'b', name: 'Mia', call: 'Mia', role: 'baby', inStory: true } as CastMember, { id: 'm', name: 'Ana', call: 'Mom', role: 'mom', inStory: true } as CastMember];
+  const cast: CastMember[] = [{ id: 'b', name: 'Mia', call: 'Mia', role: 'baby', inStory: true }, { id: 'm', name: 'Ana', call: 'Mom', role: 'parent', inStory: true }];
   const seen = new Set<Action>();
   for (const t of STORY_TYPES) for (const seed of [1, 2, 3]) for (const p of generateStory(t.id, cast, { seed }).pages) { assert.ok(p.action && p.action in ACTIONS); seen.add(p.action!); }
   assert.ok(seen.size >= 3, `stories use several actions (${[...seen]})`);
@@ -57,4 +57,14 @@ test('arranging moves, sizes, flips and hides, and only when asked', () => {
   assert.ok(/scale\(-1 1\)/.test(moved), 'flipped');
   const hidden = sceneSvg({ ...base, focusPlace: { hidden: true } });
   assert.ok(!hidden.includes('bt-thing') || hidden.split('bt-thing').length < plain.split('bt-thing').length, 'the thing can be hidden');
+});
+
+test('the title page says what the book is about, and every page has a heading', () => {
+  const cast: CastMember[] = [{ id: 'b', name: 'Mia', call: 'Mia', role: 'baby', inStory: true }, { id: 'm', name: 'Ana', call: 'Mom', role: 'parent', inStory: true }];
+  for (const t of STORY_TYPES) {
+    const st = generateStory(t.id, cast, { seed: 4 });
+    assert.ok(st.about && st.about.includes('{@b}') && st.about.length > 20, `${t.id} has an about line`);
+    assert.ok(st.dedication?.includes('{@b}'));
+    for (const p of st.pages) assert.ok(p.heading && p.heading.length > 1, `${t.id} pages have headings`);
+  }
 });
