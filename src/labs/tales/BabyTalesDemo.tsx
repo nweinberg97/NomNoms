@@ -597,7 +597,7 @@ export function BabyTalesDemo() {
       const pl = placed(p, `char:${id}`) ?? {};
       // what they're doing: the parent's choice, else (for the star) what the words say
       const action = pl.action ?? (id === cast[0]?.member.id ? p.action : undefined);
-      return { id, look: { ...look, ...(action ? { action } : {}), ...(pl.hold ? { hold: pl.hold } : {}) }, place: pl };
+      return { id, look: { ...look, ...(action ? { action } : {}), ...(pl.hold ? { hold: pl.hold } : {}), ...(pl.mood ? { expression: pl.mood } : {}) }, place: pl };
     }).filter(Boolean) as { id: string; look: Look; place: Placement }[];
     return sceneSvg({ placeId: p.place, drawn: drawnPlace(p.place), photo: photoPlace(p.place), things: thingsFor(p), seed: story.seed + view, chars, focus: p.focus, focusPlace: placed(p, 'focus'), selected: arranging ? picked ?? undefined : undefined, editable: arranging, animated, label: fill(p.text, members), style: mode, world });
   };
@@ -730,13 +730,17 @@ export function BabyTalesDemo() {
                 const who = picked?.startsWith('char:') ? cast.find((c) => c.member.id === picked.slice(5)) : undefined;
                 const isStar = who && who.member.id === cast[0]?.member.id;
                 const doing: Action = (pl?.action ?? (isStar ? page.action : undefined) ?? 'stand');
+                const feels = pl?.mood ?? (who ? exprOf(lookFor(who.member.id, page) ?? who.look) : undefined);
                 const holdable = [...(page.focus && hasThing(page.focus.e) && !HOLDABLE.some(([e]) => e === page.focus!.e) ? [[page.focus.e, 'The thing on this page'] as [string, string]] : []), ...HOLDABLE];
                 const name = who ? who.member.name || 'them' : picked === 'focus' ? 'the thing on this page' : 'this';
                 return (
                   <div className="lab-card bt-arrange" data-testid="arrange">
                     {!picked ? (
                       <>
-                        <p className="lab-sub bt-arrange-hint">Tap someone or something in the picture to pick it. Drag to move it, drag the round corner handle to resize it, or use the buttons here to swap them or change what they're doing.</p>
+                        <p className="lab-sub bt-arrange-hint">Pick someone to change how they feel, what they're doing and what they're holding, or tap them in the picture to drag and resize them.</p>
+                        <div className="lab-chips" data-testid="arrange-people">
+                          {page.cast.map((id) => { const c = cast.find((x) => x.member.id === id); return c ? <button key={id} type="button" className="lab-chip" onClick={() => setPicked(`char:${id}`)} data-testid={`arrange-pick-${id}`}>{c.member.call || c.member.name}</button> : null; })}
+                        </div>
                         <div className="bt-arrange-row">
                           <label className="field bt-setting"><span>Setting</span>
                             <select value={page.place} onChange={(e) => setSetting(e.target.value)} data-testid="arrange-setting">{placeOptions}</select>
@@ -769,6 +773,8 @@ export function BabyTalesDemo() {
                         )}
                         {who && who.member.role !== 'pet' && (
                           <>
+                            <p className="lab-sub">How {name} feels</p>
+                            <div className="lab-chips bt-moods">{(Object.keys(EXPRESSIONS) as Expression[]).map((x) => <button key={x} type="button" className="lab-chip" aria-pressed={feels === x} onClick={() => setPlace(picked, { mood: x })} data-testid={`mood-${x}`}>{EXPRESSIONS[x]}</button>)}</div>
                             <p className="lab-sub">What {name} is doing</p>
                             <div className="lab-chips">{(Object.keys(ACTIONS) as Action[]).map((a) => <button key={a} type="button" className="lab-chip" aria-pressed={doing === a} onClick={() => setPlace(picked, { action: a })} data-testid={`act-${a}`}>{ACTIONS[a]}</button>)}</div>
                             <label className="field"><span>Holding</span>

@@ -53,7 +53,7 @@ export interface StoryPage {
 }
 
 /** One person's or thing's place in a page picture (scene units: 400 × 300; x, y = where they stand). */
-export interface Placement { x?: number; y?: number; scale?: number; flip?: boolean; action?: Action; hold?: string }
+export interface Placement { x?: number; y?: number; scale?: number; flip?: boolean; action?: Action; hold?: string; /** How this person feels on this page (their face), chosen by the parent. */ mood?: Expression }
 export interface PageLayout {
   /** By cast id. */
   chars?: Record<string, Placement>;
