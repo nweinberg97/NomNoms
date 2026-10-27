@@ -201,7 +201,7 @@ function defs(id: string, l: Look, skin: string, fur: string) {
   switch (MODE) {
     case 'gouache': // painted: gentle, low-contrast washes, no gloss
       body = `<radialGradient id="sk${id}" cx="42%" cy="34%" r="80%">${stops([[0, shade(skin, 0.12)], [0.7, skin], [1, shade(skin, -0.06)]])}</radialGradient>
-        <linearGradient id="hr${id}" x1="0" y1="0" x2=".2" y2="1">${stops([[0, shade(l.hair, 0.1)], [0.5, l.hair], [1, shade(l.hair, -0.08)]])}</linearGradient>
+        <linearGradient id="hr${id}" gradientUnits="userSpaceOnUse" x1="70" y1="12" x2="112" y2="212">${stops([[0, shade(l.hair, 0.1)], [0.5, l.hair], [1, shade(l.hair, -0.08)]])}</linearGradient>
         <radialGradient id="fu${id}" cx="42%" cy="34%" r="80%">${stops([[0, shade(fur, 0.12)], [0.6, fur], [1, shade(fur, -0.06)]])}</radialGradient>
         <radialGradient id="ir${id}" cx="50%" cy="40%" r="60%">${stops([[0, shade(eye, 0.2)], [1, shade(eye, -0.15)]])}</radialGradient>
         <linearGradient id="gl${id}" x1="0" y1="0" x2="0" y2="1">${stops([[0, '#fff', 0.08], [1, '#000', 0.04]])}</linearGradient>`;
@@ -215,14 +215,14 @@ function defs(id: string, l: Look, skin: string, fur: string) {
       break;
     case 'inked': // two-tone cel shading with a hard shadow edge
       body = `<radialGradient id="sk${id}" cx="36%" cy="30%" r="82%">${stops([[0, shade(skin, 0.06)], [0.76, skin], [0.76, shade(skin, -0.12)], [1, shade(skin, -0.12)]])}</radialGradient>
-        <linearGradient id="hr${id}" x1="0" y1="0" x2=".3" y2="1">${stops([[0, shade(l.hair, 0.32)], [0.16, shade(l.hair, 0.32)], [0.16, l.hair], [0.62, l.hair], [0.62, shade(l.hair, -0.25)], [1, shade(l.hair, -0.25)]])}</linearGradient>
+        <linearGradient id="hr${id}" gradientUnits="userSpaceOnUse" x1="70" y1="12" x2="112" y2="212">${stops([[0, shade(l.hair, 0.32)], [0.16, shade(l.hair, 0.32)], [0.16, l.hair], [0.62, l.hair], [0.62, shade(l.hair, -0.25)], [1, shade(l.hair, -0.25)]])}</linearGradient>
         <radialGradient id="fu${id}" cx="36%" cy="30%" r="82%">${stops([[0, fur], [0.76, fur], [0.76, shade(fur, -0.15)], [1, shade(fur, -0.15)]])}</radialGradient>
         <radialGradient id="ir${id}" cx="50%" cy="40%" r="60%">${stops([[0, shade(eye, 0.3)], [0.5, eye], [0.5, shade(eye, -0.3)], [1, shade(eye, -0.3)]])}</radialGradient>
         <linearGradient id="gl${id}" x1="0" y1="0" x2="0" y2="1">${stops([[0, '#fff', 0.22], [0.22, '#fff', 0.22], [0.22, '#fff', 0], [0.7, '#000', 0], [0.7, '#000', 0.1], [1, '#000', 0.1]])}</linearGradient>`;
       break;
     default: // Pocketlight 3D: soft volume and gloss
       body = `<radialGradient id="sk${id}" cx="40%" cy="30%" r="78%">${stops([[0, shade(skin, 0.3)], [0.6, skin], [1, shade(skin, -0.14)]])}</radialGradient>
-        <linearGradient id="hr${id}" x1="0" y1="0" x2=".3" y2="1">${stops([[0, shade(l.hair, 0.25)], [0.55, l.hair], [1, shade(l.hair, -0.22)]])}</linearGradient>
+        <linearGradient id="hr${id}" gradientUnits="userSpaceOnUse" x1="70" y1="12" x2="112" y2="212">${stops([[0, shade(l.hair, 0.25)], [0.55, l.hair], [1, shade(l.hair, -0.22)]])}</linearGradient>
         <radialGradient id="fu${id}" cx="40%" cy="30%" r="80%">${stops([[0, shade(fur, 0.3)], [0.6, fur], [1, shade(fur, -0.18)]])}</radialGradient>
         <radialGradient id="ir${id}" cx="50%" cy="40%" r="60%">${stops([[0, shade(eye, 0.45)], [0.6, eye], [1, shade(eye, -0.45)]])}</radialGradient>
         <linearGradient id="gl${id}" x1="0" y1="0" x2="0" y2="1">${stops([[0, '#fff', 0.28], [0.55, '#fff', 0], [1, '#000', 0.08]])}</linearGradient>`;
@@ -526,7 +526,7 @@ function coreDefs(id: string, l: Look, skin: string, fur: string): string {
   const eye = l.eyes ?? EYE_COLOURS[0];
   const st = (pairs: [number, string, number?][]) => pairs.map(([o, c, a]) => `<stop offset="${o}" stop-color="${c}"${a === undefined ? '' : ` stop-opacity="${a}"`}/>`).join('');
   return `<defs><radialGradient id="sk${id}" cx="40%" cy="32%" r="80%">${st([[0, skin], [1, skin]])}</radialGradient>
-    <linearGradient id="hr${id}" x1="0" y1="0" x2=".25" y2="1">${st([[0, shade(l.hair, 0.16)], [0.55, l.hair], [1, shade(l.hair, -0.14)]])}</linearGradient>
+    <linearGradient id="hr${id}" gradientUnits="userSpaceOnUse" x1="70" y1="12" x2="112" y2="212">${st([[0, shade(l.hair, 0.16)], [0.55, l.hair], [1, shade(l.hair, -0.14)]])}</linearGradient>
     <radialGradient id="fu${id}" cx="40%" cy="32%" r="80%">${st([[0, shade(fur, 0.1)], [1, fur]])}</radialGradient>
     <radialGradient id="ir${id}" cx="50%" cy="66%" r="62%">${st([[0, shade(eye, 0.5)], [0.65, eye], [1, shade(eye, -0.15)]])}</radialGradient>
     <linearGradient id="gl${id}" x1="0" y1="0" x2=".35" y2="1">${st([[0, '#fff', 0.12], [0.22, '#fff', 0.12], [0.22, '#fff', 0], [0.68, '#000', 0], [0.68, '#000', 0.08], [1, '#000', 0.08]])}</linearGradient>
@@ -683,13 +683,13 @@ function coreFace(id: string, l: Look, w: WorldId): string {
   const scalp = scalpOn ? vol(`<clipPath id="sc${id}"><path d="M-20 -60 H220 V${T} H${(100 + cr + 4).toFixed(1)} Q100 ${(2 * (S.top + 22) - T).toFixed(1)} ${(100 - cr - 4).toFixed(1)} ${T} H-20 Z"/></clipPath><path d="${bigHead}" fill="url(#hr${id})" clip-path="url(#sc${id})"/>`) : '';
   // …and over the fringe, a plain band of hair just inside the head's edge hides the fringe's own outline there,
   // so the hair reads as one piece instead of a headband
-  const seam = scalpOn ? vol(`<clipPath id="rg${id}"><path clip-rule="evenodd" d="${bigHead} ${coreHead({ ...S, top: S.top + 7.5, cran: S.cran - 7.5 }, l)}"/></clipPath><g clip-path="url(#sc${id})"><path d="${bigHead}" fill="url(#hr${id})" stroke="none" clip-path="url(#rg${id})"/></g>`) : '';
+  const seam = scalpOn ? vol(`<clipPath id="rg${id}"><path clip-rule="evenodd" d="${bigHead} ${coreHead({ ...S, top: S.top + 12, cran: S.cran - 12 }, l)}"/></clipPath><g clip-path="url(#sc${id})"><path d="${bigHead}" fill="url(#hr${id})" stroke="none" clip-path="url(#rg${id})"/></g>`) : '';
   const gap = SHAPE_RANGE.eyeGap * shapeOf(l, 'eyeGap');
   const nose = 1 + SHAPE_RANGE.nose * shapeOf(l, 'nose'), mw = 1 + SHAPE_RANGE.mouth * shapeOf(l, 'mouth');
   const around = (x: number, y: number, sx: number, sy: number, inner: string) => (sx === 1 && sy === 1 ? inner : `<g transform="translate(${x} ${y}) scale(${+sx.toFixed(3)} ${+sy.toFixed(3)}) translate(${-x} ${-y})">${inner}</g>`);
   const neckW = l.kind === 'baby' ? 13 : w === 'fairytale' ? 8 : w === 'mythic' ? 15 : w === 'adventure' ? 14 : 11;
   const earX = S.cran - 2;
-  const ears = [-1, 1].map((sd) => `<ellipse cx="${100 + sd * earX}" cy="${S.ey}" rx="${l.kind === 'baby' ? 7.5 : 7}" ry="${l.kind === 'baby' ? 9 : 8.5}" fill="${skin}"/><path d="M${100 + sd * (earX + 2)} ${S.ey - 5} q${sd * 4} 5 0 10" stroke="${shade(l.skin, -0.25)}" stroke-width="1.8" fill="none" stroke-linecap="round" opacity=".6"/>`).join('');
+  const ears = COVERS_EARS.includes(l.hairStyle) ? '' : [-1, 1].map((sd) => `<ellipse cx="${100 + sd * earX}" cy="${S.ey}" rx="${l.kind === 'baby' ? 7.5 : 7}" ry="${l.kind === 'baby' ? 9 : 8.5}" fill="${skin}"/><path d="M${100 + sd * (earX + 2)} ${S.ey - 5} q${sd * 4} 5 0 10" stroke="${shade(l.skin, -0.25)}" stroke-width="1.8" fill="none" stroke-linecap="round" opacity=".6"/>`).join('');
   const clip = `ch${id}`;
   const blushX = S.ex + gap + 13, blushY = S.ey + 15;
   const fr = l.freckles ? [[-blushX + 2, blushY - 1], [-blushX + 8, blushY + 3], [-blushX - 4, blushY + 4], [blushX - 2, blushY - 1], [blushX - 8, blushY + 3], [blushX + 4, blushY + 4]].map(([x, y]) => `<circle cx="${100 + x}" cy="${y}" r="1.5" fill="${shade(l.skin, -0.32)}" opacity=".8"/>`).join('') : '';
@@ -706,7 +706,7 @@ function coreFace(id: string, l: Look, w: WorldId): string {
     ${around(100, 112, nose, 1 + (nose - 1) * 0.35, talesNose(featS, l))}
     ${facialHair(id, l)}
     ${around(100, 128, mw, 1, talesMouth(id, featS, l))}
-    ${scalp}${front}${seam}
+    ${hairShadow(id, l, clip, front)}${back ? noInk(scalp) : scalp}${front}${scalpOn ? noInk(front) : ''}${seam}
     ${worldHair(l)}
     ${flair(l)}`;
 }
@@ -720,6 +720,14 @@ function coreFace(id: string, l: Look, w: WorldId): string {
  * blush; a warm brown line instead of black.
  */
 const femme = (l: Look) => !!l.lashes;
+/** The same shapes with no outline (the storybook line skips anything that already says stroke). */
+const noInk = (svg: string) => svg.replace(/<(path|ellipse|circle|rect|polygon)\b(?![^>]*\bstroke=)/g, '<$1 stroke="none"');
+/** Hairstyles that fall over the ears (the ears are tucked under the hair, not stuck on top of it). */
+const COVERS_EARS: HairStyle[] = ['bob', 'long', 'wavy', 'curtain', 'halfup', 'bangs', 'longcurly', 'locs', 'afro'];
+/** The soft shadow the hair casts on the forehead and temples: what makes it sit on the head, not on top of it like a wig. */
+const hairShadow = (id: string, l: Look, clip: string, front: string) => front && !l.face
+  ? `<filter id="hsh${id}" x="-10%" y="-10%" width="120%" height="130%"><feFlood flood-color="${shade(l.skin, -0.5)}"/><feComposite in2="SourceAlpha" operator="in"/><feGaussianBlur stdDeviation="1.6"/></filter><g clip-path="url(#${clip})" opacity=".3"><g transform="translate(1.2 3.6)" filter="url(#hsh${id})">${front}</g></g>`
+  : '';
 function talesSpec(l: Look): FaceSpec {
   const k = l.kind, f = femme(l);
   switch (k) {
@@ -883,20 +891,30 @@ function talesMouth(id: string, s: FaceSpec, l: Look): string {
       ${lowerLip}${shine}${L.upperLip}${corners(W, y0)}${chin}`;
   };
   const line = (d: string, sw = 1.6) => `<path d="${d}" stroke="${seam}" stroke-width="${sw}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
+  /**
+   * "Oh": a small open mouth, not a ring. The opening is a soft oval a little narrower at the top, the upper lip
+   * a thin arch over it with a hint of a cupid's bow, the fuller lower lip a crescent under it, and the corners pinched.
+   */
+  const oh = (rx: number, ry: number, k = 1) => {
+    const cy = my + 3, top = cy - ry, bot = cy + ry, up = tu * (f && grown ? 0.8 : 0.55) * k, lo = tl * (f && grown ? 0.85 : 0.7) * k;
+    const open = `M100 ${n(top)} C${X(rx * 0.75)} ${n(top)} ${X(rx)} ${n(cy - ry * 0.35)} ${X(rx)} ${n(cy + ry * 0.1)} C${X(rx)} ${n(cy + ry * 0.7)} ${X(rx * 0.6)} ${n(bot)} 100 ${n(bot)} C${X(-rx * 0.6)} ${n(bot)} ${X(-rx)} ${n(cy + ry * 0.7)} ${X(-rx)} ${n(cy + ry * 0.1)} C${X(-rx)} ${n(cy - ry * 0.35)} ${X(-rx * 0.75)} ${n(top)} 100 ${n(top)} Z`;
+    const cx0 = rx + 1.6, cyc = cy + ry * 0.1;
+    const upperLip = `<path d="M${X(-cx0)} ${n(cyc)} C${X(-cx0)} ${n(top - up * 0.6)} ${X(-3)} ${n(top - up * 1.05)} 100 ${n(top - up * 0.7)} C${X(3)} ${n(top - up * 1.05)} ${X(cx0)} ${n(top - up * 0.6)} ${X(cx0)} ${n(cyc)} C${X(rx)} ${n(cy - ry * 0.35)} ${X(rx * 0.75)} ${n(top)} 100 ${n(top)} C${X(-rx * 0.75)} ${n(top)} ${X(-rx)} ${n(cy - ry * 0.35)} ${X(-cx0)} ${n(cyc)} Z" fill="${upper}" stroke="none"/>`;
+    const lowerLip = `<path d="M${X(-cx0)} ${n(cyc)} C${X(-rx)} ${n(cy + ry * 0.7)} ${X(-rx * 0.6)} ${n(bot)} 100 ${n(bot)} C${X(rx * 0.6)} ${n(bot)} ${X(rx)} ${n(cy + ry * 0.7)} ${X(cx0)} ${n(cyc)} C${X(cx0 + 0.4)} ${n(bot + lo * 0.6)} ${X(rx * 0.5)} ${n(bot + lo)} 100 ${n(bot + lo)} C${X(-rx * 0.5)} ${n(bot + lo)} ${X(-cx0 - 0.4)} ${n(bot + lo * 0.6)} ${X(-cx0)} ${n(cyc)} Z" fill="${lower}" stroke="none"/>`;
+    const shine = `<ellipse cx="${X(1.2)}" cy="${n(bot + lo * 0.55)}" rx="${n(rx * 0.32)}" ry=".7" fill="#fff" opacity="${f && grown ? 0.35 : 0.2}"/>`;
+    const under = `<path d="M${X(-rx * 0.5)} ${n(bot + lo + 2)} Q100 ${n(bot + lo + 3)} ${X(rx * 0.5)} ${n(bot + lo + 2)}" stroke="${shade(l.skin, -0.16)}" stroke-width="1.4" fill="none" stroke-linecap="round" opacity=".25"/>`;
+    return `${under}<clipPath id="to${id}"><path d="${open}"/></clipPath><path d="${open}" fill="#4f1a22" stroke="${seam}" stroke-width=".9"/><g clip-path="url(#to${id})"><ellipse cx="100" cy="${n(bot + 0.6)}" rx="${n(rx * 0.7)}" ry="${n(ry * 0.45)}" fill="#c9586a" stroke="none"/></g>${lowerLip}${shine}${upperLip}`;
+  };
   switch (ex) {
     case 'laugh': case 'starry': return open(l.kind === 'baby' ? 10 : 12.5, 1.06);
     case 'grin': return open(l.kind === 'baby' ? 8.5 : 10);
     case 'silly': return open(8) + `<path d="M96 ${my + 4} Q96 ${my + 13} 102 ${my + 13} Q108 ${my + 13} 108 ${my + 4} Z" fill="#e2707c" stroke="${shade('#e2707c', -0.3)}" stroke-width="1.2"/>`;
-    case 'wow': {
-      // a small round "oh": the lips make a soft ring
-      const rx = wd * 0.36, ry = wd * 0.46;
-      return `<ellipse cx="100" cy="${n(my + 3)}" rx="${n(rx + tl * 0.45)}" ry="${n(ry + tl * 0.45)}" fill="${lower}"/><ellipse cx="100" cy="${n(my + 3)}" rx="${n(rx)}" ry="${n(ry)}" fill="#5a1d26" stroke="${seam}" stroke-width="1.1"/><ellipse cx="100" cy="${n(my + 3 + ry * 0.5)}" rx="${n(rx * 0.6)}" ry="${n(ry * 0.3)}" fill="#d65f6c"/>` + chin;
-    }
+    case 'wow': return oh(wd * 0.34, wd * 0.44);
     case 'worried': {
       const L = lips(wd * 0.72, my + 2, -0.6, 0.85);
       return L.under + L.lowerLip + L.upperLip + line(`M${X(-wd * 0.72)} ${my + 2} Q${X(-wd * 0.36)} ${my + 0.4} 100 ${my + 1.6} Q${X(wd * 0.36)} ${my + 2.8} ${X(wd * 0.72)} ${my + 1.4}`) + chin;
     }
-    case 'sleepy': return `<ellipse cx="100" cy="${n(my + 2)}" rx="${n(wd * 0.3)}" ry="${n(wd * 0.34)}" fill="${lower}"/><ellipse cx="100" cy="${n(my + 2)}" rx="${n(wd * 0.2)}" ry="${n(wd * 0.24)}" fill="#5a1d26"/>` + chin;
+    case 'sleepy': return oh(wd * 0.2, wd * 0.24, 0.7);
     case 'shy': return smile(wd * 0.68, 1.8);
     case 'dreamy': return smile(wd * 0.82, 2.4);
     case 'brave': {
@@ -910,15 +928,18 @@ function talesMouth(id: string, s: FaceSpec, l: Look): string {
 }
 
 function talesFace(id: string, l: Look): string {
-  const [rawBack, front] = hair(id, l);
-  const back = !OPEN_HEADWEAR.includes(l.hat) && ['puff', 'topknot', 'bun'].includes(l.hairStyle) ? '' : rawBack;
+  const [rawBack, rawFront] = hair(id, l);
   const S = talesSpec(l), skin = `url(#sk${id})`, head = coreHead(S, l);
+  // the hairstyles are drawn for a rounder head: fitted to this one so they hug it instead of floating round it
+  const k = Math.min(1, (S.cran + 6) / 62);
+  const fit = (x: string) => (x && k < 0.995 ? `<g transform="translate(100 ${S.ey}) scale(${k.toFixed(3)}) translate(-100 -${S.ey})">${x}</g>` : x);
+  const back = fit(!OPEN_HEADWEAR.includes(l.hat) && ['puff', 'topknot', 'bun'].includes(l.hairStyle) ? '' : rawBack), front = fit(rawFront);
   const gap = SHAPE_RANGE.eyeGap * shapeOf(l, 'eyeGap');
   const nose = 1 + SHAPE_RANGE.nose * shapeOf(l, 'nose'), mw = 1 + SHAPE_RANGE.mouth * shapeOf(l, 'mouth');
   const around = (x: number, y: number, sx: number, sy: number, inner: string) => (sx === 1 && sy === 1 ? inner : `<g transform="translate(${x} ${y}) scale(${+sx.toFixed(3)} ${+sy.toFixed(3)}) translate(${-x} ${-y})">${inner}</g>`);
   const neckW = l.kind === 'baby' ? 13 : l.kind === 'kid' ? 11 : femme(l) ? 9 : 12.5;
   const earX = S.cran - 1.5;
-  const ears = [-1, 1].map((sd) => `<ellipse cx="${100 + sd * earX}" cy="${S.ey + 2}" rx="${l.kind === 'baby' ? 7.5 : 6.5}" ry="${l.kind === 'baby' ? 9 : 9.5}" fill="${skin}"/><path d="M${100 + sd * (earX + 1.5)} ${S.ey - 3} q${sd * 3.6} 5 0 10" stroke="${shade(l.skin, -0.25)}" stroke-width="1.6" fill="none" stroke-linecap="round" opacity=".6"/>`).join('');
+  const ears = COVERS_EARS.includes(l.hairStyle) ? '' : [-1, 1].map((sd) => `<ellipse cx="${100 + sd * earX}" cy="${S.ey + 2}" rx="${l.kind === 'baby' ? 7.5 : 6.5}" ry="${l.kind === 'baby' ? 9 : 9.5}" fill="${skin}"/><path d="M${100 + sd * (earX + 1.5)} ${S.ey - 3} q${sd * 3.6} 5 0 10" stroke="${shade(l.skin, -0.25)}" stroke-width="1.6" fill="none" stroke-linecap="round" opacity=".6"/>`).join('');
   const clip = `th${id}`;
   const blushX = S.ex + gap + (l.kind === 'baby' ? 11 : 10), blushY = S.ey + (l.kind === 'baby' ? 16 : 17);
   const fr = l.freckles ? [[-blushX + 2, blushY - 2], [-blushX + 8, blushY + 2], [-blushX - 4, blushY + 3], [blushX - 2, blushY - 2], [blushX - 8, blushY + 2], [blushX + 4, blushY + 3]].map(([x, y]) => `<circle cx="${100 + x}" cy="${y}" r="1.4" fill="${shade(l.skin, -0.32)}" opacity=".8"/>`).join('') : '';
@@ -927,7 +948,7 @@ function talesFace(id: string, l: Look): string {
   const T = S.ey - 14, cr = S.cran * (1 + SHAPE_RANGE.faceWidth * shapeOf(l, 'faceWidth'));
   const bigHead = coreHead({ ...S, top: S.top - 2.5, cran: S.cran + 2.5 }, l);
   const scalp = scalpOn ? `<clipPath id="tsc${id}"><path d="M-20 -60 H220 V${T} H${(100 + cr + 4).toFixed(1)} Q100 ${(2 * (S.top + 22) - T).toFixed(1)} ${(100 - cr - 4).toFixed(1)} ${T} H-20 Z"/></clipPath><path d="${bigHead}" fill="url(#hr${id})" clip-path="url(#tsc${id})"/>` : '';
-  const seam = scalpOn ? `<clipPath id="trg${id}"><path clip-rule="evenodd" d="${bigHead} ${coreHead({ ...S, top: S.top + 7.5, cran: S.cran - 7.5 }, l)}"/></clipPath><g clip-path="url(#tsc${id})"><path d="${bigHead}" fill="url(#hr${id})" stroke="none" clip-path="url(#trg${id})"/></g>` : '';
+  const seam = scalpOn ? `<clipPath id="trg${id}"><path clip-rule="evenodd" d="${bigHead} ${coreHead({ ...S, top: S.top + 12, cran: S.cran - 12 }, l)}"/></clipPath><g clip-path="url(#tsc${id})"><path d="${bigHead}" fill="url(#hr${id})" stroke="none" clip-path="url(#trg${id})"/></g>` : '';
   // cel shading: one shadow tone down the far side of the face and under the hairline
   const shadowTone = mixHex(shade(l.skin, -0.13), '#b4524a', 0.12);
   return `${back}
@@ -943,7 +964,7 @@ function talesFace(id: string, l: Look): string {
     ${around(100, S.ey + 20, nose, 1 + (nose - 1) * 0.35, talesNose(S, l))}
     ${facialHair(id, l)}
     ${around(100, S.ey + 34, mw, 1, talesMouth(id, S, l))}
-    ${scalp}${front}${seam}
+    ${hairShadow(id, l, clip, front)}${back ? noInk(scalp) : scalp}${front}${scalpOn ? noInk(front) : ''}${seam}
     ${worldHair(l)}
     ${flair(l)}`;
 }
