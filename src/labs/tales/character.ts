@@ -668,6 +668,15 @@ function coreFace(id: string, l: Look, w: WorldId): string {
   const vol = (s: string) => (w === 'adventure' && s ? `<g transform="translate(100 78) scale(1.06) translate(-100 -78)">${s}</g>` : s);
   const back = vol(back0), front = vol(rawFront);
   const S = faceSpec(l, w), skin = `url(#sk${id})`, head = coreHead(S, l);
+  // the scalp: hair that fills the whole top of the head down to the hairline, so no style leaves a bald
+  // crown or a band of skin between the fringe and the hair behind (the fringe's own shape sits on top)
+  const scalpOn = !['bald', 'tuft', 'buzz', 'sides'].includes(l.hairStyle) && !l.face && !l.drawing;
+  const T = S.ey - 16, cr = S.cran * (1 + SHAPE_RANGE.faceWidth * shapeOf(l, 'faceWidth'));
+  const bigHead = coreHead({ ...S, top: S.top - 2.5, cran: S.cran + 2.5 }, l);
+  const scalp = scalpOn ? vol(`<clipPath id="sc${id}"><path d="M-20 -60 H220 V${T} H${(100 + cr + 4).toFixed(1)} Q100 ${(2 * (S.top + 22) - T).toFixed(1)} ${(100 - cr - 4).toFixed(1)} ${T} H-20 Z"/></clipPath><path d="${bigHead}" fill="url(#hr${id})" clip-path="url(#sc${id})"/>`) : '';
+  // …and over the fringe, a plain band of hair just inside the head's edge hides the fringe's own outline there,
+  // so the hair reads as one piece instead of a headband
+  const seam = scalpOn ? vol(`<clipPath id="rg${id}"><path clip-rule="evenodd" d="${bigHead} ${coreHead({ ...S, top: S.top + 7.5, cran: S.cran - 7.5 }, l)}"/></clipPath><g clip-path="url(#sc${id})"><path d="${bigHead}" fill="url(#hr${id})" stroke="none" clip-path="url(#rg${id})"/></g>`) : '';
   const gap = SHAPE_RANGE.eyeGap * shapeOf(l, 'eyeGap');
   const nose = 1 + SHAPE_RANGE.nose * shapeOf(l, 'nose'), mw = 1 + SHAPE_RANGE.mouth * shapeOf(l, 'mouth');
   const around = (x: number, y: number, sx: number, sy: number, inner: string) => (sx === 1 && sy === 1 ? inner : `<g transform="translate(${x} ${y}) scale(${+sx.toFixed(3)} ${+sy.toFixed(3)}) translate(${-x} ${-y})">${inner}</g>`);
@@ -690,7 +699,7 @@ function coreFace(id: string, l: Look, w: WorldId): string {
     ${around(100, 112, nose, 1 + (nose - 1) * 0.35, coreNose(S, l, w))}
     ${facialHair(id, l)}
     ${around(100, 128, mw, 1, coreMouth(id, S, l, w))}
-    ${front}
+    ${scalp}${front}${seam}
     ${worldHair(l)}
     ${flair(l)}`;
 }
