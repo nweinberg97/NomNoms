@@ -8,6 +8,7 @@ import { DemoNote, LabsHeader } from '../LabsHeader';
 import { OWN_DROP_ATTR } from '../../components/DropZone';
 import { NAMES, PET_NAMES, PLACES, ROLE_LABEL, STORY_TYPES, type Place, type Role, type StoryType } from './catalog';
 import {
+  ACTIONS, type Action,
   EXPRESSIONS, EXTRAS, EYE_COLOURS, FACE_VIEWBOX, fitViewBox, FACIAL, GLASSES, HAIR_COLOURS, HAIR_STYLES, HATS, OUTFITS, PERSONALITIES, SKIN_TONES, WEAR_BOX,
   characterSvg, exprOf, isPet, type Expression, type Facial, type HairStyle, type Kind, type Look, type Personality, type WearSlot, type WorldId,
 } from './character';
@@ -18,7 +19,8 @@ import { applyDNA, buildDNA, parentTraits } from './likeness/dna';
 import type { Measurements } from './likeness/measure';
 import { describeDNA, type IdentityKey } from './likeness/dna';
 import { SHAPE_KEYS, type ShapeKey } from './likeness/measure';
-import { fill, generateStory, regeneratePage, tokenize, type CastMember, type Story, type StoryPage } from './generator';
+import { fill, generateStory, regeneratePage, tokenize, type CastMember, type PageLayout, type Placement, type Story, type StoryPage } from './generator';
+import { hasThing } from './things';
 import { sceneSvg, type DrawnPlace, type SceneThing } from './scene';
 import { STYLE_MODES, STYLES, type StyleMode } from './styles';
 import { AssetStudio } from './AssetStudio';
@@ -104,6 +106,15 @@ function placeFromDrawing(id: string, name: string, image: string): DrawnPlace {
   return { ...familyPlace(id, name), image, props: ['✨', '🎨'] };
 }
 
+const clampX = (x: number) => Math.round(Math.min(400, Math.max(0, x)));
+const clampY = (y: number) => Math.round(Math.min(300, Math.max(40, y)));
+/** Drawn things a character can hold in their hand. */
+const HOLDABLE: [string, string][] = ([
+  ['🎈', 'Balloon'], ['🧸', 'Teddy'], ['⚽', 'Ball'], ['📖', 'Book'], ['🌷', 'Flower'], ['🍦', 'Ice cream'], ['🪁', 'Kite'], ['🎁', 'Present'], ['🏮', 'Lantern'],
+  ['🗺️', 'Map'], ['🍎', 'Apple'], ['⭐', 'Star'], ['☔', 'Umbrella'], ['🧁', 'Cupcake'], ['🍪', 'Cookie'], ['🔦', 'Torch'], ['🪣', 'Bucket'], ['🍭', 'Lollipop'],
+  ['🧭', 'Compass'], ['🔭', 'Telescope'], ['💎', 'Gem'], ['🌻', 'Sunflower'], ['🐥', 'Chick'], ['🐶', 'Puppy'],
+] as [string, string][]).filter(([e]) => hasThing(e));
+
 export function BabyTalesDemo() {
   const app = useAppOptional();
   const heroName = app?.baby ? firstName(app.baby.name) : 'Maya';
@@ -116,6 +127,12 @@ export function BabyTalesDemo() {
   const [dressUp, setDressUp] = useState(true);
   const [story, setStory] = useState<Story>(() => generateStory('lost', sampleCast(heroName).map((p) => p.member), { seed: 7 }));
   const [view, setView] = useState(0); // 0 = cover, then pages
+  /** The picked person or thing in the page picture ('char:<id>', 'thing:<id>', 'focus'), and a drag in progress. */
+  const [picked, setPicked] = useState<string | null>(null);
+  const [live, setLive] = useState<{ key: string; x: number; y: number } | null>(null);
+  const drag = useRef<{ key: string; sx: number; sy: number; ax: number; ay: number; k: number; moved: boolean } | null>(null);
+  const artRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { setPicked(null); setLive(null); }, [view]);
   const [tab, setTab] = useState<WardrobeTab>('hat');
   const [editorTab, setEditorTab] = useState<EditorTab>('face');
   const [showAllTypes, setShowAllTypes] = useState(false);
@@ -129,30 +146,37 @@ export function BabyTalesDemo() {
   const [readings, setReadings] = useState<Record<string, Measurements>>({});
 
   /* ── undo / redo for every change to the characters ──────── */
-  type Snap = { cast: Person[]; chosen: Record<string, IdentityKey[]>; readings: Record<string, Measurements>; sel: number };
+  type Snap = { cast: Person[]; chosen: Record<string, IdentityKey[]>; readings: Record<string, Measurements>; sel: number; story: Story };
   const past = useRef<Snap[]>([]);
   const future = useRef<Snap[]>([]);
-  const prevSnap = useRef<Snap>({ cast, chosen, readings, sel });
+  const prevSnap = useRef<Snap>({ cast, chosen, readings, sel, story });
   const lastPush = useRef(0);
   const restoring = useRef(false);
+  /** The story was rebuilt from its recipe (not edited by hand), or brought back by undo. */
+  const autoStory = useRef(false);
+  const keepStory = useRef(false);
   const [, setHistoryTick] = useState(0);
   useEffect(() => {
-    const now: Snap = { cast, chosen, readings, sel };
+    const now: Snap = { cast, chosen, readings, sel, story };
     const was = prevSnap.current;
     prevSnap.current = now;
     if (restoring.current) { restoring.current = false; return; }
-    if (was.cast === cast && was.chosen === chosen) return; // just picking someone isn't a change
+    const auto = autoStory.current;
+    autoStory.current = false;
+    // just picking someone isn't a change, and nor is the story redrawing itself for a new cast
+    if (was.cast === cast && was.chosen === chosen && (was.story === story || auto)) return;
     const t = Date.now();
     // a slider drag or a burst of typing is one step
     if (t - lastPush.current > 700 || !past.current.length) { past.current.push(was); if (past.current.length > 60) past.current.shift(); }
     lastPush.current = t;
     future.current = [];
     setHistoryTick((x) => x + 1);
-  }, [cast, chosen, readings, sel]);
+  }, [cast, chosen, readings, sel, story]);
   const restore = (to: Snap) => {
     restoring.current = true;
     lastPush.current = 0;
-    setCast(to.cast); setChosen(to.chosen); setReadings(to.readings);
+    keepStory.current = to.cast.map((p) => `${p.member.id}:${p.member.inStory}`).join() !== membership; // the story would redraw for the cast
+    setCast(to.cast); setChosen(to.chosen); setReadings(to.readings); setStory(to.story);
     setSel(Math.min(to.sel, to.cast.length - 1));
     setResult(null); setStatus(undefined);
     setHistoryTick((x) => x + 1);
@@ -222,6 +246,8 @@ export function BabyTalesDemo() {
 
   // a new story whenever its recipe changes
   useEffect(() => {
+    if (keepStory.current) { keepStory.current = false; return; } // undo brought back the story as it was, edits and all
+    autoStory.current = true;
     setStory(generateStory(type, members, { seed, places, extraPlaces }));
     setView(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -406,6 +432,68 @@ export function BabyTalesDemo() {
     }
     return l;
   };
+  /* ── arranging a page picture: move, size, flip; what each person does and holds ── */
+  const placeOf = (p: StoryPage | undefined, key: string): (Placement & { hidden?: boolean }) | undefined => {
+    const L = p?.layout;
+    if (!L) return undefined;
+    return key === 'focus' ? L.focus : key.startsWith('char:') ? L.chars?.[key.slice(5)] : L.things?.[key.slice(6)];
+  };
+  /** A placement with the drag in progress applied. */
+  const placed = (p: StoryPage | undefined, key: string) => {
+    const pl = placeOf(p, key);
+    return live && live.key === key && p === page ? { ...pl, x: live.x, y: live.y } : pl;
+  };
+  const setPlace = (key: string, patch: Partial<Placement> & { hidden?: boolean }) => {
+    if (!page) return;
+    const L: PageLayout = { ...(page.layout ?? {}) };
+    if (key === 'focus') L.focus = { ...L.focus, ...patch };
+    else if (key.startsWith('char:')) L.chars = { ...L.chars, [key.slice(5)]: { ...L.chars?.[key.slice(5)], ...patch } };
+    else L.things = { ...L.things, [key.slice(6)]: { ...L.things?.[key.slice(6)], ...patch } };
+    setPage({ layout: L });
+  };
+  const nudge = (key: string, dx: number, dy: number) => {
+    const el = artRef.current?.querySelector<SVGGElement>(`[data-edit="${CSS.escape(key)}"]`);
+    if (!el) return;
+    const pl = placeOf(page, key);
+    const x = pl?.x ?? +el.dataset.ax!, y = pl?.y ?? +el.dataset.ay!;
+    setPlace(key, { x: clampX(x + dx), y: clampY(y + dy) });
+  };
+  const resize = (key: string, by: number) => setPlace(key, { scale: Math.round(Math.min(1.7, Math.max(0.5, (placeOf(page, key)?.scale ?? 1) + by)) * 100) / 100 });
+  const onArtDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!page) return;
+    const g = (e.target as Element).closest<SVGGElement>('[data-edit]');
+    if (!g) { setPicked(null); return; }
+    const svg = artRef.current?.querySelector('svg');
+    const k = svg ? 400 / svg.getBoundingClientRect().width : 1;
+    const key = g.dataset.edit!, pl = placeOf(page, key);
+    drag.current = { key, sx: e.clientX, sy: e.clientY, ax: pl?.x ?? +g.dataset.ax!, ay: pl?.y ?? +g.dataset.ay!, k, moved: false };
+    setPicked(key);
+    (e.currentTarget as HTMLDivElement).setPointerCapture?.(e.pointerId);
+    e.preventDefault();
+  };
+  const onArtMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const d = drag.current;
+    if (!d) return;
+    const dx = (e.clientX - d.sx) * d.k, dy = (e.clientY - d.sy) * d.k;
+    if (!d.moved && Math.hypot(dx, dy) < 3) return;
+    d.moved = true;
+    setLive({ key: d.key, x: clampX(d.ax + dx), y: clampY(d.ay + dy) });
+  };
+  const onArtUp = () => {
+    const d = drag.current;
+    drag.current = null;
+    if (d?.moved && live && live.key === d.key) setPlace(d.key, { x: live.x, y: live.y });
+    setLive(null);
+  };
+  const onArtKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!picked) return;
+    const step = e.shiftKey ? 20 : 6;
+    const m: Record<string, () => void> = {
+      ArrowLeft: () => nudge(picked, -step, 0), ArrowRight: () => nudge(picked, step, 0), ArrowUp: () => nudge(picked, 0, -step), ArrowDown: () => nudge(picked, 0, step),
+      '+': () => resize(picked, 0.1), '=': () => resize(picked, 0.1), '-': () => resize(picked, -0.1), Escape: () => setPicked(null),
+    };
+    if (m[e.key]) { e.preventDefault(); m[e.key](); }
+  };
   const drawnPlace = (id?: string) => drawn.find((d) => d.id === id);
   const photoPlace = (id?: string) => {
     const a = photoPlaces.find((x) => x.meta.id === id);
@@ -414,18 +502,25 @@ export function BabyTalesDemo() {
   const thingsFor = (p?: StoryPage): SceneThing[] => (p?.things ?? []).map((tid, i) => {
     const a = things.find((x) => x.meta.id === tid);
     if (!a || !art_.get(tid)) return null;
-    return { image: art_.get(tid)!, width: a.base.w, height: a.base.h, heightRatio: a.meta.placement.heightRatio ?? 0.5, x: [0.86, 0.5, 0.14][i % 3] };
+    return { image: art_.get(tid)!, width: a.base.w, height: a.base.h, heightRatio: a.meta.placement.heightRatio ?? 0.5, x: [0.86, 0.5, 0.14][i % 3], id: tid, place: placed(p, `thing:${tid}`) };
   }).filter(Boolean) as SceneThing[];
-  const art = (p: StoryPage | undefined, animated: boolean) => {
+  const art = (p: StoryPage | undefined, animated: boolean, arranging = false) => {
     if (!p) {
       const first = story.pages[0];
       const ids = [cast[0].member.id, ...cast.filter((c, i) => i > 0 && c.member.inStory).slice(0, 2).map((c) => c.member.id)];
       return sceneSvg({ placeId: first?.place ?? 'park', drawn: drawnPlace(first?.place), photo: photoPlace(first?.place), seed: story.seed, chars: ids.map((id) => ({ look: lookFor(id, first)! })), animated, label: 'Story cover', style: mode, world });
     }
-    const chars = p.cast.map((id) => lookFor(id, p)).filter(Boolean).map((look) => ({ look: look! }));
-    return sceneSvg({ placeId: p.place, drawn: drawnPlace(p.place), photo: photoPlace(p.place), things: thingsFor(p), seed: story.seed + view, chars, focus: p.focus, animated, label: fill(p.text, members), style: mode, world });
+    const chars = p.cast.map((id) => {
+      const look = lookFor(id, p);
+      if (!look) return null;
+      const pl = placed(p, `char:${id}`) ?? {};
+      // what they're doing: the parent's choice, else (for the star) what the words say
+      const action = pl.action ?? (id === cast[0]?.member.id ? p.action : undefined);
+      return { id, look: { ...look, ...(action ? { action } : {}), ...(pl.hold ? { hold: pl.hold } : {}) }, place: pl };
+    }).filter(Boolean) as { id: string; look: Look; place: Placement }[];
+    return sceneSvg({ placeId: p.place, drawn: drawnPlace(p.place), photo: photoPlace(p.place), things: thingsFor(p), seed: story.seed + view, chars, focus: p.focus, focusPlace: placed(p, 'focus'), selected: arranging ? picked ?? undefined : undefined, editable: arranging, animated, label: fill(p.text, members), style: mode, world });
   };
-  const bigArt = useMemo(() => art(page, true), [page, cast, dressUp, story, view, drawn, mode, art_, world, worldWear]); // eslint-disable-line react-hooks/exhaustive-deps
+  const bigArt = useMemo(() => art(page, true, true), [page, cast, dressUp, story, view, drawn, mode, art_, world, worldWear, picked, live]); // eslint-disable-line react-hooks/exhaustive-deps
   // a preview of each look: the star and one friend at the park
   const lookPreviews = useMemo(() => {
     const friend = cast.find((c, i) => i > 0 && !isPet(c.look.kind) && !c.look.drawing) ?? cast[0];
@@ -509,7 +604,9 @@ export function BabyTalesDemo() {
             <div className="lab-h"><h2 id="bt-story-h" className="display">Your book</h2></div>
             <div className="bt-book">
               <div className="bt-spread">
-                <div className="bt-art" dangerouslySetInnerHTML={{ __html: bigArt }} />
+                <div className={cx('bt-art', page && 'bt-arrange-on', page && picked && 'is-picking')} ref={artRef} tabIndex={page ? 0 : undefined} aria-label={page ? 'Page picture: tap someone or something to move it' : undefined}
+                  onPointerDown={onArtDown} onPointerMove={onArtMove} onPointerUp={onArtUp} onPointerCancel={onArtUp} onKeyDown={onArtKey}
+                  dangerouslySetInnerHTML={{ __html: bigArt }} data-testid="page-art" />
                 <div className="bt-words">
                   {view === 0 ? (
                     <>
@@ -531,6 +628,52 @@ export function BabyTalesDemo() {
                 <div className="bt-dots">{[0, ...story.pages.map((_, i) => i + 1)].map((i) => <button key={i} type="button" className={cx(i === view && 'on')} aria-label={i ? `Page ${i}` : 'Cover'} onClick={() => setView(i)} />)}</div>
                 <button type="button" className="btn btn-primary btn-sm" onClick={() => setView((v) => (v >= story.pages.length ? 0 : v + 1))} data-testid="next-page">{view >= story.pages.length ? 'Back to cover' : 'Next page'}</button>
               </div>
+
+              {page && (() => {
+                const pl = picked ? placeOf(page, picked) : undefined;
+                const who = picked?.startsWith('char:') ? cast.find((c) => c.member.id === picked.slice(5)) : undefined;
+                const isStar = who && who.member.id === cast[0]?.member.id;
+                const doing: Action = (pl?.action ?? (isStar ? page.action : undefined) ?? 'stand');
+                const holdable = [...(page.focus && hasThing(page.focus.e) && !HOLDABLE.some(([e]) => e === page.focus!.e) ? [[page.focus.e, 'The thing on this page'] as [string, string]] : []), ...HOLDABLE];
+                const name = who ? who.member.name || 'them' : picked === 'focus' ? 'the thing on this page' : 'this';
+                return (
+                  <div className="lab-card bt-arrange" data-testid="arrange">
+                    {!picked ? (
+                      <p className="lab-sub bt-arrange-hint">Tap someone or something in the picture to move it, resize it, or change what they're doing.{page.layout && <> <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPage({ layout: undefined })} data-testid="arrange-reset">Reset this picture</button></>}</p>
+                    ) : (
+                      <>
+                        <div className="bt-arrange-top"><strong>Arranging {name}</strong>
+                          <button type="button" className="btn btn-primary btn-sm" onClick={() => setPicked(null)} data-testid="arrange-done">Done</button>
+                        </div>
+                        {who && who.member.role !== 'pet' && (
+                          <>
+                            <p className="lab-sub">What {name} is doing</p>
+                            <div className="lab-chips">{(Object.keys(ACTIONS) as Action[]).map((a) => <button key={a} type="button" className="lab-chip" aria-pressed={doing === a} onClick={() => setPlace(picked, { action: a })} data-testid={`act-${a}`}>{ACTIONS[a]}</button>)}</div>
+                            <label className="field"><span>Holding</span>
+                              <select value={pl?.hold ?? ''} onChange={(e) => setPlace(picked, { hold: e.target.value || undefined })} data-testid="arrange-hold">
+                                <option value="">Nothing</option>
+                                {holdable.map(([e, n]) => <option key={e} value={e}>{n}</option>)}
+                              </select>
+                            </label>
+                          </>
+                        )}
+                        <label className="field"><span>Size {Math.round((pl?.scale ?? 1) * 100)}%</span>
+                          <input type="range" min={50} max={170} step={5} value={Math.round((pl?.scale ?? 1) * 100)} onChange={(e) => setPlace(picked, { scale: +e.target.value / 100 })} data-testid="arrange-size" />
+                        </label>
+                        <div className="bt-arrange-row">
+                          <button type="button" className="btn btn-ghost btn-sm" aria-label="Move left" onClick={() => nudge(picked, -10, 0)} data-testid="nudge-left">←</button>
+                          <button type="button" className="btn btn-ghost btn-sm" aria-label="Move up" onClick={() => nudge(picked, 0, -10)} data-testid="nudge-up">↑</button>
+                          <button type="button" className="btn btn-ghost btn-sm" aria-label="Move down" onClick={() => nudge(picked, 0, 10)} data-testid="nudge-down">↓</button>
+                          <button type="button" className="btn btn-ghost btn-sm" aria-label="Move right" onClick={() => nudge(picked, 10, 0)} data-testid="nudge-right">→</button>
+                          <button type="button" className="btn btn-ghost btn-sm" aria-pressed={!!pl?.flip} onClick={() => setPlace(picked, { flip: !pl?.flip })} data-testid="arrange-flip">Flip</button>
+                          {!who && <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setPlace(picked, { hidden: true }); setPicked(null); }} data-testid="arrange-hide">Hide</button>}
+                          <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setPage({ layout: undefined }); setPicked(null); }} data-testid="arrange-reset">Reset this picture</button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                );
+              })()}
 
               {page && (
                 <details className="lab-card bt-edit" open={editOpen} onToggle={(e) => setEditOpen((e.target as HTMLDetailsElement).open)} data-testid="page-editor">

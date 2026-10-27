@@ -1,4 +1,4 @@
-import type { Expression, Pose } from './character';
+import type { Action, Expression, Pose } from './character';
 import { ANIMALS, COLOURS, COUNTABLES, FOODS, LOST, LOVES, NUMBER_WORDS, PLACES, YUCKS, type Place, type Role, type StoryType } from './catalog';
 
 /**
@@ -41,8 +41,39 @@ export interface StoryPage {
   mood?: Expression;
   /** The star's body language on this page (story worlds). */
   pose?: Pose;
+  /** What the star is doing on this page (walking, running, jumping…), read from the words. */
+  action?: Action;
+  /** The family's own arrangement of this page's picture: where people and things stand,
+   *  how big they are, what each person is doing and holding. */
+  layout?: PageLayout;
   /** Set when the words were changed by hand. */
   edited?: boolean;
+}
+
+/** One person's or thing's place in a page picture (scene units: 400 × 300; x, y = where they stand). */
+export interface Placement { x?: number; y?: number; scale?: number; flip?: boolean; action?: Action; hold?: string }
+export interface PageLayout {
+  /** By cast id. */
+  chars?: Record<string, Placement>;
+  /** The page's big thing. */
+  focus?: Placement & { hidden?: boolean };
+  /** Things from the family's photos, by asset id. */
+  things?: Record<string, Placement>;
+}
+
+/** What someone is doing, read from a page's words (and mood). */
+export function actionFromText(text: string, mood?: Expression): Action {
+  const t = text.toLowerCase();
+  if (/\b(sleep|sleeps|asleep|nap|naps|snooze|snor|goodnight|night night|dream)/.test(t)) return 'sleep';
+  if (/\b(run|runs|running|race|races|racing|dash|dashes|chase|chases|zoom|zooms|hurry|hurries)\b/.test(t)) return 'run';
+  if (/\b(jump|jumps|jumping|hop|hops|leap|leaps|bounce|bounces|splash|splashes|boing)\b/.test(t)) return 'jump';
+  if (/\b(dance|dances|dancing|wiggle|wiggles|twirl|twirls|spin|spins|boogie)\b/.test(t)) return 'dance';
+  if (/\b(sit|sits|sitting|picnic|reads?|eat|eats|lunch|dinner|breakfast|snack|bath|tea party)\b/.test(t)) return 'sit';
+  if (/\b(walk|walks|walking|stroll|strolls|tiptoe|tiptoes|march|marches|off to|goes to|heads to|let.s go)\b/.test(t)) return 'walk';
+  if (/\b(hello|hi there|wave|waves|goodbye|bye|see you)\b/.test(t)) return 'wave';
+  if (/\b(hooray|yay|hurray|cheer|cheers|win|wins|did it|well done)\b/.test(t) || mood === 'laugh' || mood === 'starry') return 'cheer';
+  if (/\b(look|looks|see|sees|spot|spots|there it is|over there|finds|found)\b/.test(t) || mood === 'wow') return 'point';
+  return 'stand';
 }
 
 export interface Story {
@@ -384,6 +415,8 @@ export function generateStory(type: StoryType, cast: CastMember[], opts: { seed:
   if (type === 'counting' || type === 'colours') pages[pages.length - 1].mood ??= 'proud';
   // the star's personality, in their own words, on the first page
   if (opts.heroLine && pages[0]) pages[0].text += ` ${opts.heroLine.replace(/\{H\}/g, H)}`;
+  // every page gets an action from its words, so the star isn't standing still on every page
+  for (const p of pages) if (!p.action) p.action = actionFromText(p.text, p.mood);
   return { type, seed: opts.seed, title, pages };
 }
 

@@ -85,6 +85,19 @@
 .bt-spread { display: grid; grid-template-columns: minmax(0, 1fr); border-radius: 8px; overflow: hidden; background: #fbf7f0; box-shadow: var(--shadow-lg); }
 .bt-art { aspect-ratio: 4 / 3; }
 .bt-art > svg { display: block; width: 100%; height: 100%; }
+.bt-arrange-on svg * { pointer-events: none; }
+.bt-arrange-on [data-edit], .bt-arrange-on [data-edit] * { pointer-events: auto; }
+.bt-arrange-on { user-select: none; -webkit-user-select: none; }
+/* once something is picked, a finger on the picture drags it instead of scrolling the page */
+.bt-arrange-on.is-picking { touch-action: none; }
+.bt-arrange-on:focus-visible { outline: 3px solid #2f7de1; outline-offset: 2px; }
+.bt-arrange-on [data-edit]:active { cursor: grabbing; }
+.bt-arrange { display: grid; gap: 10px; margin-top: 12px; padding: 14px; }
+.bt-arrange-hint { margin: 0; }
+.bt-arrange-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.bt-arrange-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.bt-arrange .field { margin: 0; }
+.bt-arrange .lab-sub { margin: 0; }
 .bt-words { padding: clamp(18px, 4vw, 36px); display: flex; flex-direction: column; justify-content: center; gap: 10px; color: #26221f; }
 .bt-words small { font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: #8f857b; }
 .bt-text { font-family: var(--serif); font-size: clamp(20px, 2.8vw, 27px); line-height: 1.35; color: #26221f; text-wrap: pretty; }

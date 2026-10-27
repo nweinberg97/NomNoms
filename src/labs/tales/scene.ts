@@ -56,7 +56,9 @@ export function backdrop(p: Place, seed: number): string {
   return s;
 }
 
-export interface SceneCharacter { look: Look; size?: 'small' | 'normal' }
+/** A placement from the page editor (scene units; x, y = where they stand). */
+export interface ScenePlace { x?: number; y?: number; scale?: number; flip?: boolean; hidden?: boolean }
+export interface SceneCharacter { look: Look; size?: 'small' | 'normal'; /** For editing: the cast id. */ id?: string; place?: ScenePlace }
 
 /** A place drawn or uploaded by the family, used as a backdrop. */
 export type DrawnPlace = Place & { image: string };
@@ -65,7 +67,7 @@ export type DrawnPlace = Place & { image: string };
 export interface PhotoPlace { image: string; horizon: number }
 
 /** A thing made from a photo, standing on the ground. */
-export interface SceneThing { image: string; width: number; height: number; heightRatio: number; x: number }
+export interface SceneThing { image: string; width: number; height: number; heightRatio: number; x: number; id?: string; place?: ScenePlace }
 
 /** How tall a grown-up stands in a 400 × 300 scene; things are sized against it. */
 const PERSON_HEIGHT = 190;
@@ -81,6 +83,12 @@ export function sceneSvg(opts: {
   seed: number;
   chars: SceneCharacter[];
   focus?: { e: string; count?: number; faded?: boolean };
+  /** Where the big thing sits (page editor). */
+  focusPlace?: ScenePlace;
+  /** The picked item in the page editor ('char:<id>', 'thing:<id>' or 'focus'), outlined. */
+  selected?: string;
+  /** Mark items so the page editor can pick and move them. */
+  editable?: boolean;
   animated?: boolean;
   label?: string;
   style?: StyleMode;
@@ -109,36 +117,55 @@ export function sceneSvg(opts: {
   }
   let s = `<defs>${styleFilters(mode, id)}</defs>${back}`;
   // things made from photos stand on the ground, sized against a grown-up
+  const box = (key: string, x: number, y: number, w: number, h: number, inner: string, ax = x + w / 2, ay = y + h) => {
+    const sel = opts.selected === key ? `<rect x="${(x - 4).toFixed(1)}" y="${(y - 4).toFixed(1)}" width="${(w + 8).toFixed(1)}" height="${(h + 8).toFixed(1)}" rx="10" fill="none" stroke="#2f7de1" stroke-width="2.5" stroke-dasharray="7 5" class="bt-sel"/>` : '';
+    return opts.editable ? `<g data-edit="${key}" data-ax="${ax.toFixed(1)}" data-ay="${ay.toFixed(1)}" style="cursor:grab">${inner}<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" fill="transparent"/>${sel}</g>` : inner;
+  };
   (opts.things ?? []).forEach((t) => {
-    const h = Math.max(22, Math.min(270, t.heightRatio * PERSON_HEIGHT));
+    const pl = t.place ?? {};
+    if (pl.hidden) return;
+    const h = Math.max(22, Math.min(270, t.heightRatio * PERSON_HEIGHT)) * (pl.scale ?? 1);
     const w = (h * t.width) / t.height;
-    const cx = t.x * 400, y = 292 - h;
-    s += `<ellipse cx="${cx.toFixed(1)}" cy="292" rx="${(w * 0.42).toFixed(1)}" ry="${Math.max(3, h * 0.035).toFixed(1)}" fill="${STYLES[mode].palette.shadow}" opacity=".2"/>
-      <image href="${esc(t.image)}" x="${(cx - w / 2).toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}"${t.image.startsWith('data:image/svg') ? '' : ` filter="url(#img${id})"`}/>`;
+    const cx = pl.x ?? t.x * 400, base = pl.y ?? 292, y = base - h;
+    const flip = pl.flip ? ` transform="translate(${(2 * cx).toFixed(1)} 0) scale(-1 1)"` : '';
+    s += box(`thing:${t.id ?? ''}`, cx - w / 2, y, w, h, `<g${flip}><ellipse cx="${cx.toFixed(1)}" cy="${base.toFixed(1)}" rx="${(w * 0.42).toFixed(1)}" ry="${Math.max(3, h * 0.035).toFixed(1)}" fill="${STYLES[mode].palette.shadow}" opacity=".2"/>
+      <image href="${esc(t.image)}" x="${(cx - w / 2).toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}"${t.image.startsWith('data:image/svg') ? '' : ` filter="url(#img${id})"`}/></g>`);
   });
   const slots = opts.chars.length >= 3
     ? [{ x: 10, w: 132 }, { x: 140, w: 124 }, { x: 262, w: 124 }]
     : [{ x: 36, w: 156 }, { x: 214, w: 150 }];
   opts.chars.slice(0, slots.length).forEach((c, i) => {
-    const slot = slots[i];
+    const slot = slots[i], pl = c.place ?? {};
+    if (pl.hidden) return;
     const small = c.size === 'small' || isPet(c.look.kind);
-    const w = small ? slot.w * 0.78 : slot.w;
-    const h = w * 1.25;
-    const x = slot.x + (slot.w - w) / 2;
-    const y = 296 - h + (small ? 4 : 0);
-    s += `<svg x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" viewBox="-20 -44 240 314" overflow="visible">${characterMarkup(c.look, { animated: opts.animated, style: mode })}</svg>`;
+    const w = (small ? slot.w * 0.78 : slot.w) * (pl.scale ?? 1);
+    const h = w * (314 / 240);
+    const fx = pl.x ?? slot.x + slot.w / 2, fy = pl.y ?? 296 + (small ? 4 : 0);
+    const x = fx - w / 2, y = fy - h;
+    const svg = `<svg x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" viewBox="-20 -44 240 314" overflow="visible">${characterMarkup(c.look, { animated: opts.animated, style: mode })}</svg>`;
+    const flipped = pl.flip ? `<g transform="translate(${(2 * fx).toFixed(1)} 0) scale(-1 1)">${svg}</g>` : svg;
+    // the pick box hugs the figure (the box above includes room for hats and raised arms)
+    s += box(`char:${c.id ?? i}`, x + w * 0.12, y + h * 0.1, w * 0.76, h * 0.88, flipped, fx, fy);
   });
   s += worldAtmosphere(opts.world, id, opts.seed);
-  if (opts.focus && hasThing(opts.focus.e)) {
-    const f = opts.focus;
+  if (opts.focus && hasThing(opts.focus.e) && !opts.focusPlace?.hidden) {
+    const f = opts.focus, fp = opts.focusPlace ?? {};
+    const k = fp.scale ?? 1, cx = fp.x ?? 200, cy = fp.y ?? 76;
+    // drawn around (200, 76), then moved and sized as placed
+    const at = `translate(${cx.toFixed(1)} ${cy.toFixed(1)}) scale(${k.toFixed(3)}) translate(-200 -76)${fp.flip ? ' translate(400 0) scale(-1 1)' : ''}`;
+    let inner: string, bw: number, bh: number;
     if (f.count) {
       const n = f.count, size = n > 3 ? 30 : 38, gap = size + 8, x0 = 200 - ((n - 1) * gap) / 2;
-      s += `<g class="bt-focus">${Array.from({ length: n }, (_, i) => emoji(f.e, x0 + i * gap, 58 + (i % 2) * 10, size)).join('')}</g>`;
+      inner = `<g class="bt-focus">${Array.from({ length: n }, (_, i) => emoji(f.e, x0 + i * gap, 58 + (i % 2) * 10, size)).join('')}</g>`;
+      bw = (n - 1) * gap + size; bh = size + 28;
     } else if (f.faded) {
-      s += `<g class="bt-focus" opacity=".9"><circle cx="200" cy="74" r="38" fill="#fff" opacity=".7"/>${emoji(f.e, 200, 74, 46, 'opacity=".35"')}${askMark(232, 46, 26)}</g>`;
+      inner = `<g class="bt-focus" opacity=".9"><circle cx="200" cy="74" r="38" fill="#fff" opacity=".7"/>${emoji(f.e, 200, 74, 46, 'opacity=".35"')}${askMark(232, 46, 26)}</g>`;
+      bw = 90; bh = 90;
     } else {
-      s += `<g class="bt-focus"><ellipse cx="200" cy="80" rx="44" ry="40" fill="#fff" opacity=".28"/>${emoji(f.e, 200, 76, 64)}</g>`;
+      inner = `<g class="bt-focus"><ellipse cx="200" cy="80" rx="44" ry="40" fill="#fff" opacity=".28"/>${emoji(f.e, 200, 76, 64)}</g>`;
+      bw = 88; bh = 84;
     }
+    s += box('focus', cx - (bw * k) / 2, cy - (bh * k) / 2, bw * k, bh * k, `<g transform="${at}">${inner}</g>`, cx, cy);
   }
   if (mode === 'pocketlight') s += `<rect width="400" height="300" fill="url(#glow${id})"/><rect width="400" height="300" fill="url(#vig${id})"/>`;
   return `<svg viewBox="0 0 400 300" class="bt-scene st-${mode}${opts.animated ? ' is-animated' : ''}" ${opts.label ? `role="img" aria-label="${opts.label.replace(/"/g, '&quot;')}"` : 'aria-hidden="true"'}>${s}</svg>`;
