@@ -106,8 +106,10 @@ function placeFromDrawing(id: string, name: string, image: string): DrawnPlace {
   return { ...familyPlace(id, name), image, props: ['✨', '🎨'] };
 }
 
+const isAppleSafari = typeof navigator !== 'undefined' && /Safari/.test(navigator.userAgent) && !/Chrome|Chromium|CriOS|Edg|Firefox|FxiOS/.test(navigator.userAgent);
 const clampX = (x: number) => Math.round(Math.min(400, Math.max(0, x)));
 const clampY = (y: number) => Math.round(Math.min(300, Math.max(40, y)));
+const clampScale = (v: number) => Math.round(Math.min(1.7, Math.max(0.5, v)) * 100) / 100;
 /** Drawn things a character can hold in their hand. */
 const HOLDABLE: [string, string][] = ([
   ['🎈', 'Balloon'], ['🧸', 'Teddy'], ['⚽', 'Ball'], ['📖', 'Book'], ['🌷', 'Flower'], ['🍦', 'Ice cream'], ['🪁', 'Kite'], ['🎁', 'Present'], ['🏮', 'Lantern'],
@@ -129,8 +131,8 @@ export function BabyTalesDemo() {
   const [view, setView] = useState(0); // 0 = cover, then pages
   /** The picked person or thing in the page picture ('char:<id>', 'thing:<id>', 'focus'), and a drag in progress. */
   const [picked, setPicked] = useState<string | null>(null);
-  const [live, setLive] = useState<{ key: string; x: number; y: number } | null>(null);
-  const drag = useRef<{ key: string; sx: number; sy: number; ax: number; ay: number; k: number; moved: boolean } | null>(null);
+  const [live, setLive] = useState<{ key: string; x?: number; y?: number; scale?: number } | null>(null);
+  const drag = useRef<{ key: string; sx: number; sy: number; ax: number; ay: number; k: number; moved: boolean; resize?: { s0: number; d0: number; ox: number; oy: number } } | null>(null);
   const artRef = useRef<HTMLDivElement>(null);
   const [writing, setWriting] = useState(false);
   useEffect(() => { setPicked(null); setLive(null); setWriting(false); }, [view]);
@@ -165,7 +167,8 @@ export function BabyTalesDemo() {
     const auto = autoStory.current;
     autoStory.current = false;
     // just picking someone isn't a change, and nor is the story redrawing itself for a new cast
-    if (was.cast === cast && was.chosen === chosen && (was.story === story || auto)) return;
+    if (was.cast === cast && was.chosen === chosen && (was.story === story || (auto && !was.story.edited))) return;
+    if (auto && was.story.edited) toast('New story made. Your page edits are one Undo away.', { icon: 'refresh', ms: 4000, action: { label: 'Undo', run: () => undoRef.current() } });
     const t = Date.now();
     // a slider drag or a burst of typing is one step
     if (t - lastPush.current > 700 || !past.current.length) { past.current.push(was); if (past.current.length > 60) past.current.shift(); }
@@ -223,7 +226,31 @@ export function BabyTalesDemo() {
   const photoPlaces = library.filter((a) => a.meta.kind === 'place');
   const things = library.filter((a) => a.meta.kind === 'object');
   const extraPlaces: Place[] = [...drawn, ...photoPlaces.map((a) => familyPlace(a.meta.id, a.meta.name))];
-  const onAsset = async (a: StoredAsset, save: boolean) => {
+  /** "Our place", then "Our place 2"…, so two places never share a name. */
+  const uniqueName = (name: string, skip?: string) => {
+    const taken = new Set([...library.filter((x) => x.meta.id !== skip).map((x) => x.meta.name), ...drawn.filter((d) => d.id !== skip).map((d) => d.name)].map((n) => n.toLowerCase()));
+    if (!taken.has(name.toLowerCase())) return name;
+    let i = 2;
+    while (taken.has(`${name} ${i}`.toLowerCase())) i++;
+    return `${name} ${i}`;
+  };
+  /** Rename a family place or thing: the story's headings that used the old name follow along. */
+  const renamePlace = (id: string, name: string) => {
+    const old = library.find((x) => x.meta.id === id)?.meta.name ?? drawn.find((d) => d.id === id)?.name;
+    setLibrary((l) => l.map((x) => (x.meta.id === id ? { ...x, meta: { ...x.meta, name } } : x)));
+    setDrawn((ds) => ds.map((d) => (d.id === id ? placeFromDrawing(id, name, d.image) : d)));
+    if (old != null) setStory((st) => ({ ...st, pages: st.pages.map((pg) => (pg.place === id && (pg.heading ?? '') === old ? { ...pg, heading: name } : pg)) }));
+  };
+  /** Keep a renamed photo place or thing saved (only if it was saved already). */
+  const keepName = (id: string) => {
+    const a = library.find((x) => x.meta.id === id);
+    if (!a) return;
+    const name = a.meta.name.trim() ? uniqueName(a.meta.name.trim(), id) : uniqueName(a.meta.kind === 'place' ? 'Our place' : 'Our thing', id);
+    if (name !== a.meta.name) renamePlace(id, name);
+    if (saved.has(id)) void saveAsset({ ...a, meta: { ...a.meta, name } }).catch(() => undefined);
+  };
+  const onAsset = async (a0: StoredAsset, save: boolean) => {
+    const a = { ...a0, meta: { ...a0.meta, name: uniqueName(a0.meta.name) } };
     setStudio(null);
     setLibrary((l) => [a, ...l.filter((x) => x.meta.id !== a.meta.id)]);
     if (a.meta.kind === 'place') setPlaces((ps) => [...ps, a.meta.id]);
@@ -382,7 +409,7 @@ export function BabyTalesDemo() {
       toast(`${person.member.call || person.member.name} is wearing “${name}”`, { icon: 'sparkle', ms: 1800 });
     } else if (pad?.mode === 'place') {
       const id = `draw-${Date.now()}`;
-      setDrawn((ds) => [...ds, placeFromDrawing(id, name, image)]);
+      setDrawn((ds) => [...ds, placeFromDrawing(id, uniqueName(name), image)]);
       setPlaces((ps) => [...ps, id]);
       toast(`“${name}” is in the story now`, { icon: 'sparkle', ms: 1800 });
     } else if (pad?.redraw) {
@@ -399,7 +426,7 @@ export function BabyTalesDemo() {
 
   /* ── story ─────────────────────────────────────────── */
   const page: StoryPage | undefined = view > 0 ? story.pages[view - 1] : undefined;
-  const setPage = (patch: Partial<StoryPage>) => setStory((s) => ({ ...s, pages: s.pages.map((p, i) => (i === view - 1 ? { ...p, ...patch } : p)) }));
+  const setPage = (patch: Partial<StoryPage>) => setStory((s) => ({ ...s, edited: true, pages: s.pages.map((p, i) => (i === view - 1 ? { ...p, ...patch } : p)) }));
   /** Someone as they appear in the current world: their own look, dressed for it. Identity never changes. */
   const dressed = (who: Person, w: WorldId = world): Look => (w === 'everyday' || who.look.drawing ? who.look : { ...who.look, ...worldCostume(w, who.look, who.member.id === cast[0]?.member.id), ...worldWear[`${w}:${who.member.id}`], world: w });
   const lookFor = (id: string, p?: StoryPage): Look | undefined => {
@@ -442,7 +469,7 @@ export function BabyTalesDemo() {
   /** A placement with the drag in progress applied. */
   const placed = (p: StoryPage | undefined, key: string) => {
     const pl = placeOf(p, key);
-    return live && live.key === key && p === page ? { ...pl, x: live.x, y: live.y } : pl;
+    return live && live.key === key && p === page ? { ...pl, ...(live.x != null ? { x: live.x, y: live.y } : {}), ...(live.scale != null ? { scale: live.scale } : {}) } : pl;
   };
   const setPlace = (key: string, patch: Partial<Placement> & { hidden?: boolean }) => {
     if (!page) return;
@@ -459,15 +486,21 @@ export function BabyTalesDemo() {
     const x = pl?.x ?? +el.dataset.ax!, y = pl?.y ?? +el.dataset.ay!;
     setPlace(key, { x: clampX(x + dx), y: clampY(y + dy) });
   };
-  const resize = (key: string, by: number) => setPlace(key, { scale: Math.round(Math.min(1.7, Math.max(0.5, (placeOf(page, key)?.scale ?? 1) + by)) * 100) / 100 });
+  const resize = (key: string, by: number) => setPlace(key, { scale: clampScale((placeOf(page, key)?.scale ?? 1) + by) });
   const onArtDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!page) return;
     const g = (e.target as Element).closest<SVGGElement>('[data-edit]');
     if (!g) { setPicked(null); return; }
     const svg = artRef.current?.querySelector('svg');
-    const k = svg ? 400 / svg.getBoundingClientRect().width : 1;
+    const r = svg?.getBoundingClientRect();
+    const k = r ? 400 / r.width : 1;
     const key = g.dataset.edit!, pl = placeOf(page, key);
-    drag.current = { key, sx: e.clientX, sy: e.clientY, ax: pl?.x ?? +g.dataset.ax!, ay: pl?.y ?? +g.dataset.ay!, k, moved: false };
+    const ax = pl?.x ?? +g.dataset.ax!, ay = pl?.y ?? +g.dataset.ay!;
+    // the corner handle resizes around the feet (or the thing's centre)
+    const handle = (e.target as Element).closest('[data-resize]');
+    const ox = r ? r.left + ax / k : 0, oy = r ? r.top + (key === 'focus' ? ay : ay - 60) / k : 0;
+    const resize = handle && r ? { s0: pl?.scale ?? 1, d0: Math.max(12, Math.hypot(e.clientX - ox, e.clientY - oy)), ox, oy } : undefined;
+    drag.current = { key, sx: e.clientX, sy: e.clientY, ax, ay, k, moved: false, resize };
     setPicked(key);
     (e.currentTarget as HTMLDivElement).setPointerCapture?.(e.pointerId);
     e.preventDefault();
@@ -478,12 +511,15 @@ export function BabyTalesDemo() {
     const dx = (e.clientX - d.sx) * d.k, dy = (e.clientY - d.sy) * d.k;
     if (!d.moved && Math.hypot(dx, dy) < 3) return;
     d.moved = true;
-    setLive({ key: d.key, x: clampX(d.ax + dx), y: clampY(d.ay + dy) });
+    if (d.resize) {
+      const { s0, d0, ox, oy } = d.resize;
+      setLive({ key: d.key, scale: clampScale(s0 * Math.hypot(e.clientX - ox, e.clientY - oy) / d0) });
+    } else setLive({ key: d.key, x: clampX(d.ax + dx), y: clampY(d.ay + dy) });
   };
   const onArtUp = () => {
     const d = drag.current;
     drag.current = null;
-    if (d?.moved && live && live.key === d.key) setPlace(d.key, { x: live.x, y: live.y });
+    if (d?.moved && live && live.key === d.key) setPlace(d.key, live.scale != null ? { scale: live.scale } : { x: live.x, y: live.y });
     setLive(null);
   };
   const onArtKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
@@ -641,9 +677,9 @@ export function BabyTalesDemo() {
                   {view === 0 ? (
                     <>
                       <small>The Adventures of {cast[0].member.name}</small>
-                      <input className="bt-title" value={fill(story.title, members)} onChange={(e) => setStory((s) => ({ ...s, title: tokenize(e.target.value, members) }))} aria-label="Story title" data-testid="story-title" />
-                      <textarea className="bt-about" rows={2} value={fill(story.about ?? '', members)} placeholder="What this book is about" onChange={(e) => setStory((s) => ({ ...s, about: tokenize(e.target.value, members) }))} aria-label="What this book is about" data-testid="story-about" />
-                      <input className="bt-dedication" value={fill(story.dedication ?? '', members)} placeholder="For…" onChange={(e) => setStory((s) => ({ ...s, dedication: tokenize(e.target.value, members) }))} aria-label="Dedication" data-testid="story-dedication" />
+                      <input className="bt-title" value={fill(story.title, members)} onChange={(e) => setStory((s) => ({ ...s, title: tokenize(e.target.value, members), edited: true }))} aria-label="Story title" data-testid="story-title" />
+                      <textarea className="bt-about" rows={2} value={fill(story.about ?? '', members)} placeholder="What this book is about" onChange={(e) => setStory((s) => ({ ...s, about: tokenize(e.target.value, members), edited: true }))} aria-label="What this book is about" data-testid="story-about" />
+                      <input className="bt-dedication" value={fill(story.dedication ?? '', members)} placeholder="For…" onChange={(e) => setStory((s) => ({ ...s, dedication: tokenize(e.target.value, members), edited: true }))} aria-label="Dedication" data-testid="story-dedication" />
                       {cast[0].look.personality && <p className="bt-tagline">{PERSONALITIES[cast[0].look.personality].line.replace(/\{H\}/g, cast[0].member.call || cast[0].member.name)}</p>}
                       <p className="bt-by">A NomNoms Baby Tale starring {members.filter((m) => m.inStory || m.role === 'baby').map((m) => m.call).join(', ')}</p>
                     </>
@@ -677,7 +713,7 @@ export function BabyTalesDemo() {
                   <div className="lab-card bt-arrange" data-testid="arrange">
                     {!picked ? (
                       <>
-                        <p className="lab-sub bt-arrange-hint">Tap someone or something in the picture to move it, resize it, swap them, or change what they're doing.</p>
+                        <p className="lab-sub bt-arrange-hint">Tap someone or something in the picture to pick it. Drag to move it, drag the round corner handle to resize it, or use the buttons here to swap them or change what they're doing.</p>
                         <div className="bt-arrange-row">
                           <label className="field bt-setting"><span>Setting</span>
                             <select value={page.place} onChange={(e) => setSetting(e.target.value)} data-testid="arrange-setting">{placeOptions}</select>
@@ -689,6 +725,13 @@ export function BabyTalesDemo() {
                       <>
                         <div className="bt-arrange-top"><strong>Arranging {name}</strong>
                           <button type="button" className="btn btn-primary btn-sm" onClick={() => setPicked(null)} data-testid="arrange-done">Done</button>
+                        </div>
+                        <div className="bt-size">
+                          <button type="button" className="btn btn-ghost btn-sm" onClick={() => resize(picked, -0.1)} aria-label="Smaller" data-testid="arrange-smaller">Smaller</button>
+                          <label className="field"><span>Size {Math.round((pl?.scale ?? 1) * 100)}%</span>
+                            <input type="range" min={50} max={170} step={5} value={Math.round((pl?.scale ?? 1) * 100)} onChange={(e) => setPlace(picked, { scale: +e.target.value / 100 })} data-testid="arrange-size" />
+                          </label>
+                          <button type="button" className="btn btn-ghost btn-sm" onClick={() => resize(picked, 0.1)} aria-label="Bigger" data-testid="arrange-bigger">Bigger</button>
                         </div>
                         {who && (
                           <div className="bt-arrange-row">
@@ -713,9 +756,7 @@ export function BabyTalesDemo() {
                             </label>
                           </>
                         )}
-                        <label className="field"><span>Size {Math.round((pl?.scale ?? 1) * 100)}%</span>
-                          <input type="range" min={50} max={170} step={5} value={Math.round((pl?.scale ?? 1) * 100)} onChange={(e) => setPlace(picked, { scale: +e.target.value / 100 })} data-testid="arrange-size" />
-                        </label>
+
                         <div className="bt-arrange-row">
                           <button type="button" className="btn btn-ghost btn-sm" aria-label="Move left" onClick={() => nudge(picked, -10, 0)} data-testid="nudge-left">←</button>
                           <button type="button" className="btn btn-ghost btn-sm" aria-label="Move up" onClick={() => nudge(picked, 0, -10)} data-testid="nudge-up">↑</button>
@@ -928,11 +969,12 @@ export function BabyTalesDemo() {
                       <details className="bt-genmoji">
                         <summary><span>Use a real Genmoji</span><small>iPhone, iPad or Mac with Apple Intelligence</small></summary>
                         <ol>
-                          <li>Tap the box below and open the emoji keyboard (on Mac, press <kbd>fn</kbd> <kbd>E</kbd>).</li>
-                          <li>Choose <strong>Genmoji</strong>, then pick {person.member.name || 'them'} from your Photos or describe them.</li>
-                          <li>Insert it. It becomes their face, and you can still dress them up.</li>
+                          <li>On a Mac, open this page in <strong>Safari</strong> (other browsers can only insert Genmoji you’ve already made).</li>
+                          <li>Click the box below, then press <kbd>fn</kbd> <kbd>E</kbd> (or <kbd>Control</kbd> <kbd>Command</kbd> <kbd>Space</kbd>) to open the emoji viewer.</li>
+                          <li>Click the <strong>Genmoji</strong> button at its top right to make a <em>new</em> one: describe {person.member.name || 'them'} (“a toddler with red curls and a big smile”) or choose them from your Photos.</li>
+                          <li>Click <strong>Add</strong>, then pick the new Genmoji to drop it in the box. It becomes their face, and you can still dress them up.</li>
                         </ol>
-                        <p className="lab-hint">Apple only makes Genmoji inside its own keyboard, so a website can’t turn a photo into one by itself. The photo stays with Apple; NomNoms only keeps the finished face.</p>
+                        <p className="lab-hint">Apple makes Genmoji only inside its own emoji viewer, so a website can’t create one by itself; this box catches the one you make. The photo stays with Apple; NomNoms only keeps the finished face.{!isAppleSafari && <><br /><strong>You’re not in Safari, so the Genmoji button may not appear here.</strong></>}</p>
                         <div ref={genRef} className="bt-genbox" contentEditable suppressContentEditableWarning data-placeholder="Tap here and insert a Genmoji…" aria-label="Insert a Genmoji here"
                           onInput={() => setTimeout(onGenmoji, 150)}
                           onPaste={(e) => { const f = pastedImage(e); if (!f) return; e.preventDefault(); update({ look: { face: URL.createObjectURL(f), faceScale: 100, faceY: 0, glassesY: 0 } }); setStatus('Got it. Now dress them up.'); }} />
@@ -1087,13 +1129,19 @@ export function BabyTalesDemo() {
                     ))}
                   </div>
                   <label className="lab-switch"><input type="checkbox" checked={dressUp} onChange={(e) => setDressUp(e.target.checked)} /> Dress for each place</label>
-                  {library.length > 0 && (
+                  {(library.length > 0 || drawn.length > 0) && (
                     <div className="bt-library" data-testid="library">
-                      <p className="lab-sub">Made from your photos</p>
+                      <p className="lab-sub">Your places and things <small>(tap a name to rename it)</small></p>
+                      {drawn.map((d) => (
+                        <div key={d.id} className="bt-asset">
+                          <img src={d.image} alt="" />
+                          <div><input className="bt-asset-name" value={d.name} onChange={(e) => renamePlace(d.id, e.target.value)} onBlur={() => { if (!d.name.trim()) renamePlace(d.id, uniqueName('Our place', d.id)); }} aria-label={`Rename ${d.name}`} data-testid="rename-place" /><small>Drawn place · This story only</small></div>
+                        </div>
+                      ))}
                       {library.map((a) => (
                         <div key={a.meta.id} className={cx('bt-asset', a.meta.kind === 'object' && 'is-thing')}>
                           <img src={art_.get(a.meta.id)} alt="" />
-                          <div><strong>{a.meta.name}</strong><small>{a.meta.kind === 'place' ? 'Place' : 'Thing'} · {saved.has(a.meta.id) ? 'Saved in this browser' : 'This story only'}</small></div>
+                          <div><input className="bt-asset-name" value={a.meta.name} onChange={(e) => renamePlace(a.meta.id, e.target.value)} onBlur={() => keepName(a.meta.id)} aria-label={`Rename ${a.meta.name}`} data-testid="rename-place" /><small>{a.meta.kind === 'place' ? 'Place' : 'Thing'} · {saved.has(a.meta.id) ? 'Saved in this browser' : 'This story only'}</small></div>
                           <button type="button" className="btn btn-danger-ghost btn-sm" onClick={() => void removeAsset(a.meta.id)} aria-label={`Delete ${a.meta.name}`} data-testid="asset-delete"><Icon name="x" size={14} /></button>
                         </div>
                       ))}

@@ -73,6 +73,9 @@ export interface SceneThing { image: string; width: number; height: number; heig
 const PERSON_HEIGHT = 190;
 
 /** A full story picture in an illustration mode. `chars[0]` is the star (drawn on the left). */
+/** How tall each age is drawn next to a grown-up. */
+const KIND_SCALE = { baby: 0.74, kid: 0.86, adult: 1, elder: 0.97 } as const;
+
 export function sceneSvg(opts: {
   placeId: string;
   /** A drawn place to use instead of the built-in ones. */
@@ -118,7 +121,11 @@ export function sceneSvg(opts: {
   let s = `<defs>${styleFilters(mode, id)}</defs>${back}`;
   // things made from photos stand on the ground, sized against a grown-up
   const box = (key: string, x: number, y: number, w: number, h: number, inner: string, ax = x + w / 2, ay = y + h) => {
-    const sel = opts.selected === key ? `<rect x="${(x - 4).toFixed(1)}" y="${(y - 4).toFixed(1)}" width="${(w + 8).toFixed(1)}" height="${(h + 8).toFixed(1)}" rx="10" fill="none" stroke="#2f7de1" stroke-width="2.5" stroke-dasharray="7 5" class="bt-sel"/>` : '';
+    // the picked one gets a dashed outline and a corner handle: drag it to make them bigger or smaller
+    const hx = x + w + 4, hy = y - 4;
+    const sel = opts.selected === key ? `<rect x="${(x - 4).toFixed(1)}" y="${(y - 4).toFixed(1)}" width="${(w + 8).toFixed(1)}" height="${(h + 8).toFixed(1)}" rx="10" fill="none" stroke="#2f7de1" stroke-width="2.5" stroke-dasharray="7 5" class="bt-sel"/>`
+      + `<g data-resize="${key}" class="bt-resize" style="cursor:nesw-resize"><circle cx="${hx.toFixed(1)}" cy="${hy.toFixed(1)}" r="16" fill="transparent"/><circle cx="${hx.toFixed(1)}" cy="${hy.toFixed(1)}" r="9.5" fill="#fff" stroke="#2f7de1" stroke-width="2.5"/>`
+      + `<path d="M${(hx - 4).toFixed(1)} ${(hy + 4).toFixed(1)} L${(hx + 4).toFixed(1)} ${(hy - 4).toFixed(1)} M${(hx + 0.5).toFixed(1)} ${(hy - 4).toFixed(1)} H${(hx + 4).toFixed(1)} V${(hy - 0.5).toFixed(1)} M${(hx - 4).toFixed(1)} ${(hy + 0.5).toFixed(1)} V${(hy + 4).toFixed(1)} H${(hx - 0.5).toFixed(1)}" stroke="#2f7de1" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></g>` : '';
     return opts.editable ? `<g data-edit="${key}" data-ax="${ax.toFixed(1)}" data-ay="${ay.toFixed(1)}" style="cursor:grab">${inner}<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" fill="transparent"/>${sel}</g>` : inner;
   };
   (opts.things ?? []).forEach((t) => {
@@ -138,7 +145,9 @@ export function sceneSvg(opts: {
     const slot = slots[i], pl = c.place ?? {};
     if (pl.hidden) return;
     const small = c.size === 'small' || isPet(c.look.kind);
-    const w = (small ? slot.w * 0.78 : slot.w) * (pl.scale ?? 1);
+    // little ones are drawn little: a baby comes up to about a grown-up's chest
+    const age = KIND_SCALE[c.look.kind as keyof typeof KIND_SCALE] ?? 1;
+    const w = (small ? slot.w * 0.78 : slot.w * age) * (pl.scale ?? 1);
     const h = w * (314 / 240);
     const fx = pl.x ?? slot.x + slot.w / 2, fy = pl.y ?? 296 + (small ? 4 : 0);
     const x = fx - w / 2, y = fy - h;

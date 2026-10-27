@@ -957,7 +957,15 @@ function legsFor(kind: Legs, B: BodySpec, E: number, legFill: string, feet: stri
   const [a, b] = hx, end = 245 + E;
   switch (kind) {
     case 'walk': return leg(`M${a} 210 C${a - 2} ${222 + E / 3} ${a - 5} ${234 + E * 0.66} ${a - 7} ${end - 4}`) + leg(`M${b} 210 C${b + 1} ${222 + E / 3} ${b + 3} ${234 + E * 0.66} ${b + 4} ${end}`) + foot(B.footX[0] - 8, 245 + E, -22) + foot(B.footX[1] + 4, 250.5 + E, 16);
-    case 'run': { const k = 211 + (end - 211) * 0.55; return leg(`M${b} 210 C${b + 3} ${222 + E / 3} ${b + 7} ${234 + E * 0.66} ${b + 10} ${end}`) + foot(B.footX[1] + 10, 250 + E, 24) + leg(`M${a} 210 C${a - 10} 218 ${a - 13} ${k - 6} ${a - 7} ${k}`) + foot(a - 8, k + 4, -34, 0.92); }
+    case 'run': {
+      // mid-stride, heading right: the front knee comes up, the back foot kicks up behind (sole showing)
+      const L = end - 210;
+      const seg = (x0: number, y0: number, x1: number, y1: number, bx: number, w0: number, w1: number) => (legFill ? limb(`M${x0.toFixed(1)} ${y0.toFixed(1)} C${(x0 + (x1 - x0) / 3 + bx).toFixed(1)} ${(y0 + (y1 - y0) / 3).toFixed(1)} ${(x0 + (2 * (x1 - x0)) / 3 + bx).toFixed(1)} ${(y0 + (2 * (y1 - y0)) / 3).toFixed(1)} ${x1.toFixed(1)} ${y1.toFixed(1)}`, w0, w1, legFill) : '');
+      const W = B.legW, kf = [b + 0.46 * L, 210 + 0.3 * L], af = [kf[0] - 0.02 * L, kf[1] + 0.5 * L];
+      const kb = [a - 0.16 * L, 210 + 0.46 * L], ab = [kb[0] - 0.46 * L, kb[1] - 0.12 * L];
+      return seg(a, 210, kb[0], kb[1], -2, W * 1.04, W * 0.94) + seg(kb[0], kb[1], ab[0], ab[1], 0, W * 0.94, W * 0.82) + foot(ab[0] - 3, ab[1] - 2, -68, 0.9)
+        + seg(b, 210, kf[0], kf[1], 2, W * 1.04, W * 0.94) + seg(kf[0], kf[1], af[0], af[1], 0, W * 0.94, W * 0.82) + foot(af[0] + 6, af[1] + 3, 8);
+    }
     case 'jump': { const k = 211 + (end - 211) * 0.7; return leg(`M${a} 210 C${a - 9} 220 ${a - 13} ${k - 6} ${a - 9} ${k}`) + leg(`M${b} 210 C${b + 9} 220 ${b + 13} ${k - 6} ${b + 9} ${k}`) + foot(a - 10, k + 4, -28) + foot(b + 10, k + 4, 28); }
     case 'sit': return leg(`M${a} 210 C${a - 4} 214 ${a - 12} 218 ${a - 17} 221`) + leg(`M${b} 210 C${b + 4} 214 ${b + 12} 218 ${b + 17} 221`) + foot(a - 20, 223, -78, 1.05) + foot(b + 20, 223, 78, 1.05);
     case 'dance': return leg(`M${a} 210 C${a - 1} ${222 + E / 3} ${a - 2} ${234 + E * 0.66} ${a - 3} ${end}`) + foot(B.footX[0] - 3, 249 + E, -14) + leg(`M${b} 210 C${b + 10} 216 ${b + 20} 224 ${b + 30} ${232 + E * 0.4}`) + foot(b + 33, 235 + E * 0.4, 42, 0.95);
@@ -1088,7 +1096,9 @@ const mirrorArm = (a: Arm): Arm => ({ arm: mirrorPath(a.arm), sleeve: mirrorPath
 const HOLD: Arm = { arm: 'M130 162 C142 174 151 192 149 211', sleeve: 'M130 162 C137 168 142 175 144 182', hand: [150, 216], thumb: [143, 211] };
 const SWING_F: Arm = { arm: 'M70 162 C62 176 62 192 70 204', sleeve: 'M70 162 C65 170 63 177 63 184', hand: [71, 208], thumb: [76, 203] };
 const SWING_B: Arm = { arm: 'M130 162 C141 175 150 189 156 200', sleeve: 'M130 162 C137 168 142 175 146 182', hand: [158, 204], thumb: [152, 200] };
-const PUMP: Arm = { arm: 'M70 162 C56 170 48 160 54 142', sleeve: 'M70 162 C63 166 58 166 56 160', hand: [55, 137], thumb: [61, 140] };
+/** Running: the back arm swings out behind, the front arm bends up in front at chest height. */
+const RUN_BACK: Arm = { arm: 'M70 162 C60 172 50 180 38 182', sleeve: 'M70 162 C64 168 59 172 54 175', hand: [34, 182], thumb: [39, 177] };
+const RUN_FWD: Arm = { arm: 'M130 162 C142 178 156 182 162 168', sleeve: 'M130 162 C136 170 141 175 146 178', hand: [163, 163], thumb: [157, 166] };
 type Legs = 'stand' | 'walk' | 'run' | 'jump' | 'sit' | 'dance';
 interface ActionSpec { left: Arm | 'pose'; right: Arm; legs: Legs; lift: number; lean: number; raised: [boolean, boolean] }
 /** Arms, legs and body for each action (front view, storybook style). */
@@ -1097,7 +1107,7 @@ function actionSpec(l: Look): ActionSpec {
   const up = mirrorArm(POSES.cheer);
   switch (a) {
     case 'walk': return { left: SWING_F, right: SWING_B, legs: 'walk', lift: 0, lean: 2, raised: [false, false] };
-    case 'run': return { left: PUMP, right: SWING_B, legs: 'run', lift: 6, lean: 7, raised: [false, false] };
+    case 'run': return { left: RUN_BACK, right: RUN_FWD, legs: 'run', lift: 2, lean: 9, raised: [false, false] };
     case 'jump': return { left: POSES.cheer, right: up, legs: 'jump', lift: 26, lean: 0, raised: [true, true] };
     case 'sit': return { left: POSES.stand, right: HOLD, legs: 'sit', lift: -22, lean: 0, raised: [false, false] };
     case 'wave': return { left: POSES.wave, right: HOLD, legs: 'stand', lift: 0, lean: 0, raised: [true, false] };
@@ -1276,7 +1286,7 @@ export function characterMarkup(l: Look, opts: { animated?: boolean; style?: Sty
   const asleep = !pet && l.action === 'sleep';
   const handThing = (h: [number, number]) => (l.hold ? thingArt(l.hold, h[0] + 4, h[1] - 18, 56) : '');
   const prop = pet ? extra(l) : A && A.raised[1] ? '' : l.hold ? handThing(A!.right.hand) : extra(l);
-  const speed = l.action === 'run' ? `<g stroke="#a9b8c8" stroke-width="3.2" stroke-linecap="round" opacity=".65"><path d="M10 138 H-18"/><path d="M4 170 H-30"/><path d="M12 202 H-14"/></g>` : '';
+  const speed = l.action === 'run' ? `<g stroke="#a9b8c8" stroke-width="3.2" stroke-linecap="round" opacity=".65"><path d="M14 130 H-16"/><path d="M6 162 H-28"/><path d="M14 194 H-12"/></g><g fill="#d9cfc2" opacity=".75"><circle cx="34" cy="${FEET - 4}" r="7"/><circle cx="20" cy="${FEET - 8}" r="5"/><circle cx="9" cy="${FEET - 3}" r="3.5"/></g>` : '';
   const boing = l.action === 'jump' ? `<g stroke="#a9b8c8" stroke-width="2.6" fill="none" stroke-linecap="round" opacity=".7"><path d="M64 252 q8 -6 16 0"/><path d="M120 252 q8 -6 16 0"/></g>` : '';
   const shadowNow = up > 10 ? shadow.replace('rx="56"', 'rx="40"').replace('rx="54"', 'rx="38"') : shadow;
   const pose = (inner: string) => asleep

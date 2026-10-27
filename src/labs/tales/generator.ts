@@ -86,6 +86,8 @@ export interface Story {
   about?: string;
   /** "For Maya, with love": a line on the title page. */
   dedication?: string;
+  /** The parent changed something by hand (a new story then becomes an undo step). */
+  edited?: boolean;
   pages: StoryPage[];
 }
 
@@ -201,7 +203,8 @@ export function generateStory(type: StoryType, cast: CastMember[], opts: { seed:
   const pool = chosen.length ? chosen : (PREFERRED[type] ?? PLACES.filter((p) => !p.imaginary && !p.night && p.id !== 'home').map((p) => p.id));
   // the chosen places come first; if fewer than four were chosen, fill in with fitting others
   const fallback = PREFERRED[type] ?? PLACES.filter((p) => !p.imaginary && !p.night && p.id !== 'home').map((p) => p.id);
-  const stops = [...r.shuffle(pool), ...r.shuffle(fallback.filter((id) => !pool.includes(id)))].slice(0, 4);
+  // places the parent picked come first, in the order they picked them
+  const stops = [...(chosen.length ? chosen : r.shuffle(pool)), ...r.shuffle(fallback.filter((id) => !pool.includes(id)))].slice(0, 4);
   while (stops.length < 4) stops.push(r.pick(pool));
 
   let n = 0;
@@ -445,6 +448,18 @@ export function generateStory(type: StoryType, cast: CastMember[], opts: { seed:
   // the star's personality, in their own words, on the first page
   if (opts.heroLine && pages[0]) pages[0].text += ` ${opts.heroLine.replace(/\{H\}/g, H)}`;
   // every page gets an action from its words, so the star isn't standing still on every page
+  // every place the parent picked is in the book, and their own place (a photo or drawing) opens it,
+  // so it's on the cover too. Pages already at a picked place keep it.
+  if (chosen.length && pages.length) {
+    const family = new Set(opts.extraPlaces?.map((p) => p.id));
+    const own = chosen.find((id) => family.has(id));
+    if (own && !chosen.includes(pages[0].place)) pages[0].place = own;
+    const missing = chosen.filter((id) => !pages.some((p) => p.place === id));
+    for (const p of pages) {
+      if (!missing.length) break;
+      if (!chosen.includes(p.place)) p.place = missing.shift()!;
+    }
+  }
   for (const p of pages) {
     if (!p.action) p.action = actionFromText(p.text, p.mood);
     p.heading ??= place(p.place).name;

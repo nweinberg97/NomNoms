@@ -113,6 +113,10 @@
 .bt-text-tap:hover { background: rgba(0,0,0,.035); }
 .bt-text-edit { border: 0; border-bottom: 1.5px dashed var(--accent); background: transparent; resize: none; width: 100%; outline: none; padding: 0; field-sizing: content; }
 .bt-setting { flex: 1 1 200px; }
+.bt-asset-name { font: inherit; font-weight: 600; border: 0; border-bottom: 1.5px dashed #d8cdbd; background: transparent; padding: 1px 0; width: 100%; outline: none; color: inherit; }
+.bt-asset-name:focus { border-bottom-color: var(--accent); }
+.bt-size { display: flex; align-items: flex-end; gap: 8px; }
+.bt-size .field { flex: 1; }
 .bt-tagline { font-family: var(--serif, Lora, serif); font-style: italic; font-size: 16px; color: #6f655c; margin: 0; }
 .bt-pager { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
 .bt-dots { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
