@@ -229,6 +229,39 @@ function loopsOf(label: Int32Array, w: number, h: number, k: number, box: { x0: 
   return loops;
 }
 
+/**
+ * Round off region edges before tracing: each pixel takes the label most common around it (a
+ * mode filter). Superpixels leave stair-step borders, which drew as blocky "pixel" edges; this
+ * turns them into soft curves while keeping real shapes. Unlabelled pixels (outside a mask) stay so.
+ */
+function roundEdges(label: Int32Array, w: number, h: number, r: number, passes: number): Int32Array {
+  let src = label;
+  const cand = new Int32Array((2 * r + 1) ** 2), cnt = new Int32Array((2 * r + 1) ** 2);
+  for (let p = 0; p < passes; p++) {
+    const out = new Int32Array(src.length);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const i = y * w + x, own = src[i];
+      if (own < 0) { out[i] = own; continue; }
+      let m = 0;
+      for (let dy = -r; dy <= r; dy++) {
+        const yy = y + dy; if (yy < 0 || yy >= h) continue;
+        for (let dx = -r; dx <= r; dx++) {
+          const xx = x + dx; if (xx < 0 || xx >= w || dx * dx + dy * dy > r * r + r) continue;
+          const v = src[yy * w + xx]; if (v < 0) continue;
+          let j = 0; while (j < m && cand[j] !== v) j++;
+          if (j === m) { cand[m] = v; cnt[m] = 0; m++; }
+          cnt[j]++;
+        }
+      }
+      let best = own, bc = -1;
+      for (let j = 0; j < m; j++) if (cnt[j] > bc || (cnt[j] === bc && cand[j] === own)) { bc = cnt[j]; best = cand[j]; }
+      out[i] = best;
+    }
+    src = out;
+  }
+  return src;
+}
+
 function simplify(pts: number[][], eps: number): number[][] {
   if (pts.length < 4) return pts;
   // closed loop: split at the point farthest from the first, simplify both halves
@@ -261,7 +294,7 @@ function smoothPath(p: number[][]): string {
     const a = p[(i - 1 + n) % n], b = p[(i + 1) % n];
     const v1 = [c[0] - a[0], c[1] - a[1]], v2 = [b[0] - c[0], b[1] - c[1]];
     const cos = (v1[0] * v2[0] + v1[1] * v2[1]) / ((Math.hypot(...v1) * Math.hypot(...v2)) || 1);
-    return cos < 0.45; // turns of more than ~63°
+    return cos < -0.2; // only real corners (turns of more than ~100°) stay sharp; stair steps become curves
   });
   const m0 = mid(p[n - 1], p[0]);
   let d = `M${f(m0[0])} ${f(m0[1])}`;
@@ -361,12 +394,16 @@ export function* vectorizeSteps(src: Raster, opts: VectorOptions = {}): Generato
   }
 
   yield 'outlines';
+  // soft edges: round off the stair-steps the superpixels leave (scaled to the picture size)
+  const rr = Math.max(2, Math.round(Math.min(w, h) / 120));
+  const soft = roundEdges(label, w, h, rr, 2);
   const shapes: VShape[] = [];
   const toRgb = (l: number[]) => labToRgb(l[0], l[1], l[2]).map((v) => Math.round(v)) as [number, number, number];
   for (const k of ids) {
     const r = regions[k], a = acc.get(k)!, m = meanOf(r);
-    const loops = loopsOf(label, w, h, k, r);
-    const d = loops.map((lp) => smoothPath(simplify(lp, 1.5))).join('');
+    const box = { x0: Math.max(0, r.x0 - rr * 2), y0: Math.max(0, r.y0 - rr * 2), x1: Math.min(w - 1, r.x1 + rr * 2), y1: Math.min(h - 1, r.y1 + rr * 2) };
+    const loops = loopsOf(soft, w, h, k, box).filter((lp) => lp.length > 8);
+    const d = loops.map((lp) => smoothPath(simplify(lp, 2.2))).join('');
     if (!d) continue;
     const top = a.tn ? a.t.map((v) => v / a.tn) : m, bottom = a.bn ? a.b.map((v) => v / a.bn) : m;
     // keep the shade gentle: no more than a small step from the shape's average

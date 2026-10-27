@@ -27,6 +27,7 @@ import { AssetStudio } from './AssetStudio';
 import { DrawingMagic } from './DrawingMagic';
 import { WORLDS, WORLD_IDS, worldCostume, worldPose } from './worlds';
 import { assetArtUrl } from './assets/browser';
+import { DRAW_STYLES, DRAW_STYLE_NAMES, type DrawStyle } from './assets/paintRender';
 import { deleteAsset, listAssets, saveAsset } from './assets/library';
 import type { StoredAsset } from './assets/meta';
 import type { AssetKind } from './assets/pipeline';
@@ -253,6 +254,14 @@ export function BabyTalesDemo() {
     setLibrary((l) => l.map((x) => (x.meta.id === id ? { ...x, meta: { ...x.meta, name } } : x)));
     setDrawn((ds) => ds.map((d) => (d.id === id ? placeFromDrawing(id, name, d.image) : d)));
     if (old != null) setStory((st) => ({ ...st, pages: st.pages.map((pg) => (pg.place === id && (pg.heading ?? '') === old ? { ...pg, heading: name } : pg)) }));
+  };
+  /** Draw a photo place or thing another way (storybook shapes, soft paint, watercolour, pencil); kept if it was saved. */
+  const restyle = (id: string, drawStyle: DrawStyle) => {
+    const a = library.find((x) => x.meta.id === id);
+    if (!a) return;
+    const next = { ...a, base: { ...a.base, drawStyle } };
+    setLibrary((l) => l.map((x) => (x.meta.id === id ? next : x)));
+    if (saved.has(id)) void saveAsset(next).catch(() => undefined);
   };
   /** Keep a renamed photo place or thing saved (only if it was saved already). */
   const keepName = (id: string) => {
@@ -1162,7 +1171,10 @@ export function BabyTalesDemo() {
                       {library.map((a) => (
                         <div key={a.meta.id} className={cx('bt-asset', a.meta.kind === 'object' && 'is-thing')}>
                           <img src={art_.get(a.meta.id)} alt="" />
-                          <div><input className="bt-asset-name" value={a.meta.name} onChange={(e) => renamePlace(a.meta.id, e.target.value)} onBlur={() => keepName(a.meta.id)} aria-label={`Rename ${a.meta.name}`} data-testid="rename-place" /><small>{a.meta.kind === 'place' ? 'Place' : 'Thing'} · {saved.has(a.meta.id) ? 'Saved in this browser' : 'This story only'}</small></div>
+                          <div><input className="bt-asset-name" value={a.meta.name} onChange={(e) => renamePlace(a.meta.id, e.target.value)} onBlur={() => keepName(a.meta.id)} aria-label={`Rename ${a.meta.name}`} data-testid="rename-place" />
+                            <select className="bt-asset-style" value={a.base.drawStyle ?? 'shapes'} onChange={(e) => restyle(a.meta.id, e.target.value as DrawStyle)} aria-label={`How ${a.meta.name} is drawn`} data-testid="asset-style">
+                              {DRAW_STYLES.map((d) => <option key={d} value={d}>{DRAW_STYLE_NAMES[d]}</option>)}
+                            </select><small>{a.meta.kind === 'place' ? 'Place' : 'Thing'} · {saved.has(a.meta.id) ? 'Saved in this browser' : 'This story only'}</small></div>
                           <button type="button" className="btn btn-danger-ghost btn-sm" onClick={() => void removeAsset(a.meta.id)} aria-label={`Delete ${a.meta.name}`} data-testid="asset-delete"><Icon name="x" size={14} /></button>
                         </div>
                       ))}

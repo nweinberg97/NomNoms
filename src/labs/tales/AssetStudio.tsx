@@ -9,6 +9,7 @@ import { decodePhoto, findThingsToHide, rasterToCanvas, rasterToUrl, resize, wip
 import { makeMeta, type StoredAsset } from './assets/meta';
 import { brushMask, cropRaster, hideRegions, maskCoverage, rotate90, MAX_SIDE, type AssetKind, type Raster, type Rect } from './assets/pipeline';
 import { assetArtUrl } from './assets/browser';
+import { DRAW_STYLES, DRAW_STYLE_NAMES, type DrawStyle } from './assets/paintRender';
 import { DETAILS, type VectorStage } from './assets/vector';
 import { cutOutAsync, makeAsset } from './assets/make';
 import { DrawingMagic } from './DrawingMagic';
@@ -71,7 +72,7 @@ export function AssetStudio({ open, kind: startKind, mode: startMode, star, onCl
   const reset = () => {
     wipe(photo); wipe(work.current);
     setStep('pick'); setPhoto(null); setCrop(null); setHides([]); setAutoFound(0); setLooked(false); setTool('frame'); setKeep(0);
-    setMask(null); setMaskEdited(false); setResult(null); setConfirm(false); setError(undefined); setName(''); setHorizon(null); setSeed(7);
+    setMask(null); setMaskEdited(false); setResult(null); setConfirm(false); setError(undefined); setName(''); setHorizon(null); setSeed(7); setDrawStyle('shapes');
   };
   useEffect(() => { if (open) { setKind(startKind); setMode(startMode); setHeight(startKind === 'object' ? 0.35 : 1); } else reset(); }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -226,7 +227,8 @@ export function AssetStudio({ open, kind: startKind, mode: startMode, star, onCl
   };
 
   /* ── 3. review ───────────────────────────────────────── */
-  const preview = useMemo(() => (result ? assetArtUrl(result.base, mode) : ''), [result, mode]);
+  const [drawStyle, setDrawStyle] = useState<DrawStyle>('shapes');
+  const preview = useMemo(() => (result ? assetArtUrl({ ...result.base, drawStyle }, mode) : ''), [result, mode, drawStyle]);
   const beforeUrl = useMemo(() => (step === 'review' && work.current ? rasterToUrl(work.current, 'image/jpeg') : ''), [step, workVersion]); // eslint-disable-line react-hooks/exhaustive-deps
   const inScene = useMemo(() => {
     if (!result || !preview) return '';
@@ -239,7 +241,7 @@ export function AssetStudio({ open, kind: startKind, mode: startMode, star, onCl
   const finish = (save: boolean) => {
     if (!result) return;
     const meta = { ...result.meta, name: name.trim() || result.meta.name, styleMode: mode, placement: { ...result.meta.placement, ...(kind === 'object' ? { heightRatio: height } : {}) } };
-    onDone({ meta, base: result.base }, save);
+    onDone({ meta, base: { ...result.base, drawStyle } }, save);
     reset();
   };
 
@@ -340,6 +342,10 @@ export function AssetStudio({ open, kind: startKind, mode: startMode, star, onCl
             <p className="lab-sub">Look</p>
             <div className="lab-chips" role="radiogroup" aria-label="Look">
               {STYLE_MODES.map((m) => <button key={m} type="button" className="lab-chip" aria-pressed={mode === m} onClick={() => setMode(m)} data-testid={`ast-mode-${m}`}>{STYLES[m].name}</button>)}
+            </div>
+            <p className="lab-sub">Drawing style</p>
+            <div className="lab-chips" role="radiogroup" aria-label="Drawing style">
+              {DRAW_STYLES.map((d) => <button key={d} type="button" className="lab-chip" role="radio" aria-checked={drawStyle === d} aria-pressed={drawStyle === d} onClick={() => setDrawStyle(d)} data-testid={`ast-style-${d}`}>{DRAW_STYLE_NAMES[d]}</button>)}
             </div>
             <div className="ast-scene" dangerouslySetInnerHTML={{ __html: inScene }} />
             <p className="lab-hint">In a story it follows whatever look the book uses.</p>
