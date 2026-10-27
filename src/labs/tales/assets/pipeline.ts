@@ -326,8 +326,8 @@ export interface AssetBase {
   field?: { w: number; h: number; rgb: Uint8Array };
   /** The redrawn illustration (outlines and colours only). Assets saved before it existed don't have one. */
   vector?: VectorArt;
-  /** How it's drawn: storybook shapes (default), soft paint, watercolour or pencil sketch. */
-  drawStyle?: 'shapes' | 'painted' | 'watercolour' | 'sketch';
+  /** How it's drawn (paintRender.ts); assets made before this have none and draw as shapes. */
+  drawStyle?: 'shapes' | 'cartoon' | 'painted' | 'blocks' | 'sketch' | 'watercolour';
 }
 
 export const FIELD_W = 24;

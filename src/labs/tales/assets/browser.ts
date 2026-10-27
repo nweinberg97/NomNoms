@@ -1,6 +1,6 @@
 import { renderBase } from './render';
 import { vectorUrl } from './vectorRender';
-import { paintedSvg } from './paintRender';
+import { drawStyleOf, stylizeBase } from './paintRender';
 import type { StyleMode } from '../styles';
 import { fitSize, makeRaster, type AssetBase, type Raster, type Rect } from './pipeline';
 
@@ -14,12 +14,9 @@ import { fitSize, makeRaster, type AssetBase, type Raster, type Rect } from './p
 /** Decode a photo, upright, at most `max` pixels on its long side. The file itself is not kept. */
 /** The picture for an asset in a look: the redrawn vector when there is one, else the older pixel rendering. */
 export function assetArtUrl(base: AssetBase, mode: StyleMode): string {
-  const style = base.drawStyle ?? 'shapes';
-  if (style !== 'shapes') {
-    // soft paint, watercolour or pencil: the asset's own simplified colours, finished with filters
-    const svg = paintedSvg(rasterToUrl(renderBase(base, mode), 'image/png'), base.w, base.h, style, mode);
-    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
-  }
+  const style = drawStyleOf(base.drawStyle);
+  // the crisp illustration styles are drawn from the asset's simplified colours; 'shapes' is the vector redraw
+  if (style !== 'shapes') return rasterToUrl(stylizeBase(base, style, mode), 'image/png');
   return base.vector ? vectorUrl(base.vector, mode, { transparent: base.kind === 'object' }) : rasterToUrl(renderBase(base, mode), 'image/png');
 }
 

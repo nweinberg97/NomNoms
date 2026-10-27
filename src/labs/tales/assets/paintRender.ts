@@ -1,77 +1,223 @@
 /**
- * Other ways to draw a place (or thing) made from a photo, besides the storybook
- * shapes of vectorRender.ts. Each one starts from the picture's simplified
- * colours (the asset's palette and labels, never the photo) and finishes it with
- * SVG filters, so it stays smooth at any size and costs nothing to switch:
+ * Ways to draw a place (or thing) made from a photo, crisp at full size, from
+ * the asset's simplified colours (its palette and per-pixel labels, never the
+ * photo). Each style is a different illustration technique, not a blur filter:
  *
- *   painted      soft brushwork: blended edges, gentle stroke direction, canvas grain
- *   watercolour  loose washes: bleeding edges, darker pooled rims, paper texture
- *   sketch       coloured-pencil: pale fill with hand-drawn graphite lines
+ *   cartoon    a clean flat illustration: bright simplified colours, smooth
+ *              edges, a fine dark outline where colours meet
+ *   painted    a painted film backdrop: the same shapes with soft light and
+ *              colour moving inside them, brush grain, a warm glow, no outlines
+ *   blocks     a block world: the picture built from little shaded cubes
+ *   sketch     ink and wash: pale washes of colour under hand-drawn ink lines
+ *   shapes     the paper-shape vector redraw (vectorRender.ts)
+ *
+ * Everything is computed from numbers (no AI, nothing leaves the device), is
+ * the same every time for the same asset, and is drawn at twice the asset's
+ * size so edges stay sharp on phones.
  */
-import type { StyleMode } from '../styles';
+import { STYLES, type StyleMode } from '../styles';
+import { labToRgb, makeRaster, rgbToLab, type AssetBase, type Raster } from './pipeline';
 
-export type DrawStyle = 'shapes' | 'painted' | 'watercolour' | 'sketch';
-export const DRAW_STYLES: DrawStyle[] = ['shapes', 'painted', 'watercolour', 'sketch'];
+export type DrawStyle = 'shapes' | 'cartoon' | 'painted' | 'blocks' | 'sketch';
+export const DRAW_STYLES: DrawStyle[] = ['cartoon', 'painted', 'blocks', 'sketch', 'shapes'];
 export const DRAW_STYLE_NAMES: Record<DrawStyle, string> = {
-  shapes: 'Storybook shapes',
-  painted: 'Soft paint',
-  watercolour: 'Watercolour',
-  sketch: 'Pencil sketch',
+  cartoon: 'Cartoon',
+  painted: 'Painted film',
+  blocks: 'Block world',
+  sketch: 'Ink & wash',
+  shapes: 'Paper shapes',
 };
+/** Older saved assets may name a style that was replaced; map it to the nearest one. */
+export const drawStyleOf = (s: string | undefined): DrawStyle =>
+  s === 'cartoon' || s === 'painted' || s === 'blocks' || s === 'sketch' || s === 'shapes' ? s : s === 'watercolour' ? 'painted' : 'shapes';
 
-let uid = 0;
+type RGB = [number, number, number];
 
-/** The filter for a style, sized to the picture (w × h). */
-function filterFor(style: Exclude<DrawStyle, 'shapes'>, id: string, w: number, mode: StyleMode): string {
-  const k = w / 640; // the effects are tuned for a 640-wide picture
-  const warm = mode === 'gouache' ? 0.08 : 0.04;
-  switch (style) {
-    case 'painted':
-      return `<filter id="${id}" x="-3%" y="-3%" width="106%" height="106%" color-interpolation-filters="sRGB">
-        <feGaussianBlur in="SourceGraphic" stdDeviation="${(1.4 * k).toFixed(2)}" result="soft"/>
-        <feTurbulence type="fractalNoise" baseFrequency="${(0.03 / k).toFixed(4)} ${(0.1 / k).toFixed(4)}" numOctaves="2" seed="3" result="brush"/>
-        <feDisplacementMap in="soft" in2="brush" scale="${(8 * k).toFixed(1)}" xChannelSelector="R" yChannelSelector="G" result="stroked"/>
-        <feColorMatrix in="stroked" type="saturate" values="1.08" result="rich"/>
-        <feTurbulence type="fractalNoise" baseFrequency="${(0.8 / k).toFixed(3)}" numOctaves="2" seed="5" result="grain"/>
-        <feColorMatrix in="grain" type="matrix" values="0 0 0 0 ${0.5 + warm}  0 0 0 0 0.42  0 0 0 0 0.34  0 0 0 0.16 0" result="tint"/>
-        <feComposite in="tint" in2="rich" operator="in" result="tintIn"/>
-        <feBlend in="tintIn" in2="rich" mode="multiply"/>
-      </filter>`;
-    case 'watercolour':
-      return `<filter id="${id}" x="-3%" y="-3%" width="106%" height="106%" color-interpolation-filters="sRGB">
-        <feTurbulence type="fractalNoise" baseFrequency="${(0.018 / k).toFixed(4)}" numOctaves="3" seed="7" result="flow"/>
-        <feDisplacementMap in="SourceGraphic" in2="flow" scale="${(12 * k).toFixed(1)}" xChannelSelector="R" yChannelSelector="G" result="bled"/>
-        <feGaussianBlur in="bled" stdDeviation="${(1.5 * k).toFixed(2)}" result="wash"/>
-        <feGaussianBlur in="bled" stdDeviation="${(5 * k).toFixed(2)}" result="wide"/>
-        <feComposite in="wash" in2="wide" operator="arithmetic" k1="0" k2="1.9" k3="-0.9" k4="0" result="rims"/>
-        <feColorMatrix in="rims" type="saturate" values="1.1" result="vivid"/>
-        <feComponentTransfer in="vivid" result="light"><feFuncR type="linear" slope=".88" intercept=".11"/><feFuncG type="linear" slope=".88" intercept=".1"/><feFuncB type="linear" slope=".88" intercept=".09"/></feComponentTransfer>
-        <feTurbulence type="fractalNoise" baseFrequency="${(0.55 / k).toFixed(3)}" numOctaves="3" seed="11" result="paper"/>
-        <feColorMatrix in="paper" type="matrix" values="0 0 0 0 0.55  0 0 0 0 0.5  0 0 0 0 0.44  0 0 0 0.2 0" result="tint"/>
-        <feComposite in="tint" in2="light" operator="in" result="tintIn"/>
-        <feBlend in="tintIn" in2="light" mode="multiply"/>
-      </filter>`;
-    case 'sketch':
-      return `<filter id="${id}" x="-3%" y="-3%" width="106%" height="106%" color-interpolation-filters="sRGB">
-        <feTurbulence type="fractalNoise" baseFrequency="${(0.05 / k).toFixed(4)}" numOctaves="2" seed="13" result="wob"/>
-        <feDisplacementMap in="SourceGraphic" in2="wob" scale="${(3 * k).toFixed(1)}" xChannelSelector="R" yChannelSelector="G" result="hand"/>
-        <feGaussianBlur in="hand" stdDeviation="${(1.6 * k).toFixed(2)}" result="soft"/>
-        <feColorMatrix in="soft" type="saturate" values=".9" result="calm"/>
-        <feComponentTransfer in="calm" result="pale"><feFuncR type="linear" slope=".55" intercept=".45"/><feFuncG type="linear" slope=".55" intercept=".44"/><feFuncB type="linear" slope=".55" intercept=".42"/></feComponentTransfer>
-        <feGaussianBlur in="hand" stdDeviation="${(1.2 * k).toFixed(2)}" result="calmEdges"/>
-        <feConvolveMatrix in="calmEdges" order="3" kernelMatrix="-1 -1 -1 -1 8 -1 -1 -1 -1" preserveAlpha="true" result="edges"/>
-        <feColorMatrix in="edges" type="matrix" values="0 0 0 0 0.3  0 0 0 0 0.26  0 0 0 0 0.24  1.7 1.7 1.7 0 -0.2" result="lines"/>
-        <feComponentTransfer in="lines" result="pencil"><feFuncA type="linear" slope=".75"/></feComponentTransfer>
-        <feMerge><feMergeNode in="pale"/><feMergeNode in="pencil"/></feMerge>
-      </filter>`;
+/** Small regions (specks, leaf noise) join the neighbour they share the most edge with. */
+function cleanLabels(labels: Uint8Array, w: number, h: number, minArea: number, alpha?: Uint8Array): Uint8Array {
+  const out = new Uint8Array(labels);
+  const seen = new Uint8Array(w * h);
+  const stack: number[] = [];
+  const nb = (p: number) => { const x = p % w, y = (p / w) | 0; return [x > 0 ? p - 1 : -1, x < w - 1 ? p + 1 : -1, y > 0 ? p - w : -1, y < h - 1 ? p + w : -1]; };
+  for (let s = 0; s < w * h; s++) {
+    if (seen[s] || (alpha && !alpha[s])) continue;
+    const lab = out[s], pix: number[] = [];
+    seen[s] = 1; stack.push(s);
+    while (stack.length) {
+      const p = stack.pop()!; pix.push(p);
+      for (const q of nb(p)) if (q >= 0 && !seen[q] && out[q] === lab && (!alpha || alpha[q])) { seen[q] = 1; stack.push(q); }
+    }
+    if (pix.length >= minArea) continue;
+    const votes = new Map<number, number>();
+    for (const p of pix) for (const q of nb(p)) if (q >= 0 && out[q] !== lab && (!alpha || alpha[q])) votes.set(out[q], (votes.get(out[q]) ?? 0) + 1);
+    let best = -1, bc = 0;
+    for (const [k, c] of votes) if (c > bc) { bc = c; best = k; }
+    if (best >= 0) for (const p of pix) out[p] = best;
   }
+  return out;
 }
 
-/**
- * A drawn picture from the asset's simplified colours (`png`: the palette ×
- * labels rendered at full size, as a data URL) in the chosen style.
- */
-export function paintedSvg(png: string, w: number, h: number, style: Exclude<DrawStyle, 'shapes'>, mode: StyleMode): string {
-  const id = `pp${++uid}`;
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}"><defs>${filterFor(style, id, w, mode)}</defs><g filter="url(#${id})"><image href="${png}" x="${(-w * 0.03).toFixed(1)}" y="${(-h * 0.03).toFixed(1)}" width="${(w * 1.06).toFixed(1)}" height="${(h * 1.06).toFixed(1)}" preserveAspectRatio="none"/></g></svg>`;
+/** Labels at S× the size with smooth (not stair-stepped) edges: each new pixel takes the label with most weight among its four neighbours. */
+function upLabels(labels: Uint8Array, w: number, h: number, S: number): Uint8Array {
+  const W = w * S, H = h * S, out = new Uint8Array(W * H);
+  const wt = new Float32Array(256);
+  for (let Y = 0; Y < H; Y++) {
+    const fy = (Y + 0.5) / S - 0.5, y0 = Math.max(0, Math.floor(fy)), y1 = Math.min(h - 1, y0 + 1), ty = Math.min(1, Math.max(0, fy - y0));
+    for (let X = 0; X < W; X++) {
+      const fx = (X + 0.5) / S - 0.5, x0 = Math.max(0, Math.floor(fx)), x1 = Math.min(w - 1, x0 + 1), tx = Math.min(1, Math.max(0, fx - x0));
+      const a = labels[y0 * w + x0], b = labels[y0 * w + x1], c = labels[y1 * w + x0], d = labels[y1 * w + x1];
+      wt[a] = 0; wt[b] = 0; wt[c] = 0; wt[d] = 0;
+      wt[a] += (1 - tx) * (1 - ty); wt[b] += tx * (1 - ty); wt[c] += (1 - tx) * ty; wt[d] += tx * ty;
+      let best = a; for (const k of [b, c, d]) if (wt[k] > wt[best]) best = k;
+      out[Y * W + X] = best;
+    }
+  }
+  return out;
+}
+
+/** Brighter, cleaner illustration colours: more chroma, a touch more contrast, warmer in warm looks. */
+function illustrate(c: number[], mode: StyleMode, chroma = 1.28): RGB {
+  const [L, a, b] = rgbToLab(c[0], c[1], c[2]);
+  const warm = STYLES[mode].colour.warmth * 30;
+  const L2 = Math.max(4, Math.min(97, 50 + (L - 50) * 1.08 + 3));
+  // photo foliage reads olive; illustrated foliage is a fresher green (yellow-greens turn toward green)
+  let A = a, Bv = b;
+  const hue = (Math.atan2(b, a) * 180) / Math.PI;
+  if (hue > 95 && hue < 135 && Math.hypot(a, b) > 12) { const r = Math.hypot(a, b), t = ((Math.min(135, hue + 14)) * Math.PI) / 180; A = r * Math.cos(t); Bv = r * Math.sin(t); }
+  return labToRgb(L2, A * chroma + warm * 0.2, Bv * chroma + warm * 0.5).map(Math.round) as RGB;
+}
+const shadeRgb = (c: RGB, dL: number): RGB => { const [L, a, b] = rgbToLab(c[0], c[1], c[2]); return labToRgb(Math.max(0, Math.min(100, L + dL)), a, b).map(Math.round) as RGB; };
+const dE = (p: number[], q: number[]) => { const A = rgbToLab(p[0], p[1], p[2]), B = rgbToLab(q[0], q[1], q[2]); return Math.hypot(A[0] - B[0], A[1] - B[1], A[2] - B[2]); };
+const lumOf = (c: number[]) => rgbToLab(c[0], c[1], c[2])[0];
+/** A cheap repeatable noise in [0, 1). */
+const hash = (x: number, y: number) => { let v = (x * 374761393 + y * 668265263) | 0; v = Math.imul(v ^ (v >>> 13), 1274126177); return ((v ^ (v >>> 16)) >>> 0) / 4294967296; };
+
+/** Bilinear sample of the asset's tiny colour map (soft light and colour moving inside shapes). */
+function fieldAt(base: AssetBase, u: number, v: number): RGB | null {
+  const F = base.field;
+  if (!F) return null;
+  const fx = u * F.w - 0.5, fy = v * F.h - 0.5;
+  const x0 = Math.max(0, Math.min(F.w - 1, Math.floor(fx))), y0 = Math.max(0, Math.min(F.h - 1, Math.floor(fy)));
+  const x1 = Math.min(F.w - 1, x0 + 1), y1 = Math.min(F.h - 1, y0 + 1);
+  const tx = Math.min(1, Math.max(0, fx - x0)), ty = Math.min(1, Math.max(0, fy - y0));
+  const at = (x: number, y: number, c: number) => F.rgb[(y * F.w + x) * 3 + c];
+  return [0, 1, 2].map((c) => at(x0, y0, c) * (1 - tx) * (1 - ty) + at(x1, y0, c) * tx * (1 - ty) + at(x0, y1, c) * (1 - tx) * ty + at(x1, y1, c) * tx * ty) as RGB;
+}
+
+/** The finished picture for a style (other than 'shapes'), at twice the asset's size. */
+export function stylizeBase(base: AssetBase, style: Exclude<DrawStyle, 'shapes'>, mode: StyleMode): Raster {
+  const { w, h } = base, S = 2, W = w * S, H = h * S;
+  const alpha = base.alpha;
+  const out = makeRaster(W, H);
+  const put = (i: number, c: number[], a = 255) => { out.data[i * 4] = c[0]; out.data[i * 4 + 1] = c[1]; out.data[i * 4 + 2] = c[2]; out.data[i * 4 + 3] = a; };
+
+  if (style === 'blocks') {
+    // a block world: about 46 blocks across the long side, each one colour, bevelled and lightly textured
+    const b1 = Math.max(4, Math.round(Math.max(w, h) / 46)), B = b1 * S;
+    const pal = base.palette.map((c) => illustrate(c, mode, 1.22));
+    const counts = new Uint16Array(256);
+    for (let by = 0; by * b1 < h; by++) for (let bx = 0; bx * b1 < w; bx++) {
+      counts.fill(0); let any = 0, tot = 0;
+      for (let y = by * b1; y < Math.min(h, (by + 1) * b1); y++) for (let x = bx * b1; x < Math.min(w, (bx + 1) * b1); x++) {
+        const i = y * w + x; tot++; if (alpha && !alpha[i]) continue; counts[base.labels[i]]++; any++;
+      }
+      const filled = any > tot * 0.45;
+      let best = 0; for (let k = 1; k < 256; k++) if (counts[k] > counts[best]) best = k;
+      const c = pal[best] ?? ([200, 200, 200] as RGB);
+      const light = shadeRgb(c, 9), dark = shadeRgb(c, -12), edge = shadeRgb(c, -24), speckA = shadeRgb(c, 5), speckB = shadeRgb(c, -6);
+      const bev = Math.max(2, Math.round(B / 8));
+      for (let Y = by * B; Y < Math.min(H, (by + 1) * B); Y++) for (let X = bx * B; X < Math.min(W, (bx + 1) * B); X++) {
+        const i = Y * W + X;
+        if (!filled) { put(i, [0, 0, 0], 0); continue; }
+        const lx = X - bx * B, ly = Y - by * B;
+        let col: RGB = lx < bev || ly < bev ? light : lx >= B - bev || ly >= B - bev ? dark : c;
+        if (lx === 0 || ly === 0) col = edge;
+        // a little pixel texture on each face, like the blocks in a building game
+        if (col === c) { const t = hash((X / 3) | 0, (Y / 3) | 0); if (t > 0.8) col = t > 0.9 ? speckA : speckB; }
+        put(i, col);
+      }
+    }
+    return out;
+  }
+
+  const clean = cleanLabels(base.labels, w, h, Math.max(16, Math.round(w * h * (style === 'sketch' ? 0.0012 : 0.0007))), alpha);
+  const L2 = upLabels(clean, w, h, S);
+  const A2 = alpha ? upLabels(alpha, w, h, S) : null;
+  const pal = base.palette.map((c) => illustrate(c, mode, style === 'sketch' ? 0.9 : style === 'painted' ? 1.15 : 1.3));
+  // ink only between colours that really differ; the ink is a deep version of the darker side
+  const inks = new Map<number, RGB | null>();
+  const inkOf = (a: number, b: number): RGB | null => {
+    const key = a * 256 + b;
+    if (inks.has(key)) return inks.get(key)!;
+    const pa = pal[a], pb = pal[b];
+    let ink: RGB | null = null;
+    if (pa && pb && dE(pa, pb) >= (style === 'sketch' ? 10 : 15)) ink = style === 'sketch' ? [58, 46, 40] : shadeRgb(lumOf(pa) < lumOf(pb) ? pa : pb, -30);
+    inks.set(key, ink);
+    return ink;
+  };
+  // the soft colour map in illustration colours, worked out once (sampled per pixel below)
+  const litField: AssetBase = { ...base, field: base.field && { ...base.field, rgb: (() => { const F = base.field!, o = new Uint8Array(F.rgb.length); for (let j = 0; j < F.w * F.h; j++) { const c = illustrate([F.rgb[j * 3], F.rgb[j * 3 + 1], F.rgb[j * 3 + 2]], mode, 1.12); o[j * 3] = c[0]; o[j * 3 + 1] = c[1]; o[j * 3 + 2] = c[2]; } return o; })() } };
+  const glow = STYLES[mode].palette.light;
+  const gl = [1, 3, 5].map((o) => parseInt(glow.slice(o, o + 2), 16));
+  // the sky: colours that fill much of the top edge and are pale or blue are drawn as an illustrated sky
+  const sky = new Uint8Array(256);
+  let skyLow = 0;
+  if (!alpha) {
+    const topCount = new Uint32Array(256), count = new Uint32Array(256), high = new Uint32Array(256), sumY = new Float64Array(256);
+    for (let x = 0; x < w; x++) topCount[clean[x]]++;
+    for (let i = 0; i < w * h; i++) { const y = (i / w) | 0, k = clean[i]; count[k]++; sumY[k] += y; if (y < h * 0.45) high[k]++; }
+    base.palette.forEach((c, k) => {
+      const [L, a, b] = rgbToLab(c[0], c[1], c[2]);
+      // a sky spans the top edge, lives in the upper part of the picture, and is pale or blue (a white wall indoors is not)
+      const upper = count[k] > 0 && high[k] / count[k] > 0.85 && sumY[k] / count[k] < h * 0.3;
+      if (topCount[k] > w * 0.18 && upper && L > 55 && (b < -6 || (Math.hypot(a, b) < 8 && topCount[k] > w * 0.4))) sky[k] = 1;
+    });
+    if (sky.some((v) => v)) { let low = 0; for (let i = 0; i < w * h; i++) if (sky[clean[i]]) low = Math.max(low, (i / w) | 0); skyLow = low / h; }
+  }
+  const skyTop = illustrate([96, 158, 222], mode, 1), skyBot = illustrate([214, 234, 246], mode, 1);
+  const skyAt = (v: number) => { const t = Math.min(1, v / Math.max(0.2, skyLow)); return skyTop.map((c, j) => c + (skyBot[j] - c) * t); };
+  // a few soft, round illustrated clouds in the sky band
+  const clouds: [number, number, number][] = [];
+  if (skyLow > 0.08) for (let j = 0; j < 3; j++) { const r = 0.05 + hash(j, 7) * 0.03; clouds.push([0.15 + j * 0.33 + (hash(j, 3) - 0.5) * 0.12, Math.min(skyLow * 0.55, 0.05 + hash(j, 5) * skyLow * 0.4), r]); }
+  const inCloud = (u: number, v: number) => { for (const [cx, cy, r] of clouds) { const d = Math.min(Math.hypot((u - cx) / r, (v - cy) / (r * 0.62)), Math.hypot((u - cx - r * 0.9) / (r * 0.75), (v - cy - r * 0.12) / (r * 0.5)), Math.hypot((u - cx + r * 0.9) / (r * 0.7), (v - cy - r * 0.15) / (r * 0.45))); if (d < 1) return d; } return -1; };
+  for (let Y = 0; Y < H; Y++) for (let X = 0; X < W; X++) {
+    const i = Y * W + X;
+    if (A2 && !A2[i]) { put(i, [0, 0, 0], 0); continue; }
+    const k = L2[i];
+    let c: number[] = pal[k] ?? [200, 200, 200];
+    if (sky[k]) {
+      const u = X / W, v = Y / H, cl = inCloud(u, v * (H / W));
+      c = skyAt(v);
+      if (cl >= 0) c = style === 'cartoon' && cl > 0.9 ? shadeRgb([250, 250, 252], -22) : [253, 253, 255];
+      if (style === 'sketch') c = c.map((x) => x * 0.45 + 251 * 0.55);
+      put(i, c);
+      continue;
+    }
+    if (style === 'painted') {
+      // colour and light moving inside each shape, from the picture's own soft colour map
+      const fi = fieldAt(litField, X / W, Y / H);
+      if (fi) c = c.map((v, j) => v * 0.62 + fi[j] * 0.38);
+      // a warm glow from the top left, and brush grain along the strokes
+      const g = Math.max(0, 1 - Math.hypot(X / W - 0.18, Y / H - 0.1) / 0.9) * 0.22;
+      c = c.map((v, j) => v + (gl[j] - v) * g);
+      const t = hash((X / 5) | 0, (Y / 2) | 0) - 0.5, t2 = hash(X, Y) - 0.5;
+      c = c.map((v) => v * (1 + t * 0.07 + t2 * 0.03));
+    } else if (style === 'sketch') {
+      const t = hash(X, Y) - 0.5;
+      c = c.map((v) => v * 0.5 + 251 * 0.5 + t * 6);
+    } else {
+      c = c.map((v) => v * (1.03 - 0.06 * (Y / H)));
+    }
+    if (style !== 'painted') {
+      const r = X < W - 1 ? L2[i + 1] : k, d = Y < H - 1 ? L2[i + W] : k, l = X > 0 ? L2[i - 1] : k, u = Y > 0 ? L2[i - W] : k;
+      const other = r !== k ? r : d !== k ? d : l !== k ? l : u !== k ? u : -1;
+      if (other >= 0) {
+        const ink = inkOf(k, other);
+        // the sketch line breaks now and then, like a hand-drawn one
+        if (ink && (style !== 'sketch' || hash((X / 5) | 0, (Y / 5) | 0) > 0.1)) c = style === 'sketch' ? ink : c.map((v, j) => v * 0.15 + ink[j] * 0.85);
+      }
+    }
+    put(i, c);
+  }
+  return out;
 }
