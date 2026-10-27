@@ -209,3 +209,18 @@ test('the age group shapes the whole character, not just its size', () => {
   assert.ok(['tuft', 'curly'].includes(baby.hairStyle), `baby hair: ${baby.hairStyle}`);
   assert.equal(buildDNA(m, 'kid').facial, undefined, 'no facial hair for kids');
 });
+
+test('the hairstyle follows what the photo shows: side part, tied up, length and texture', async () => {
+  const { pickHairStyle } = await import('../likeness/dna');
+  const T = <V,>(value: V) => ({ value, source: 'measured' as const, confidence: 0.7 });
+  const pick = (d: Record<string, unknown>, kind: 'adult' | 'kid' = 'adult') => pickHairStyle(kind, d as never)!.value;
+  assert.equal(pick({ length: T('long'), texture: T('straight'), part: T(0.8) }), 'sweep');
+  assert.equal(pick({ length: T('long'), texture: T('straight'), part: T(0) }), 'long');
+  assert.equal(pick({ length: T('medium'), texture: T('wavy') }), 'lob');
+  assert.equal(pick({ length: T('short'), texture: T('straight'), up: T(0.6) }), 'bun');
+  assert.equal(pick({ length: T('short'), texture: T('straight'), up: T(0.6) }, 'kid'), 'topknot');
+  assert.equal(pick({ length: T('short'), texture: T('coily'), up: T(0.6) }), 'puff');
+  assert.equal(pick({ length: T('medium'), texture: T('coily') }), 'twists');
+  assert.equal(pick({ length: T('short'), texture: T('straight'), volume: T(-0.6) }), 'crew');
+  assert.equal(pick({ length: T('short'), texture: T('straight'), part: T(-0.7) }), 'sidepart');
+});

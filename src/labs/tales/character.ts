@@ -15,7 +15,8 @@ import { thingArt } from './things';
 export type Kind = 'baby' | 'kid' | 'adult' | 'elder' | 'dog' | 'cat' | 'bunny';
 export type HairStyle =
   | 'tuft' | 'buzz' | 'short' | 'sidepart' | 'messy' | 'quiff' | 'pixie' | 'sides' | 'bob' | 'bangs' | 'curtain' | 'long' | 'wavy' | 'longcurly'
-  | 'halfup' | 'ponytail' | 'pigtails' | 'bun' | 'topknot' | 'spacebuns' | 'curly' | 'coils' | 'puff' | 'afro' | 'braids' | 'cornrows' | 'locs' | 'bald';
+  | 'halfup' | 'ponytail' | 'pigtails' | 'bun' | 'topknot' | 'spacebuns' | 'curly' | 'coils' | 'puff' | 'afro' | 'braids' | 'cornrows' | 'locs' | 'bald'
+  | 'crew' | 'slick' | 'sweep' | 'lob' | 'shag' | 'twists';
 export type Expression = 'grin' | 'smile' | 'laugh' | 'wow' | 'starry' | 'wink' | 'silly' | 'proud' | 'brave' | 'shy' | 'dreamy' | 'worried' | 'sleepy';
 export type Facial = 'none' | 'stubble' | 'moustache' | 'trim' | 'full';
 export type Personality = 'sunny' | 'silly' | 'brave' | 'curious' | 'shy' | 'dreamy' | 'cheeky' | 'excited' | 'calm' | 'proud' | 'sleepy';
@@ -121,7 +122,7 @@ export const HAIR_STYLES: Record<HairStyle, string> = {
   tuft: 'Baby curl', buzz: 'Buzz', short: 'Short', sidepart: 'Side part', messy: 'Messy', quiff: 'Swoop', pixie: 'Pixie', sides: 'Sides only',
   bob: 'Bob', bangs: 'Bangs', curtain: 'Curtain bangs', long: 'Long', wavy: 'Wavy', longcurly: 'Long curls', halfup: 'Half up', ponytail: 'Ponytail',
   pigtails: 'Pigtails', bun: 'Bun', topknot: 'Top knot', spacebuns: 'Space buns', curly: 'Curly', coils: 'Short coils', puff: 'Puff', afro: 'Afro',
-  braids: 'Braids', cornrows: 'Cornrows', locs: 'Locs', bald: 'None',
+  braids: 'Braids', cornrows: 'Cornrows', locs: 'Locs', crew: 'Crew cut', slick: 'Slicked back', sweep: 'Side-swept', lob: 'Shoulder length', shag: 'Shag', twists: 'Twists', bald: 'None',
 };
 export const EXPRESSIONS: Record<Expression, string> = {
   grin: 'Big smile', smile: 'Smile', laugh: 'Giggle', wow: 'Wow', starry: 'Excited', wink: 'Wink', silly: 'Silly', proud: 'Proud',
@@ -440,6 +441,29 @@ function hair(id: string, l: Look): [string, string] {
       const front = [52, 70, 88, 106, 124, 142].map((x, i) => curl(x, 58 + Math.abs(i - 2.5) * 4, 13)).join('');
       return [`<path d="M28 104 C22 46 60 24 100 24 C140 24 178 46 172 104 L174 196 L26 196 Z" fill="${H}"/>${side}`, `<path d="M44 90 C44 52 70 36 100 36 C130 36 156 52 156 90 C148 72 130 64 100 64 C70 64 52 72 44 90 Z" fill="${H}"/>${front}`];
     }
+    case 'crew': return ['', `<path d="M42 90 C38 54 62 34 100 34 C138 34 162 54 158 90 C154 76 146 68 134 64 C118 60 82 60 66 64 C54 68 46 76 42 90 Z" fill="${H}"/>${Array.from({ length: 16 }, (_, i) => `<path d="M${56 + (i * 37) % 88} ${46 + (i * 17) % 18} l1.6 -3.4" stroke="${dark}" stroke-width="1.4" stroke-linecap="round" opacity=".35"/>`).join('')}${shine('M70 46 Q96 38 124 44')}`];
+    case 'slick': return ['', `<path d="M40 96 C34 52 62 28 100 28 C138 28 166 52 160 96 C158 80 152 70 144 64 C126 52 74 52 56 64 C48 70 42 80 40 96 Z" fill="${H}"/><path d="M60 62 Q80 40 112 36 M74 60 Q94 42 124 40 M92 56 Q112 44 136 46 M110 54 Q128 48 146 56" stroke="${dark}" stroke-width="1.8" fill="none" stroke-linecap="round" opacity=".38"/>${shine('M66 50 Q92 34 126 38')}`];
+    case 'sweep': return [
+      `<path d="M30 104 C24 46 60 24 100 24 C140 24 176 46 170 104 L176 192 C164 204 146 200 138 190 L138 106 L62 106 L62 190 C54 200 36 204 24 192 Z" fill="${H}"/>`,
+      `<path d="M42 104 C36 52 66 30 104 30 C138 30 162 52 158 96 C156 80 150 70 142 64 C126 74 102 80 78 76 C64 74 52 82 46 94 Z" fill="${H}"/><path d="M44 102 C48 80 70 66 104 64 C122 63 136 62 146 58" stroke="${dark}" stroke-width="2" fill="none" opacity=".35"/><path d="M126 34 Q118 38 112 46" stroke="${dark}" stroke-width="2" fill="none" stroke-linecap="round" opacity=".45"/>${shine('M62 52 Q86 40 114 42')}`,
+    ];
+    case 'lob': return [
+      `<path d="M32 108 C26 48 60 26 100 26 C140 26 174 48 168 108 C170 130 168 148 162 160 Q150 164 146 154 L146 102 L54 102 L54 154 Q50 164 38 160 C32 148 30 130 32 108 Z" fill="${H}"/><path d="M40 152 Q46 160 54 154 M146 154 Q154 160 160 152" stroke="${dark}" stroke-width="2" fill="none" opacity=".4"/>`,
+      `<path d="M42 100 C38 50 68 32 100 32 C132 32 162 50 158 100 C154 80 142 66 120 62 C110 58 104 48 100 40 C96 48 90 58 80 62 C58 66 46 80 42 100 Z" fill="${H}"/>${shine('M108 42 Q128 42 142 56')}${shine('M58 58 Q70 46 88 42')}`,
+    ];
+    case 'shag': {
+      return [
+        `<path d="M30 104 C24 46 60 24 100 24 C140 24 176 46 170 104 L170 140 Q166 150 160 146 Q158 158 150 156 Q148 150 144 148 L144 104 L56 104 L56 148 Q52 150 50 156 Q42 158 40 146 Q34 150 30 140 Z" fill="${H}"/><path d="M38 120 Q42 134 40 144 M162 120 Q158 134 160 144 M50 126 Q52 140 50 152 M150 126 Q148 140 150 152" stroke="${dark}" stroke-width="1.8" fill="none" opacity=".35"/>`,
+        `<path d="M42 92 C40 50 68 30 100 30 C132 30 160 50 158 92 L148 80 L138 92 L128 76 L116 88 L106 74 L94 88 L84 74 L72 90 L62 78 L52 92 Z" fill="${H}"/><path d="M68 74 L74 54 M96 72 L100 50 M124 74 L120 54" stroke="${dark}" stroke-width="1.8" fill="none" opacity=".35"/>${shine('M66 48 Q90 38 116 40')}`,
+      ];
+    }
+    case 'twists': {
+      const tw = (x: number, y: number, len: number, ang: number) => { const t = (ang * Math.PI) / 180, ex = x + Math.cos(t) * len, ey = y + Math.sin(t) * len; return `<path d="M${x.toFixed(1)} ${y.toFixed(1)} L${ex.toFixed(1)} ${ey.toFixed(1)}" stroke="${H}" stroke-width="9" stroke-linecap="round"/><path d="M${x.toFixed(1)} ${y.toFixed(1)} L${ex.toFixed(1)} ${ey.toFixed(1)}" stroke="${dark}" stroke-width="9" stroke-dasharray="2.5 4" stroke-linecap="round" opacity=".35"/>`; };
+      const back: string[] = [], front: string[] = [];
+      for (let a = 150; a <= 390; a += 9) { const t = (a * Math.PI) / 180, down = a < 200 || a > 340; back.push(tw(100 + 56 * Math.cos(t), 84 + 48 * Math.sin(t), down ? 16 : 9, down ? 90 + (a > 340 ? -15 : 15) : a)); }
+      for (let a = 200; a <= 340; a += 12) { const t = (a * Math.PI) / 180; front.push(tw(100 + 44 * Math.cos(t), 70 + 34 * Math.sin(t), 8, a)); }
+      return [`<ellipse cx="100" cy="82" rx="62" ry="54" fill="${H}"/>${back.join('')}`, `<path d="M42 90 C40 52 66 34 100 34 C134 34 160 52 158 90 C150 72 130 64 100 64 C70 64 50 72 42 90 Z" fill="${H}"/>${front.join('')}`];
+    }
     case 'halfup': return [
       `<path d="M30 104 C24 46 60 24 100 24 C140 24 176 46 170 104 L174 182 C162 196 146 192 138 182 L138 106 L62 106 L62 182 C54 192 38 196 26 182 Z" fill="${H}"/><circle cx="100" cy="26" r="15" fill="${H}"/>`,
       `${cap}<path d="M88 30 Q100 36 112 30" stroke="#e86f5b" stroke-width="5" fill="none" stroke-linecap="round"/>${shine('M66 50 Q88 40 112 42')}`,
@@ -754,7 +778,7 @@ function glassesFit(l: Look, svg: string): string {
 /** The same shapes with no outline (the storybook line skips anything that already says stroke). */
 const noInk = (svg: string) => svg.replace(/<(path|ellipse|circle|rect|polygon)\b(?![^>]*\bstroke=)/g, '<$1 stroke="none"');
 /** Hairstyles that fall over the ears (the ears are tucked under the hair, not stuck on top of it). */
-const COVERS_EARS: HairStyle[] = ['bob', 'long', 'wavy', 'curtain', 'halfup', 'bangs', 'longcurly', 'locs', 'afro'];
+const COVERS_EARS: HairStyle[] = ['bob', 'long', 'wavy', 'curtain', 'halfup', 'bangs', 'longcurly', 'locs', 'afro', 'sweep', 'lob', 'shag', 'twists'];
 /** The soft shadow the hair casts on the forehead and temples: what makes it sit on the head, not on top of it like a wig. */
 const hairShadow = (id: string, l: Look, clip: string, front: string) => front && !l.face
   ? `<filter id="hsh${id}" x="-10%" y="-10%" width="120%" height="130%"><feFlood flood-color="${shade(l.skin, -0.5)}"/><feComposite in2="SourceAlpha" operator="in"/><feGaussianBlur stdDeviation="1.6"/></filter><g clip-path="url(#${clip})" opacity=".3"><g transform="translate(1.2 3.6)" filter="url(#hsh${id})">${front}</g></g>`

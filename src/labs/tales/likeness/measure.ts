@@ -67,6 +67,10 @@ export interface Measurements {
   hairVolume: Measurement;
   hairTexture: Measurement<HairTexture>;
   bangs: Measurement<boolean>;
+  /** Where the fringe falls: -1 all to the left of the face, +1 all to the right, 0 even (a centre part or none). */
+  hairPart: Measurement;
+  /** How much hair sits up above the crown (a bun, top knot or puff), 0–1. */
+  hairUp: Measurement;
   facialHair: Measurement<{ moustache: number; chin: number; jaw: number }>;
   glasses: Measurement<boolean>;
   /** Baby, kid, grown-up or grandparent: a best guess the parent confirms with a tap. */
@@ -158,7 +162,7 @@ export function measure(face: FaceInput | null, px: PixelInput): Measurements {
   const allMissing = (why: string): Measurements => ({
     quality: { score: face?.score ?? 0, faces: face?.faces ?? 0, iodPx: 0, roll: 0, mouthOpen: 0, smile: 0 },
     shape: Object.fromEntries(SHAPE_KEYS.map((k) => [k, missing(why)])) as Record<ShapeKey, Measurement>,
-    skin: missing(why), eyes: missing(why), hair: missing(why), hairLength: missing(why), hairVolume: missing(why), hairTexture: missing(why), bangs: missing(why), facialHair: missing(why), glasses: missing(why), ageGroup: missing(why),
+    skin: missing(why), eyes: missing(why), hair: missing(why), hairLength: missing(why), hairVolume: missing(why), hairTexture: missing(why), bangs: missing(why), hairPart: missing(why), hairUp: missing(why), facialHair: missing(why), glasses: missing(why), ageGroup: missing(why),
     warnings: [why], debug: { oval: [], eyes: [], skinPatches: [], irises: [], regions: [] },
   });
   if (!face || !face.mesh || face.mesh.length < 468) return allMissing('No face was found in this photo.');
@@ -309,6 +313,7 @@ export function measure(face: FaceInput | null, px: PixelInput): Measurements {
   // where hair almost always shows and hats rarely sit: just outside the face, beside the forehead
   const temple = band('temple', halfW - 0.2, halfW + 0.35, topY + 0.1, -0.25, true);
   let hair: Measurement<string>, hairLength: Measurement<HairLength>, hairVolume: Measurement, hairTexture: Measurement<HairTexture>, bangs: Measurement<boolean>;
+  let hairPart: Measurement = missing('No hair to measure.'), hairUp: Measurement = missing('No hair to measure.');
   let hairLab: number[] | null = null;
   const crownFrac = crown.n ? crown.found.length / crown.n : 0;
   const sideFrac = temples.n ? temples.found.length / temples.n : 0;
@@ -398,6 +403,19 @@ export function measure(face: FaceInput | null, px: PixelInput): Measurements {
     }
     const bangFrac = fracOf(-0.7, 0.7, topY + 0.05, browY - 0.25, true);
     bangs = browY - 0.25 <= topY + 0.1 ? missing('Forehead too small to check for a fringe.') : { status: 'measured', value: bangFrac > 0.4, confidence: round(0.75 * hairConf, 2), raw: round(bangFrac, 2) };
+    // which way the hair falls over the forehead: one side much more covered = a side part or a sweep
+    if (browY - 0.25 > topY + 0.1) {
+      const lf = fracOf(-0.75, -0.05, topY + 0.05, browY - 0.2, true), rt = fracOf(0.05, 0.75, topY + 0.05, browY - 0.2, true);
+      const tot = lf + rt;
+      hairPart = { status: 'measured', value: tot > 0.12 ? round(clamp((rt - lf) / Math.max(0.2, tot), -1, 1)) : 0, confidence: round(0.6 * hairConf, 2), raw: round(rt - lf, 2), why: 'Fringe cover on each side of the forehead' };
+    }
+    // hair piled up above the crown (a bun, top knot or puff); only when the photo shows space above the head
+    if (!covered && crown.outsideFrac < 0.3) {
+      // a bun or knot is a narrow pile: hair high in the middle, but not out to the sides at that height (that's just big hair)
+      const up = fracOf(-0.4, 0.4, topY - 1.45, topY - 0.95), wide = fracOf(0.6, 1.1, topY - 1.3, topY - 0.85, false, true);
+      const v = wide > 0.25 ? 0 : up;
+      hairUp = { status: 'measured', value: round(v, 2), confidence: round(0.55 * hairConf, 2), raw: round(up, 2), why: 'Hair piled above the top of the head' };
+    }
   }
 
   /* ── facial hair (read for everyone; the DNA only uses it for grown-ups) ── */
@@ -474,7 +492,7 @@ export function measure(face: FaceInput | null, px: PixelInput): Measurements {
   const rect = (x0: number, x1: number, y0: number, y1: number): P[] => [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
   return {
     quality: { score: round(face.score, 3), faces: face.faces, iodPx: round(iodPx, 1), yaw: yaw === undefined ? undefined : round(yaw, 3), pitch: pitch === undefined ? undefined : round(pitch, 3), roll: round(f.angle, 3), mouthOpen: round(mouthOpen, 3), smile: round(smile, 3), brightness: skinLab ? round(skinLab[0], 1) : undefined },
-    shape, skin, eyes, hair, hairLength, hairVolume, hairTexture, bangs, facialHair,
+    shape, skin, eyes, hair, hairLength, hairVolume, hairTexture, bangs, hairPart, hairUp, facialHair,
     glasses: missing('Glasses aren’t detected; choose them in the wardrobe.'),
     ageGroup: ageGroupOf(face.age, hairLab, sizeConf),
     warnings,

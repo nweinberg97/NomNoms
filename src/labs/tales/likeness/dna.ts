@@ -33,7 +33,7 @@ export interface CharacterDNA {
   facial?: Trait<Facial>;
   shape: Partial<Record<ShapeKey, Trait<number>>>;
   /** The hair readings the hairstyle was chosen from. */
-  hairDetail: { length?: Trait<HairLength>; texture?: Trait<HairTexture>; volume?: Trait<number>; bangs?: Trait<boolean> };
+  hairDetail: { length?: Trait<HairLength>; texture?: Trait<HairTexture>; volume?: Trait<number>; bangs?: Trait<boolean>; part?: Trait<number>; up?: Trait<number> };
   warnings: string[];
 }
 
@@ -56,18 +56,23 @@ export function pickHairStyle(kind: Kind, d: CharacterDNA['hairDetail']): Trait<
   const tex = d.texture && d.texture.confidence >= 0.2 ? d.texture.value : 'straight';
   const big = (d.volume?.value ?? 0) > 0.3;
   const fringe = !!d.bangs?.value;
+  const side = Math.abs(d.part?.value ?? 0) > 0.45;
+  const updo = (d.up?.value ?? 0) > 0.35;
+  const thin = (d.volume?.value ?? 0) < -0.35;
   const conf = Math.min(d.length!.confidence, d.texture?.confidence ?? 0.5, 0.7);
   const style = ((): HairStyle => {
     if (len === 'none') return kind === 'baby' ? 'tuft' : kind === 'kid' ? 'buzz' : (d.volume?.value ?? -1) > -0.6 ? 'sides' : 'buzz';
     if (kind === 'baby') return tex === 'curly' || tex === 'coily' ? 'curly' : 'tuft';
-    if (tex === 'coily') return len === 'long' ? 'longcurly' : big ? 'afro' : 'coils';
-    if (tex === 'curly') return len === 'long' ? 'longcurly' : 'curly';
-    if (tex === 'wavy') return len === 'long' ? 'wavy' : len === 'medium' ? (fringe ? 'bangs' : 'bob') : fringe ? 'pixie' : 'short';
-    if (len === 'long') return fringe ? 'bangs' : 'long';
-    if (len === 'medium') return fringe ? 'bangs' : 'bob';
-    return fringe ? 'pixie' : 'short';
+    // hair tied up on top reads as short beside the face: the pile above the crown tells us it's an updo
+    if (updo) return tex === 'coily' || tex === 'curly' ? 'puff' : kind === 'kid' ? 'topknot' : 'bun';
+    if (tex === 'coily') return len === 'long' ? 'locs' : big ? 'afro' : len === 'medium' ? 'twists' : 'coils';
+    if (tex === 'curly') return len === 'long' ? 'longcurly' : len === 'medium' && fringe ? 'shag' : 'curly';
+    if (tex === 'wavy') return len === 'long' ? (side ? 'sweep' : fringe ? 'curtain' : 'wavy') : len === 'medium' ? (fringe ? 'shag' : 'lob') : fringe ? 'pixie' : side ? 'sidepart' : 'short';
+    if (len === 'long') return fringe ? 'bangs' : side ? 'sweep' : 'long';
+    if (len === 'medium') return fringe ? 'bangs' : side ? 'lob' : 'bob';
+    return fringe ? 'pixie' : side ? 'sidepart' : thin ? 'crew' : 'short';
   })();
-  const why = [`length: ${len}`, `texture: ${tex}${d.texture ? '' : ' (not read)'}`, big ? 'lots of volume' : '', fringe ? 'fringe' : ''].filter(Boolean).join(', ');
+  const why = [`length: ${len}`, `texture: ${tex}${d.texture ? '' : ' (not read)'}`, big ? 'lots of volume' : '', fringe ? 'fringe' : '', side ? 'side part' : '', updo ? 'tied up' : ''].filter(Boolean).join(', ');
   return { value: style, source: 'inferred', confidence: Math.round(conf * 100) / 100, basis: why };
 }
 
@@ -98,6 +103,9 @@ export function buildDNA(m: Measurements, kind: Kind, keep: Partial<Pick<Charact
   if (tex) hairDetail.texture = tex;
   if (vol) hairDetail.volume = vol;
   if (bangs) hairDetail.bangs = bangs;
+  const part = trait(m.hairPart), up = trait(m.hairUp);
+  if (part) hairDetail.part = part;
+  if (up) hairDetail.up = up;
   const dna: CharacterDNA = { version: 1, kind, shape, hairDetail, warnings: [...m.warnings] };
   const age = trait(m.ageGroup);
   if (age) dna.ageGroup = age;

@@ -466,7 +466,7 @@ export function BabyTalesDemo() {
     if (typeof window === 'undefined' || !window.matchMedia?.('(min-width: 900px)').matches) return;
     const id = person?.member.id;
     if (!id) return;
-    const onPage = view === 0 ? id === cast[0]?.member.id || cast.slice(1, 3).some((c) => c.member.id === id && c.member.inStory) : page?.cast.includes(id);
+    const onPage = view === 0 || page?.cast.includes(id); // the cover always shows whoever is being edited
     if (onPage) return;
     const i = story.pages.findIndex((p) => p.cast.includes(id));
     if (i >= 0) setView(i + 1);
@@ -610,7 +610,10 @@ export function BabyTalesDemo() {
   const art = (p: StoryPage | undefined, animated: boolean, arranging = false) => {
     if (!p) {
       const first = story.pages[0];
-      const ids = [cast[0].member.id, ...cast.filter((c, i) => i > 0 && c.member.inStory).slice(0, 2).map((c) => c.member.id)];
+      // the cover shows the star and two others, always including whoever is being edited, so every change shows here too
+      let ids = [cast[0].member.id, ...cast.filter((c, i) => i > 0 && c.member.inStory).slice(0, 2).map((c) => c.member.id)];
+      const editing = person?.member.id;
+      if (editing && !ids.includes(editing) && editing !== pendingId) ids = [...ids.slice(0, 2), editing];
       return sceneSvg({ placeId: first?.place ?? 'park', drawn: drawnPlace(first?.place), photo: photoPlace(first?.place), seed: story.seed, chars: ids.map((id) => ({ look: lookFor(id, first)! })), animated, label: 'Story cover', style: mode, world });
     }
     const chars = p.cast.map((id) => {
