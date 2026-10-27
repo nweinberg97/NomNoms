@@ -50,7 +50,7 @@ export const STYLES: Record<StyleMode, StyleConfig> = {
   },
   pocketlight: {
     id: 'pocketlight',
-    name: 'Pocketlight 3D',
+    name: 'Pocketlight',
     blurb: 'Soft, sculpted forms in warm, cinematic light',
     palette: { swatches: ['#f6c9a8', '#e8907a', '#f2c14e', '#8fbf9f', '#7fa8d1', '#b9a5e3', '#fbf3e6', '#5a4a42'], ink: '#4a3a33', shadow: '#5a3f3a', paper: '#fbf7f0', light: '#fff1d6' },
     colour: { pull: 0.15, saturation: 1.05, brightness: 1.04, warmth: 0.06 },

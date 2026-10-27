@@ -117,6 +117,19 @@ const HOLDABLE: [string, string][] = ([
   ['🧭', 'Compass'], ['🔭', 'Telescope'], ['💎', 'Gem'], ['🌻', 'Sunflower'], ['🐥', 'Chick'], ['🐶', 'Puppy'],
 ] as [string, string][]).filter(([e]) => hasThing(e));
 
+/** A small square preview of a photo (about 96px, in memory only) so a parent can check which photo was read. */
+async function photoThumb(src: string | Blob, size = 96): Promise<string> {
+  let img: CanvasImageSource & { width: number; height: number };
+  if (typeof src === 'string') {
+    img = await new Promise<HTMLImageElement>((res, rej) => { const im = new Image(); im.crossOrigin = 'anonymous'; im.onload = () => res(im); im.onerror = rej; im.src = src; });
+  } else img = await createImageBitmap(src);
+  const w = img.width, h = img.height, side = Math.min(w, h);
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  c.getContext('2d')!.drawImage(img, (w - side) / 2, (h - side) / 2.6, side, side, 0, 0, size, size);
+  return c.toDataURL('image/jpeg', 0.72);
+}
+
 export function BabyTalesDemo() {
   const app = useAppOptional();
   const heroName = app?.baby ? firstName(app.baby.name) : 'Maya';
@@ -141,7 +154,7 @@ export function BabyTalesDemo() {
   const [showAllTypes, setShowAllTypes] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [busy, setBusy] = useState<string>();
-  const [result, setResult] = useState<{ who: string; from: string; matched: { label: string; sure: boolean }[]; notes: string[]; kept: IdentityKey[] } | null>(null);
+  const [result, setResult] = useState<{ who: string; from: string; matched: { label: string; sure: boolean }[]; notes: string[]; kept: IdentityKey[]; accepted?: boolean } | null>(null);
   /** Identity traits a parent set by hand, per person: a new photo never overwrites these. */
   const [chosen, setChosen] = useState<Record<string, IdentityKey[]>>({});
   const [dropping, setDropping] = useState<'new' | 'current' | false>(false);
@@ -317,7 +330,7 @@ export function BabyTalesDemo() {
     const who = fresh ?? person;
     const id = who.member.id, kept = fresh ? [] : chosen[id] ?? [];
     try {
-      const r = await likenessFromPhoto(src, who.look, kept);
+      const [r, thumb] = await Promise.all([likenessFromPhoto(src, who.look, kept), photoThumb(src).catch(() => '')]);
       const m = r.measurements;
       const found = m.skin.status !== 'missing' || SHAPE_KEYS.some((k) => m.shape[k].status !== 'missing');
       if (!found) { setStatus(`${m.warnings[0] ?? 'No face was found.'} Nothing was changed.`); return; }
@@ -334,7 +347,8 @@ export function BabyTalesDemo() {
         setPendingId(null);
       } else setCast((cs) => cs.map((p) => (p.member.id === id ? { ...p, look } : p)));
       setReadings((rs) => ({ ...rs, [id]: m }));
-      setEditorTab('photo'); setResult({ who: fresh ? 'Someone new' : who.member.name, from, matched: describeDNA(r.dna), notes: r.dna.warnings, kept });
+      // a small preview of the photo, kept only on this screen until it's accepted, so you can check it read the right one
+      setEditorTab('photo'); setResult({ who: fresh ? 'Someone new' : who.member.name, from: thumb || from, matched: describeDNA(r.dna), notes: r.dna.warnings, kept });
       setStatus(fresh || id === pendingId ? 'Added! Give them a name below.' : undefined);
       undoToast(fresh ? 'Added someone new from the photo' : `Made ${who.member.name || 'them'} from the photo`);
     } catch (e) {
@@ -946,8 +960,7 @@ export function BabyTalesDemo() {
                       </div>
                       {result && (
                         <div className="bt-result" role="status" data-testid="photo-result">
-                          <span className="bt-result-photo">{result.from ? <img src={result.from} alt="" /> : <Icon name="camera" size={20} />}</span>
-                          <Icon name="arrow-right" size={18} />
+                          {result.from && !result.accepted && <><span className="bt-result-photo"><img src={result.from} alt="The photo that was used" data-testid="photo-thumb" onError={() => setResult((r) => (r ? { ...r, from: '' } : r))} /></span><Icon name="arrow-right" size={18} /></>}
                           <span className="bt-result-char" dangerouslySetInnerHTML={{ __html: characterSvg(shown, { style: mode, viewBox: fitViewBox(FACE_VIEWBOX, shown, mode) }) }} />
                           <div className="bt-result-text">
                             <strong>{result.who}, from the photo</strong>
@@ -961,6 +974,14 @@ export function BabyTalesDemo() {
                             {result.kept.length > 0 && <small>Kept your own choice of {result.kept.map((k) => (k === 'hairStyle' ? 'hairstyle' : k === 'shape' ? 'face shape' : k)).join(', ')}.</small>}
                             {result.notes.length > 0 && <ul className="bt-notes">{result.notes.slice(0, 3).map((n) => <li key={n}>{n}</li>)}</ul>}
                             <small>~ means a best guess. Fine-tune in Face & hair.</small>
+                            {result.accepted ? (
+                              <p className="bt-accepted" data-testid="photo-accepted"><Icon name="check" size={14} /> Photo removed. Only the character is kept; your photo was never uploaded or stored.</p>
+                            ) : (
+                              <div className="bt-result-actions">
+                                <button type="button" className="btn btn-primary btn-sm" onClick={() => setResult((r) => (r ? { ...r, from: '', accepted: true } : r))} data-testid="photo-accept"><Icon name="check" size={14} /> Looks right</button>
+                                <button type="button" className="btn btn-ghost btn-sm" onClick={() => fileRef.current?.click()} data-testid="photo-retry">Use a different photo</button>
+                              </div>
+                            )}
                           </div>
                         </div>
                       )}

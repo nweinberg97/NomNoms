@@ -113,6 +113,8 @@
 .bt-text-tap:hover { background: rgba(0,0,0,.035); }
 .bt-text-edit { border: 0; border-bottom: 1.5px dashed var(--accent); background: transparent; resize: none; width: 100%; outline: none; padding: 0; field-sizing: content; }
 .bt-setting { flex: 1 1 200px; }
+.bt-result-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.bt-accepted { display: flex; align-items: flex-start; gap: 6px; margin: 8px 0 0; font-size: 13px; color: #3f6b4a; background: #fff; border: 1px solid #cfe5d4; border-radius: 10px; padding: 8px 10px; }
 .bt-asset-name { font: inherit; font-weight: 600; border: 0; border-bottom: 1.5px dashed #d8cdbd; background: transparent; padding: 1px 0; width: 100%; outline: none; color: inherit; }
 .bt-asset-name:focus { border-bottom-color: var(--accent); }
 .bt-size { display: flex; align-items: flex-end; gap: 8px; }
@@ -192,16 +194,16 @@
 .lab-chip.is-drawn { display: inline-flex; align-items: center; gap: 6px; padding-left: 4px; }
 .lab-chip.is-drawn img { width: 26px; height: 20px; object-fit: cover; border-radius: 6px; }
 .lab-chip .icon, .lab-chip svg { vertical-align: -2px; }
-.bt-result { display: grid; grid-template-columns: auto auto auto minmax(0, 1fr); align-items: center; gap: 10px; padding: 12px; border-radius: 16px; background: #eef6ef; border: 1px solid #cfe5d4; color: var(--ink-2); animation: fadeIn .4s both; }
+.bt-result { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 12px; border-radius: 16px; background: #eef6ef; border: 1px solid #cfe5d4; color: var(--ink-2); animation: fadeIn .4s both; }
 .bt-result-photo, .bt-result-char { width: 58px; height: 58px; border-radius: 50%; overflow: hidden; background: var(--paper-2); display: grid; place-items: center; }
 .bt-result-photo img { width: 100%; height: 100%; object-fit: cover; }
 .bt-result-char svg { width: 100%; height: 100%; }
-.bt-result-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.bt-result-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1 1 220px; }
 .bt-result-text strong { font-size: 14px; color: var(--ink); }
 .bt-result-text small { font-size: 12px; color: var(--ink-3); }
 .bt-matched { display: flex; flex-wrap: wrap; gap: 4px; }
 .bt-matched span { font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: #fff; color: #3f7d55; border: 1px solid #cfe5d4; }
-@media (max-width: 480px) { .bt-result { grid-template-columns: auto auto auto; } .bt-result-text { grid-column: 1 / -1; } }
+@media (max-width: 480px) { .bt-result-text { flex-basis: 100%; } }
 .bt-hairs { display: grid; grid-template-columns: repeat(auto-fill, minmax(66px, 1fr)); gap: 8px; }
 .bt-hair { font: inherit; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px 2px 6px; border-radius: 14px; border: 1.5px solid var(--line); background: var(--paper); cursor: pointer; color: var(--ink-2); }
 .bt-hair span { width: 54px; height: 54px; display: block; }
@@ -349,7 +351,8 @@
 .bt-photohero-actions .btn-primary { min-height: 44px; }
 @media (min-width: 760px) { .bt-photohero { grid-template-columns: auto 1fr auto; } .bt-photohero-actions { grid-column: auto; flex-direction: column; align-items: stretch; } }
 .bt-member.is-photo .bt-face { background: #fdebe0; color: var(--accent, #b5532b); }
-.bt-kindpick { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 6px 0; font-size: 12.5px; }
+.bt-kindpick { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 6px 0; font-size: 12.5px; }
+.bt-kindpick .lab-chip { font-size: 12.5px; padding: 4px 10px; }
 .bt-kindpick > span { color: var(--ink-3, #7a6f66); }
 .bt-kindpick .lab-chip[aria-checked="true"] { background: var(--ink, #2a201c); color: #fff; border-color: var(--ink, #2a201c); }
 
@@ -452,9 +455,13 @@
 .bt-edit, .bt-compare, .bt-places { margin-top: 12px; }
 .bt-edit > summary, .bt-compare > summary, .bt-places > summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 8px; min-height: 44px; font-weight: 600; }
 .bt-edit > summary::-webkit-details-marker, .bt-compare > summary::-webkit-details-marker, .bt-places > summary::-webkit-details-marker { display: none; }
-.bt-compare > summary, .bt-places > summary { padding: 0 14px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
-.bt-compare > summary::after, .bt-places > summary::after { content: '▾'; margin-left: auto; color: var(--ink-3); transition: transform .2s; }
-.bt-compare[open] > summary::after, .bt-places[open] > summary::after { transform: rotate(180deg); }
+.bt-compare > summary, .bt-places > summary { padding: 0 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--paper); }
+/* one quiet chevron for every fold-out */
+.bt-edit > summary::after, .bt-compare > summary::after, .bt-places > summary::after { content: ''; margin-left: auto; margin-right: 4px; width: 7px; height: 7px; border-right: 1.8px solid var(--ink-3); border-bottom: 1.8px solid var(--ink-3); transform: translateY(-2px) rotate(45deg); transition: transform .2s; flex: none; }
+.bt-edit[open] > summary::after, .bt-compare[open] > summary::after, .bt-places[open] > summary::after { transform: translateY(2px) rotate(-135deg); }
+.bt-edit:not([open]) { padding-top: 4px; padding-bottom: 4px; gap: 0; }
+.bt-compare { margin-bottom: 20px; }
+.bt-edit > summary { font-size: 15px; }
 .bt-places > summary small { color: var(--ink-3); font-weight: 500; }
 .bt-compare[open] > .bt-looks, .bt-compare[open] > .bt-worlds { margin-top: 10px; }
 .bt-edit[open] { display: grid; gap: 12px; }
@@ -464,7 +471,8 @@
 .bt-places[open] > summary { margin-bottom: 2px; }
 .bt-who { display: grid; gap: 10px; }
 .bt-editor-tabs { padding: 4px 0; }
-.bt-member.is-add.is-photo { border: 2px dashed var(--accent, #e9876b); background: #fff6ef; }
+.bt-member.is-add.is-photo { border: 0; background: transparent; }
+.bt-member.is-add.is-photo .bt-face { border: 2px dashed var(--accent, #e9876b); background: #fff6ef; }
 .bt-member.is-add.is-photo .bt-face { color: var(--accent, #e9876b); }
 .bt-cast.is-dropping { outline: 3px dashed var(--accent, #e9876b); outline-offset: 4px; border-radius: 14px; }
 .bt-library { display: grid; gap: 8px; }
