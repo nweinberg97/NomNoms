@@ -6,16 +6,17 @@ import { thingArt } from './things';
  * Character designs: each look builds people its own way, like the difference
  * between two animation studios' films, not the same puppet in a different finish.
  *
- *  - Clay      stop-motion puppets: heavy, bottom-weighted bean heads, big goggle eyes
- *              under sleepy lids, a bulb nose, a wide toothy grin, stubby legs and big
- *              mitten hands and shoes
+ *  - Patchwork a handmade rag doll: a big cushion head, embroidered eyes, felt cheeks,
+ *              a stitched smile, yarn hair in strands and loops, a soft sack body with a
+ *              collar and buttons, tube limbs and mitten hands
  *  - Retro     mid-century shape design: grown-ups are blocks (square heads, boxy
  *              bodies, stick legs), kids are circles, eyes are dots, glasses are bold
  *              frames, hair is a flat graphic shape
  *  - Paper cut flat cut-paper pieces: a round head, scalloped hair, an A-line body,
  *              strip arms, each piece a little off-true like it was cut by hand
- *  - Comic     big-headed comic characters: a huge head on a small body, very large
- *              shining eyes, a tiny nose, chunky pointed locks of hair
+ *  - Sketchbook a loose picture-book drawing: tall lanky grown-ups with small egg heads,
+ *              long necks, noses with character, big brows, scribbled hair, spindly limbs
+ *              and big feet; round little ones
  *
  * Every design draws the same person: skin, hair colour and style, eye colour,
  * glasses, facial hair and freckles come from the Look, and the face proportions read
@@ -25,9 +26,9 @@ import { thingArt } from './things';
  */
 
 export type DesignMode = Exclude<StyleMode, 'tales'>;
-/** Plush and Pencil draw the Tales characters; only Retro and Paper cut build their own. */
-export const onTalesDrawing = (m: StyleMode) => m === 'pocketlight' || m === 'inked';
-export const hasDesign = (m: StyleMode): m is DesignMode => m === 'gouache' || m === 'wondercut';
+/** Every look except Tales builds its own characters. */
+export const onTalesDrawing = (_m: StyleMode) => false;
+export const hasDesign = (m: StyleMode): m is DesignMode => m !== 'tales';
 
 /* ── shared helpers ─────────────────────────────────────── */
 type Fam = 'none' | 'buzz' | 'tuft' | 'short' | 'side' | 'messy' | 'bob' | 'long' | 'curlyShort' | 'curlyLong' | 'afro' | 'bun' | 'pony' | 'pigtails' | 'sides';
@@ -148,92 +149,253 @@ const stripes = (l: Look, id: string, clip: string, y0: number, y1: number) =>
 
 const held = (l: Look, x: number, y: number) => (l.hold ? thingArt(l.hold, x, y - 16, 46) : '');
 
-/* ═════════════════════════ CLAY ═════════════════════════ */
-function clay(l: Look, id: string): { svg: string; head: Head } {
+/* ═══════════════════════ PATCHWORK: RAG DOLL ═══════════════════════ */
+/** A point and the unit normal on a quadratic curve, for stitches across a stitched line. */
+function qAt(p0: [number, number], p1: [number, number], p2: [number, number], t: number): [number, number, number, number] {
+  const u = 1 - t;
+  const x = u * u * p0[0] + 2 * u * t * p1[0] + t * t * p2[0], y = u * u * p0[1] + 2 * u * t * p1[1] + t * t * p2[1];
+  const dx = 2 * u * (p1[0] - p0[0]) + 2 * t * (p2[0] - p1[0]), dy = 2 * u * (p1[1] - p0[1]) + 2 * t * (p2[1] - p1[1]);
+  const len = Math.hypot(dx, dy) || 1;
+  return [x, y, -dy / len, dx / len];
+}
+/** A stitched line: the thread, with little cross-stitches along it. */
+function stitched(p0: [number, number], p1: [number, number], p2: [number, number], col: string, w = 2.4, ticks = 3, tick = 4): string {
+  let s = `<path d="M${n1(p0[0])} ${n1(p0[1])} Q${n1(p1[0])} ${n1(p1[1])} ${n1(p2[0])} ${n1(p2[1])}" stroke="${col}" stroke-width="${w}" fill="none" stroke-linecap="round"/>`;
+  for (let i = 0; i < ticks; i++) {
+    const [x, y, nx, ny] = qAt(p0, p1, p2, (i + 1) / (ticks + 1));
+    s += `<path d="M${n1(x - nx * tick)} ${n1(y - ny * tick)} L${n1(x + nx * tick)} ${n1(y + ny * tick)}" stroke="${col}" stroke-width="${n1(w * 0.75)}" stroke-linecap="round"/>`;
+  }
+  return s;
+}
+
+function ragdoll(l: Look, id: string): { svg: string; head: Head } {
   const k = l.kind as 'baby' | 'kid' | 'adult' | 'elder';
+  const grown = k === 'adult' || k === 'elder';
   const fw = 1 + 0.08 * sh(l, 'faceWidth'), fl = 1 + 0.06 * sh(l, 'faceLength');
-  const P = { baby: { hw: 58, hh: 60, torso: [152, 214], tw: [66, 92], leg: 14, legW: 20, arm: 40 }, kid: { hw: 48, hh: 52, torso: [136, 208], tw: [56, 82], leg: 26, legW: 19, arm: 48 }, adult: { hw: 44, hh: 50, torso: [128, 210], tw: [62, 98], leg: 30, legW: 22, arm: 56 }, elder: { hw: 46, hh: 48, torso: [130, 210], tw: [66, 104], leg: 26, legW: 22, arm: 54 } }[k];
-  const hw = P.hw * fw, hh = P.hh * fl, cx = 100, top = P.torso[0] - hh * 2 + 10, cy = top + hh;
+  // a soft toy: a big cushion head, a little sack body, stubby tube limbs; grown-ups are taller dolls
+  const P = {
+    baby: { hw: 54, hh: 48, torso: [156, 214], tw: [50, 68], legW: 19, arm: 34 },
+    kid: { hw: 45, hh: 41, torso: [134, 206], tw: [44, 62], legW: 17, arm: 44 },
+    adult: { hw: 40, hh: 38, torso: [108, 204], tw: [48, 64], legW: 16, arm: 58 },
+    elder: { hw: 42, hh: 37, torso: [112, 204], tw: [54, 72], legW: 16, arm: 54 },
+  }[k];
+  const hw = P.hw * fw, hh = P.hh * fl, cx = 100, top = P.torso[0] - hh * 2 + 8, cy = top + hh;
   const head: Head = { cx, cy, rx: hw, ry: hh, top, chin: top + hh * 2 };
   const C = clothes(l), A = armsOf(l), ex = exprOf(l);
-  const skinD = shade(l.skin, -0.14);
-  // a bean head: wider at the jowls than the crown
-  const jw = hw * (1.06 + 0.06 * sh(l, 'jaw'));
-  const headPath = `M${cx} ${n1(top)} C${n1(cx + hw * 0.9)} ${n1(top)} ${n1(cx + hw)} ${n1(top + hh * 0.5)} ${n1(cx + jw)} ${n1(cy + hh * 0.3)} C${n1(cx + jw * 1.04)} ${n1(cy + hh * 0.85)} ${n1(cx + hw * 0.5)} ${n1(top + hh * 2)} ${cx} ${n1(top + hh * 2)} C${n1(cx - hw * 0.5)} ${n1(top + hh * 2)} ${n1(cx - jw * 1.04)} ${n1(cy + hh * 0.85)} ${n1(cx - jw)} ${n1(cy + hh * 0.3)} C${n1(cx - hw)} ${n1(top + hh * 0.5)} ${n1(cx - hw * 0.9)} ${n1(top)} ${cx} ${n1(top)} Z`;
-  // goggle eyes set close together under heavy lids
-  const er = (k === 'baby' ? 13 : k === 'kid' ? 12 : 10.5) * (1 + 0.1 * sh(l, 'eyeSize'));
-  const eGap = er * 0.98 + 2 * sh(l, 'eyeGap'), eY = cy - hh * 0.12;
-  const eyeState = eyeOf(ex);
-  const lid = eyeState === 'sleepy' ? 0.55 : eyeState === 'wide' ? 0.04 : k === 'baby' ? 0.1 : 0.16;
-  const oneEye = (x: number, side: number) => {
-    if (eyeState === 'closed' || (eyeState === 'wink' && side > 0)) return `<path d="M${n1(x - er)} ${n1(eY)} Q${x} ${n1(eY + er * 0.7)} ${n1(x + er)} ${n1(eY)}" stroke="${INK}" stroke-width="3" fill="none" stroke-linecap="round"/>`;
-    return `<ellipse cx="${n1(x)}" cy="${n1(eY)}" rx="${n1(er)}" ry="${n1(er * 1.12)}" fill="#fffdf6" stroke="${shade(l.skin, -0.3)}" stroke-width="1.4"/>
-      <circle cx="${n1(x + side * -er * 0.12)}" cy="${n1(eY + er * 0.2)}" r="${n1(er * 0.58)}" fill="${l.eyes ?? '#5a3a22'}"/><circle cx="${n1(x + side * -er * 0.12)}" cy="${n1(eY + er * 0.2)}" r="${n1(er * 0.32)}" fill="#1a110e"/><circle cx="${n1(x + side * -er * 0.12 - er * 0.12)}" cy="${n1(eY + er * 0.06)}" r="${n1(er * 0.11)}" fill="#fff"/>
-      <path d="M${n1(x - er * 1.1)} ${n1(eY - er * 1.3)} H${n1(x + er * 1.1)} V${n1(eY - er * 1.12 + er * 2.24 * lid)} Q${x} ${n1(eY - er * 1.12 + er * 2.24 * lid + er * 0.4)} ${n1(x - er * 1.1)} ${n1(eY - er * 1.12 + er * 2.24 * lid)} Z" fill="${shade(l.skin, -0.04)}" clip-path="url(#ce${id}${side})"/>
-      <clipPath id="ce${id}${side}"><ellipse cx="${n1(x)}" cy="${n1(eY)}" rx="${n1(er)}" ry="${n1(er * 1.12)}"/></clipPath>
-      <path d="M${n1(x - er * 0.98)} ${n1(eY - er * 1.12 + er * 2.24 * lid)} Q${x} ${n1(eY - er * 1.12 + er * 2.24 * lid + er * 0.4)} ${n1(x + er * 0.98)} ${n1(eY - er * 1.12 + er * 2.24 * lid)}" stroke="${shade(l.skin, -0.32)}" stroke-width="1.8" fill="none"/>`;
+  const j = 1 + 0.07 * sh(l, 'jaw');
+  // cushion head: a soft squircle, plumpest at the cheeks
+  const headPath = `M${cx} ${n1(top)} C${n1(cx + hw * 0.82)} ${n1(top)} ${n1(cx + hw)} ${n1(top + hh * 0.28)} ${n1(cx + hw)} ${n1(cy)} C${n1(cx + hw * j)} ${n1(cy + hh * 0.72)} ${n1(cx + hw * 0.72)} ${n1(top + hh * 2)} ${cx} ${n1(top + hh * 2)} C${n1(cx - hw * 0.72)} ${n1(top + hh * 2)} ${n1(cx - hw * j)} ${n1(cy + hh * 0.72)} ${n1(cx - hw)} ${n1(cy)} C${n1(cx - hw)} ${n1(top + hh * 0.28)} ${n1(cx - hw * 0.82)} ${n1(top)} ${cx} ${n1(top)} Z`;
+  const thread = '#6e2f2b';
+  // embroidered eyes: a disc of eye colour, a dark centre, one bright glint
+  const er = (k === 'baby' ? 6.6 : k === 'kid' ? 6 : 5.2) * (1 + 0.1 * sh(l, 'eyeSize'));
+  const eY = cy + hh * 0.06, eGap = hw * 0.4 + 2 * sh(l, 'eyeGap');
+  const es = eyeOf(ex);
+  const eye = (x: number, side: number) => {
+    if (es === 'closed' || (es === 'wink' && side > 0) || es === 'sleepy')
+      return stitched([x - er * 1.2, eY], [x, eY + (es === 'sleepy' ? er * 0.4 : -er * 1.3)], [x + er * 1.2, eY], '#2a1d18', 2.2, 2, 2.6);
+    const r = er * (es === 'wide' ? 1.2 : 1);
+    const lash = l.lashes ? `<path d="M${n1(x + side * r * 0.7)} ${n1(eY - r * 0.7)} l${n1(side * 4)} -4" stroke="#2a1d18" stroke-width="1.8" stroke-linecap="round"/>` : '';
+    return `<circle cx="${n1(x)}" cy="${n1(eY)}" r="${n1(r)}" fill="${l.eyes ?? '#5a3a22'}"/><circle cx="${n1(x)}" cy="${n1(eY + r * 0.08)}" r="${n1(r * 0.58)}" fill="#1d1512"/><circle cx="${n1(x - r * 0.3)}" cy="${n1(eY - r * 0.34)}" r="${n1(r * 0.26)}" fill="#fff"/>${lash}`;
   };
-  const nose = (k === 'baby' ? 6 : k === 'kid' ? 8 : 11) * (1 + 0.15 * sh(l, 'nose'));
-  const nY = eY + er * 1.3 + nose * 0.4;
-  const mY = nY + nose * 1.1 + (k === 'baby' ? 2 : 6), mW = hw * (k === 'baby' ? 0.32 : 0.6) * (1 + 0.1 * sh(l, 'mouth'));
-  const mouthK = mouthOf(ex);
-  const mouth = mouthK === 'grin' || mouthK === 'open' || (mouthK === 'smile' && k !== 'baby')
-    ? `<path d="M${n1(cx - mW)} ${n1(mY - 3)} Q${cx} ${n1(mY + (mouthK === 'open' ? 22 : 14))} ${n1(cx + mW)} ${n1(mY - 3)} Q${cx} ${n1(mY + 3)} ${n1(cx - mW)} ${n1(mY - 3)} Z" fill="#6b2a2a"/><path d="M${n1(cx - mW * 0.86)} ${n1(mY - 1.5)} Q${cx} ${n1(mY + 3.5)} ${n1(cx + mW * 0.86)} ${n1(mY - 1.5)} L${n1(cx + mW * 0.7)} ${n1(mY + 3.5)} Q${cx} ${n1(mY + 7)} ${n1(cx - mW * 0.7)} ${n1(mY + 3.5)} Z" fill="#fffdf6"/><path d="M${n1(cx - mW - 2)} ${n1(mY - 4)} Q${cx} ${n1(mY + (mouthK === 'open' ? 25 : 17))} ${n1(cx + mW + 2)} ${n1(mY - 4)}" stroke="${skinD}" stroke-width="2.4" fill="none"/>`
-    : mouthK === 'o' ? `<ellipse cx="${cx}" cy="${n1(mY + 4)}" rx="${n1(mW * 0.32)}" ry="${n1(mW * 0.42)}" fill="#6b2a2a"/>`
-    : mouthK === 'wobbly' ? `<path d="M${n1(cx - mW * 0.6)} ${n1(mY + 4)} q${n1(mW * 0.3)} -5 ${n1(mW * 0.6)} 0 t${n1(mW * 0.6)} 0" stroke="#6b2a2a" stroke-width="3" fill="none" stroke-linecap="round"/>`
-    : mouthK === 'tongue' ? `<path d="M${n1(cx - mW * 0.7)} ${n1(mY)} Q${cx} ${n1(mY + 12)} ${n1(cx + mW * 0.7)} ${n1(mY)} Z" fill="#6b2a2a"/><ellipse cx="${n1(cx + 3)}" cy="${n1(mY + 9)}" rx="7" ry="6" fill="#ef7f8a"/>`
-    : `<path d="M${n1(cx - mW * 0.55)} ${n1(mY + 1)} Q${cx} ${n1(mY + 9)} ${n1(cx + mW * 0.55)} ${n1(mY + 1)}" stroke="#6b2a2a" stroke-width="3.2" fill="none" stroke-linecap="round"/>`;
-  const brows = (eyeState === 'closed' ? '' : [-1, 1].map((sd) => `<path d="M${n1(cx + sd * (eGap - er * 0.85))} ${n1(eY - er * 1.95)} Q${n1(cx + sd * eGap)} ${n1(eY - er * 2.45)} ${n1(cx + sd * (eGap + er * 0.95))} ${n1(eY - er * 1.7)}" stroke="${shade(l.hair, -0.1)}" stroke-width="${k === 'baby' ? 2.4 : 4}" fill="none" stroke-linecap="round"/>`).join(''));
-  const ears = [-1, 1].map((sd) => `<ellipse cx="${n1(cx + sd * jw * 0.98)}" cy="${n1(eY + 4)}" rx="9" ry="13" fill="${l.skin}"/><ellipse cx="${n1(cx + sd * jw * 0.98)}" cy="${n1(eY + 4)}" rx="4" ry="7" fill="${skinD}"/>`).join('');
-  const fh = facialOf(l);
-  const beard = fh === 'full' || fh === 'trim' ? `<path d="M${n1(cx - jw * 0.92)} ${n1(cy + hh * 0.2)} Q${n1(cx - jw)} ${n1(top + hh * 2.18)} ${cx} ${n1(top + hh * 2.2)} Q${n1(cx + jw)} ${n1(top + hh * 2.18)} ${n1(cx + jw * 0.92)} ${n1(cy + hh * 0.2)} Q${n1(cx + mW * 1.2)} ${n1(mY + 14)} ${cx} ${n1(mY + 16)} Q${n1(cx - mW * 1.2)} ${n1(mY + 14)} ${n1(cx - jw * 0.92)} ${n1(cy + hh * 0.2)} Z" fill="${l.hair}"/>` : '';
-  const stache = fh !== 'none' && fh !== 'stubble' ? `<path d="M${cx} ${n1(nY + nose * 0.6)} Q${n1(cx - mW * 0.9)} ${n1(nY + nose * 0.3)} ${n1(cx - mW * 1.05)} ${n1(mY)} Q${n1(cx - mW * 0.5)} ${n1(nY + nose * 1.5)} ${cx} ${n1(nY + nose * 1.1)} Q${n1(cx + mW * 0.5)} ${n1(nY + nose * 1.5)} ${n1(cx + mW * 1.05)} ${n1(mY)} Q${n1(cx + mW * 0.9)} ${n1(nY + nose * 0.3)} ${cx} ${n1(nY + nose * 0.6)} Z" fill="${l.hair}"/>` : '';
-  const freck = l.freckles ? [-1, 1].flatMap((sd) => [[16, 2], [22, 6], [12, 7]].map(([dx, dy]) => `<circle cx="${n1(cx + sd * (eGap + dx * 0.4))}" cy="${n1(nY + dy)}" r="1.6" fill="${skinD}"/>`)).join('') : '';
-  // sculpted hair: thick clumps with grooves
-  const fam = FAM[l.hairStyle] ?? 'short', hc = l.hair, hd = shade(hc, -0.22);
-  const groove = (d: string) => `<path d="${d}" stroke="${hd}" stroke-width="2.4" fill="none" stroke-linecap="round" opacity=".7"/>`;
-  const cap = `M${n1(cx - hw * 1.04)} ${n1(cy - hh * 0.05)} C${n1(cx - hw * 1.08)} ${n1(top - hh * 0.25)} ${n1(cx + hw * 1.08)} ${n1(top - hh * 0.25)} ${n1(cx + hw * 1.04)} ${n1(cy - hh * 0.05)} C${n1(cx + hw * 0.7)} ${n1(top + hh * 0.42)} ${n1(cx - hw * 0.3)} ${n1(top + hh * 0.5)} ${n1(cx - hw * 1.04)} ${n1(cy - hh * 0.05)} Z`;
+  const brows = es === 'closed' ? '' : [-1, 1].map((sd) => {
+    const bx = cx + sd * eGap, by = eY - er * 2.3 + (ex === 'worried' ? -2 : 0);
+    const tilt = ex === 'worried' ? -3 : ex === 'brave' || ex === 'proud' ? 3 : 0;
+    return `<path d="M${n1(bx - er)} ${n1(by + sd * tilt)} Q${n1(bx)} ${n1(by - 3)} ${n1(bx + er)} ${n1(by - sd * tilt)}" stroke="${shade(l.hair, -0.15)}" stroke-width="${k === 'baby' ? 2.2 : 3}" fill="none" stroke-linecap="round"/>`;
+  }).join('');
+  // round felt cheeks, sewn on
+  const cheeks = [-1, 1].map((sd) => `<circle cx="${n1(cx + sd * hw * 0.62)}" cy="${n1(eY + hh * 0.3)}" r="${n1(hw * 0.15)}" fill="#f29c96"/>`).join('');
+  const nz = 1 + 0.18 * sh(l, 'nose');
+  const nose = `<ellipse cx="${cx}" cy="${n1(eY + hh * 0.2)}" rx="${n1((grown ? 4.6 : 3.2) * nz)}" ry="${n1((grown ? 3.8 : 2.6) * nz)}" fill="${shade(l.skin, -0.14)}"/>`;
+  // a stitched mouth
+  const mY = eY + hh * (grown ? 0.44 : 0.4), mW = hw * 0.26 * (1 + 0.1 * sh(l, 'mouth'));
+  const mk = mouthOf(ex);
+  const mouth = mk === 'open' || mk === 'grin' || mk === 'tongue'
+    ? `<path d="M${n1(cx - mW)} ${n1(mY)} Q${cx} ${n1(mY + mW * 1.1)} ${n1(cx + mW)} ${n1(mY)} Z" fill="#8a3434"/>${mk === 'tongue' ? `<ellipse cx="${n1(cx + 2)}" cy="${n1(mY + mW * 0.5)}" rx="${n1(mW * 0.35)}" ry="${n1(mW * 0.25)}" fill="#ef7f8a"/>` : ''}<path d="M${n1(cx - mW - 2)} ${n1(mY - 1)} Q${cx} ${n1(mY + mW * 1.2)} ${n1(cx + mW + 2)} ${n1(mY - 1)}" stroke="${thread}" stroke-width="2" fill="none" stroke-dasharray="3 2.4" stroke-linecap="round"/>`
+    : mk === 'o' ? `<circle cx="${cx}" cy="${n1(mY + 3)}" r="${n1(mW * 0.32)}" fill="#8a3434"/>`
+    : mk === 'flat' || mk === 'wobbly' ? stitched([cx - mW * 0.7, mY + 2], [cx, mY + (mk === 'wobbly' ? -2 : 2)], [cx + mW * 0.7, mY + 2], thread, 2.6, 0, 0)
+    // the classic rag-doll smile: one curve of thread with a little stitch at each end
+    : `<path d="M${n1(cx - mW)} ${n1(mY)} Q${cx} ${n1(mY + mW * 0.75)} ${n1(cx + mW)} ${n1(mY)}" stroke="${thread}" stroke-width="2.8" fill="none" stroke-linecap="round"/>${[-1, 1].map((sd) => `<path d="M${n1(cx + sd * (mW + 1))} ${n1(mY - 3.5)} l${n1(sd * -1.5)} 6" stroke="${thread}" stroke-width="2.2" stroke-linecap="round"/>`).join('')}`;
+  // yarn hair: thick strands and loops of wool with a twist running along them
+  const fam = FAM[l.hairStyle] ?? 'short', hc = l.hair, hl = shade(hc, 0.28), hd = shade(hc, -0.2);
+  const strand = (d: string, w = 7) => `<path d="${d}" stroke="${hc}" stroke-width="${w}" fill="none" stroke-linecap="round"/><path d="${d}" stroke="${hl}" stroke-width="${n1(w * 0.22)}" fill="none" stroke-dasharray="2.5 4" stroke-linecap="round" opacity=".7"/>`;
+  const loop = (x: number, y: number, r: number) => `<circle cx="${n1(x)}" cy="${n1(y)}" r="${n1(r)}" fill="${hc}"/><circle cx="${n1(x)}" cy="${n1(y)}" r="${n1(r * 0.5)}" fill="none" stroke="${hd}" stroke-width="${n1(Math.max(1.2, r * 0.22))}"/>`;
+  const fringe = (n: number, r: number, a0 = 200, a1 = 340, lift = 0.94) => Array.from({ length: n }, (_, i) => {
+    const a = ((a0 + ((a1 - a0) * i) / (n - 1)) * Math.PI) / 180;
+    return loop(cx + Math.cos(a) * hw * lift, cy + Math.sin(a) * hh * lift, r);
+  }).join('');
+  const dome = `<path d="M${n1(cx - hw * 1.02)} ${n1(cy - hh * 0.12)} C${n1(cx - hw * 1.05)} ${n1(top - hh * 0.2)} ${n1(cx + hw * 1.05)} ${n1(top - hh * 0.2)} ${n1(cx + hw * 1.02)} ${n1(cy - hh * 0.12)} Q${cx} ${n1(top + hh * 0.42)} ${n1(cx - hw * 1.02)} ${n1(cy - hh * 0.12)} Z" fill="${hc}"/>`;
+  const bow = (x: number, y: number) => `<g transform="translate(${n1(x)} ${n1(y)})"><path d="M0 0 L-9 -6 L-9 6 Z M0 0 L9 -6 L9 6 Z" fill="${l.accent ?? '#e06a6a'}"/><circle r="3" fill="${shade(l.accent ?? '#e06a6a', -0.2)}"/></g>`;
   let back = '', front = '';
+  const lr = hw * 0.15;
   switch (fam) {
     case 'none': break;
-    case 'sides': front = [-1, 1].map((sd) => `<ellipse cx="${n1(cx + sd * jw * 0.92)}" cy="${n1(eY - 6)}" rx="10" ry="16" fill="${hc}"/>`).join(''); break;
-    case 'tuft': front = `<path d="M${cx} ${n1(top + 6)} q-4 -16 8 -20 q10 -2 8 8 q-2 6 -8 4" stroke="${hc}" stroke-width="6" fill="none" stroke-linecap="round"/>`; break;
-    case 'buzz': front = `<path d="${cap}" fill="${hc}" opacity=".8"/>`; break;
+    case 'sides': front = [-1, 1].map((sd) => loop(cx + sd * hw * 0.98, cy - hh * 0.2, lr) + loop(cx + sd * hw * 1.02, cy, lr * 0.9)).join(''); break;
+    case 'tuft': front = strand(`M${cx} ${n1(top + 4)} q-3 -14 8 -16 q10 -1 7 9 q-3 6 -9 2`, 5); break;
+    case 'buzz': front = `${dome.replace('fill=', 'opacity=".75" fill=')}`; break;
     case 'short': case 'side': case 'messy':
-      front = `<path d="${cap}" fill="${hc}"/>${fam === 'side' ? `<path d="M${n1(cx - hw * 0.9)} ${n1(top + hh * 0.3)} Q${n1(cx - hw * 0.1)} ${n1(top - hh * 0.35)} ${n1(cx + hw * 1.0)} ${n1(top + hh * 0.36)} Q${n1(cx + hw * 0.3)} ${n1(top + hh * 0.2)} ${n1(cx - hw * 0.9)} ${n1(top + hh * 0.3)} Z" fill="${shade(hc, 0.1)}"/>` : ''}${fam === 'messy' ? [-0.6, -0.1, 0.4, 0.8].map((t) => `<path d="M${n1(cx + t * hw)} ${n1(top + 2)} q${n1(4 + t * 6)} -18 ${n1(12 + t * 4)} -10 q-6 2 -6 10 Z" fill="${hc}"/>`).join('') : ''}${groove(`M${n1(cx - hw * 0.5)} ${n1(top + hh * 0.08)} Q${cx} ${n1(top - hh * 0.04)} ${n1(cx + hw * 0.5)} ${n1(top + hh * 0.1)}`)}`;
+      front = `${dome}${fam === 'side' ? fringe(6, lr, 196, 300) + strand(`M${n1(cx - hw * 0.1)} ${n1(top + 2)} Q${n1(cx + hw * 0.7)} ${n1(top + hh * 0.05)} ${n1(cx + hw * 0.95)} ${n1(cy - hh * 0.3)}`, 9) : fringe(fam === 'messy' ? 8 : 7, lr)}${fam === 'messy' ? loop(cx - hw * 0.3, top - 4, lr * 1.1) + loop(cx + hw * 0.25, top - 6, lr) : ''}`;
       break;
     case 'bob': case 'long': case 'curlyLong': {
-      const len = fam === 'bob' ? cy + hh * 0.6 : P.torso[0] + 44;
-      back = `<path d="M${n1(cx - jw * 1.18)} ${n1(cy - hh * 0.2)} C${n1(cx - jw * 1.3)} ${n1(top - hh * 0.3)} ${n1(cx + jw * 1.3)} ${n1(top - hh * 0.3)} ${n1(cx + jw * 1.18)} ${n1(cy - hh * 0.2)} L${n1(cx + jw * 1.2)} ${n1(len)} Q${cx} ${n1(len + 10)} ${n1(cx - jw * 1.2)} ${n1(len)} Z" fill="${hc}"/>${groove(`M${n1(cx - jw * 1.05)} ${n1(cy)} L${n1(cx - jw * 1.08)} ${n1(len - 6)}`)}${groove(`M${n1(cx + jw * 1.05)} ${n1(cy)} L${n1(cx + jw * 1.08)} ${n1(len - 6)}`)}`;
-      front = `<path d="M${n1(cx - hw * 1.05)} ${n1(cy - hh * 0.1)} C${n1(cx - hw * 1.1)} ${n1(top - hh * 0.28)} ${n1(cx + hw * 1.1)} ${n1(top - hh * 0.28)} ${n1(cx + hw * 1.05)} ${n1(cy - hh * 0.1)} Q${n1(cx + hw * 0.6)} ${n1(top + hh * (l.hairStyle === 'bangs' ? 0.72 : 0.36))} ${n1(cx - hw * 0.1)} ${n1(top + hh * (l.hairStyle === 'bangs' ? 0.72 : 0.5))} Q${n1(cx - hw * 0.8)} ${n1(top + hh * 0.5)} ${n1(cx - hw * 1.05)} ${n1(cy - hh * 0.1)} Z" fill="${hc}"/>${fam === 'curlyLong' ? Array.from({ length: 8 }, (_, i) => `<circle cx="${n1(cx + (i % 2 ? 1 : -1) * jw * 1.16)}" cy="${n1(cy + (Math.floor(i / 2)) * 18)}" r="9" fill="${hc}"/>`).join('') : ''}`;
+      const len = fam === 'bob' ? cy + hh * 0.75 : P.torso[0] + 46;
+      // strands from a centre parting, over the head and down past the face
+      back = [-1, 1].map((sd) => Array.from({ length: 6 }, (_, i) => {
+        const x0 = cx + sd * (2 + i * hw * 0.16), x1 = cx + sd * hw * (0.62 + i * 0.1);
+        return strand(`M${n1(x0)} ${n1(top - 1 + i * 2)} Q${n1(cx + sd * hw * (1.25 + i * 0.03))} ${n1(cy - hh * 0.2)} ${n1(x1)} ${n1(len - (i % 2) * 6)}`, 9);
+      }).join('')).join('') + (fam === 'curlyLong' ? [-1, 1].map((sd) => [0, 1, 2].map((i) => loop(cx + sd * hw * (0.75 + i * 0.12), len - 4 + (i % 2) * 6, lr * 1.1)).join('')).join('') : '');
+      front = [-1, 1].map((sd) => Array.from({ length: 4 }, (_, i) => strand(`M${n1(cx + sd * 2)} ${n1(top + 1)} Q${n1(cx + sd * hw * (0.45 + i * 0.12))} ${n1(top + hh * (0.05 + i * 0.02))} ${n1(cx + sd * hw * (0.9 + i * 0.03))} ${n1(cy - hh * (0.28 - i * 0.12))}`, 8)).join('')).join('')
+        + (l.hairStyle === 'bangs' ? fringe(5, lr, 220, 320, 0.7) : '');
       break;
     }
     case 'curlyShort': case 'afro': {
-      const R = fam === 'afro' ? 1.42 : 1.12, n = fam === 'afro' ? 13 : 10;
-      back = Array.from({ length: n }, (_, i) => { const a = Math.PI * (0.92 + (i / (n - 1)) * 1.16); return `<circle cx="${n1(cx + Math.cos(a) * hw * R)}" cy="${n1(cy - hh * 0.1 + Math.sin(a) * hh * R)}" r="${fam === 'afro' ? 22 : 14}" fill="${hc}"/>`; }).join('') + (fam === 'afro' ? `<ellipse cx="${cx}" cy="${n1(cy - hh * 0.4)}" rx="${n1(hw * 1.3)}" ry="${n1(hh * 1.1)}" fill="${hc}"/>` : '');
-      front = Array.from({ length: 6 }, (_, i) => `<circle cx="${n1(cx - hw * 0.8 + i * hw * 0.32)}" cy="${n1(top + hh * 0.12 + (i % 2) * 6)}" r="${fam === 'afro' ? 13 : 12}" fill="${hc}"/>`).join('');
+      const n = fam === 'afro' ? 14 : 11, R = fam === 'afro' ? 1.22 : 1.02, r = fam === 'afro' ? hw * 0.26 : hw * 0.19;
+      back = Array.from({ length: n }, (_, i) => { const a = Math.PI * (0.9 + (i / (n - 1)) * 1.2); return loop(cx + Math.cos(a) * hw * R, cy - hh * 0.05 + Math.sin(a) * hh * R, r); }).join('')
+        + (fam === 'afro' ? `<ellipse cx="${cx}" cy="${n1(cy - hh * 0.35)}" rx="${n1(hw * 1.1)}" ry="${n1(hh * 0.9)}" fill="${hc}"/>` + Array.from({ length: 5 }, (_, i) => loop(cx - hw * 0.7 + i * hw * 0.35, top - hh * 0.2 + (i % 2) * 8, r * 0.9)).join('') : '');
+      front = fringe(7, lr * 1.05, 205, 335, 0.9);
       break;
     }
-    case 'bun': back = `<circle cx="${cx}" cy="${n1(top - hh * 0.26)}" r="${n1(hw * 0.42)}" fill="${hc}"/>`; front = `<path d="${cap}" fill="${hc}"/>`; break;
-    case 'pony': back = `<path d="M${n1(cx + hw * 0.6)} ${n1(top + 10)} Q${n1(cx + hw * 1.7)} ${n1(cy)} ${n1(cx + hw * 1.1)} ${n1(cy + hh * 1.2)} Q${n1(cx + hw * 1.2)} ${n1(cy)} ${n1(cx + hw * 0.4)} ${n1(top + 16)} Z" fill="${hc}"/>`; front = `<path d="${cap}" fill="${hc}"/>`; break;
-    case 'pigtails': back = [-1, 1].map((sd) => `<ellipse cx="${n1(cx + sd * hw * 1.25)}" cy="${n1(cy - hh * 0.1)}" rx="${n1(hw * 0.32)}" ry="${n1(hh * 0.5)}" fill="${hc}"/>`).join(''); front = `<path d="${cap}" fill="${hc}"/>`; break;
+    case 'bun': back = `<circle cx="${cx}" cy="${n1(top - hh * 0.22)}" r="${n1(hw * 0.36)}" fill="${hc}"/>${[0.5, 0.8].map((f) => `<path d="M${n1(cx - hw * 0.36 * f)} ${n1(top - hh * 0.22)} A${n1(hw * 0.36 * f)} ${n1(hw * 0.36 * f)} 0 1 1 ${n1(cx + hw * 0.36 * f)} ${n1(top - hh * 0.22)}" stroke="${hd}" stroke-width="1.6" fill="none"/>`).join('')}`; front = dome + fringe(7, lr); break;
+    case 'pony': back = [0, 1, 2].map((i) => strand(`M${n1(cx + hw * 0.7)} ${n1(top + hh * 0.2)} Q${n1(cx + hw * (1.45 + i * 0.08))} ${n1(cy - hh * 0.1)} ${n1(cx + hw * (1.05 + i * 0.1))} ${n1(cy + hh * 0.9)}`, 8)).join('') + bow(cx + hw * 0.92, top + hh * 0.22); front = dome + fringe(7, lr); break;
+    case 'pigtails': back = [-1, 1].map((sd) => [0, 1, 2].map((i) => strand(`M${n1(cx + sd * hw * 0.9)} ${n1(cy - hh * 0.4)} Q${n1(cx + sd * hw * (1.45 + i * 0.06))} ${n1(cy - hh * 0.25)} ${n1(cx + sd * hw * (1.2 + i * 0.12))} ${n1(cy + hh * 0.7)}`, 8)).join('') + bow(cx + sd * hw * 1.05, cy - hh * 0.38)).join(''); front = dome + fringe(7, lr); break;
   }
-  // body: a pear-shaped torso, stubby legs, big shoes, mitten hands
+  const fh = facialOf(l);
+  const beard = fh === 'full' || fh === 'trim' ? Array.from({ length: 9 }, (_, i) => { const a = Math.PI * (0.12 + (i / 8) * 0.76); return loop(cx + Math.cos(a) * hw * 0.82, cy + Math.sin(a) * hh * 0.92, lr * 1.05); }).join('') : '';
+  const stache = fh !== 'none' && fh !== 'stubble' ? [-1, 1].map((sd) => strand(`M${cx} ${n1(mY - 5)} q${n1(sd * mW * 0.7)} -6 ${n1(sd * mW * 1.2)} 2`, 6)).join('') : '';
+  const freck = l.freckles ? [-1, 1].flatMap((sd) => [0, 1, 2].map((i) => `<path d="M${n1(cx + sd * (hw * 0.5 + i * 3.4))} ${n1(eY + hh * 0.16 + (i % 2) * 3)} l1.6 1.6" stroke="${shade(l.skin, -0.32)}" stroke-width="1.4" stroke-linecap="round"/>`)).join('') : '';
+  // body: a soft sack with a felt collar and two big buttons; tube limbs, mitten hands, round shoes
   const [ty0, ty1] = P.torso, [tw0, tw1] = P.tw;
-  const torso = `M${n1(cx - tw0 / 2)} ${ty0 + 6} Q${cx} ${ty0 - 6} ${n1(cx + tw0 / 2)} ${ty0 + 6} C${n1(cx + tw1 / 2 + 6)} ${n1((ty0 + ty1) / 2)} ${n1(cx + tw1 / 2 + 4)} ${ty1 - 6} ${n1(cx + tw1 / 2 - 6)} ${ty1} Q${cx} ${ty1 + 8} ${n1(cx - tw1 / 2 + 6)} ${ty1} C${n1(cx - tw1 / 2 - 4)} ${ty1 - 6} ${n1(cx - tw1 / 2 - 6)} ${n1((ty0 + ty1) / 2)} ${n1(cx - tw0 / 2)} ${ty0 + 6} Z`;
-  const footY = 252 - 8, hipY = ty1 - 6;
-  const [lg, rg] = legsAt(cx, hipY, footY, tw1 * 0.24, A.legs);
-  const legs = [lg, rg].map(([hx, hy, fx, fy]) => limb(hx, hy, fx, fy, P.legW, P.legW * 0.9, C.longSkirt ? 'none' : C.legs)).join('');
-  const shoes = [lg, rg].map(([, , fx, fy], i) => `<ellipse cx="${n1(fx + (i ? 6 : -6))}" cy="${n1(fy + 4)}" rx="${n1(P.legW * 0.95)}" ry="${n1(P.legW * 0.48)}" fill="${C.shoes}"/>`).join('');
-  const sY = ty0 + 16, sX = tw0 / 2 + 4;
+  const torso = `M${n1(cx - tw0 / 2)} ${ty0 + 8} Q${n1(cx - tw0 / 2)} ${ty0} ${cx} ${ty0 - 2} Q${n1(cx + tw0 / 2)} ${ty0} ${n1(cx + tw0 / 2)} ${ty0 + 8} C${n1(cx + tw1 / 2 + 5)} ${n1((ty0 + ty1) / 2)} ${n1(cx + tw1 / 2 + 2)} ${ty1 - 2} ${n1(cx + tw1 / 2 - 6)} ${ty1 + 2} Q${cx} ${ty1 + 8} ${n1(cx - tw1 / 2 + 6)} ${ty1 + 2} C${n1(cx - tw1 / 2 - 2)} ${ty1 - 2} ${n1(cx - tw1 / 2 - 5)} ${n1((ty0 + ty1) / 2)} ${n1(cx - tw0 / 2)} ${ty0 + 8} Z`;
+  const footY = 244, hipY = ty1 - 6;
+  const [lg, rg] = legsAt(cx, hipY, footY, tw1 * 0.22, A.legs);
+  const legs = [lg, rg].map(([hx, hy, fx, fy]) => (C.longSkirt ? '' : limb(hx, hy, fx, fy, P.legW, P.legW, C.legs))).join('');
+  const shoes = [lg, rg].map(([, , fx, fy], i) => `<ellipse cx="${n1(fx + (i ? 3 : -3))}" cy="${n1(fy + 3)}" rx="${n1(P.legW * 0.8)}" ry="${n1(P.legW * 0.55)}" fill="${C.shoes}"/>`).join('');
+  const sY = ty0 + 12, sX = tw0 / 2 + 2;
   const arm = (side: -1 | 1, pose: 'down' | 'up' | 'forward' | 'hold') => {
     const [hx, hy] = handAt(cx + side * sX, sY, P.arm, side, pose);
-    return limb(cx + side * sX, sY, hx, hy, 17, 15, C.sleeve, side * 3) + `<ellipse cx="${n1(hx)}" cy="${n1(hy)}" rx="11" ry="12" fill="${l.skin}"/><ellipse cx="${n1(hx - side * 9)}" cy="${n1(hy - 4)}" rx="5" ry="6.5" fill="${l.skin}"/>`;
+    return limb(cx + side * sX, sY, hx, hy, 15, 14, C.sleeve, side * 2) + `<circle cx="${n1(hx)}" cy="${n1(hy)}" r="${n1(k === 'baby' ? 9 : 8)}" fill="${l.skin}"/>`;
   };
-  const skirt = C.skirt ? `<path d="M${n1(cx - tw1 / 2 + 2)} ${ty1 - 22} L${n1(cx + tw1 / 2 - 2)} ${ty1 - 22} L${n1(cx + tw1 / 2 + (C.longSkirt ? 16 : 12))} ${C.longSkirt ? 246 : ty1 + 22} Q${cx} ${C.longSkirt ? 252 : ty1 + 30} ${n1(cx - tw1 / 2 - (C.longSkirt ? 16 : 12))} ${C.longSkirt ? 246 : ty1 + 22} Z" fill="${C.skirt}"/>` : '';
-  const cape = C.cape ? `<path d="M${n1(cx - tw0 / 2 - 4)} ${ty0 + 4} L${n1(cx + tw0 / 2 + 4)} ${ty0 + 4} L${n1(cx + tw1 / 2 + 16)} ${ty1 + 24} L${n1(cx - tw1 / 2 - 16)} ${ty1 + 24} Z" fill="${C.cape}"/>` : '';
-  const body = `${cape}${legs}${shoes}<path d="${torso}" fill="${C.top}"/>${stripes(l, id, `<path d="${torso}"/>`, ty0, ty1)}${l.outfit === 'overalls' ? `<path d="M${n1(cx - 24)} ${n1(ty0 + 30)} H${n1(cx + 24)} V${ty1} H${n1(cx - 24)} Z" fill="${C.legs}"/>` : ''}${skirt}`;
-  const face = `${back}${ears}<path d="${headPath}" fill="${l.skin}"/><ellipse cx="${n1(cx - hw * 0.45)}" cy="${n1(cy + hh * 0.35)}" rx="${n1(hw * 0.2)}" ry="${n1(hh * 0.12)}" fill="#f08a8a" opacity=".35"/><ellipse cx="${n1(cx + hw * 0.45)}" cy="${n1(cy + hh * 0.35)}" rx="${n1(hw * 0.2)}" ry="${n1(hh * 0.12)}" fill="#f08a8a" opacity=".35"/>${beard}<g class="bt-eyes">${oneEye(cx - eGap, -1)}${oneEye(cx + eGap, 1)}</g>${brows}<ellipse cx="${cx}" cy="${n1(nY)}" rx="${n1(nose * 0.95)}" ry="${n1(nose * 0.8)}" fill="${shade(l.skin, -0.05)}"/><ellipse cx="${n1(cx - nose * 0.3)}" cy="${n1(nY - nose * 0.3)}" rx="${n1(nose * 0.3)}" ry="${n1(nose * 0.2)}" fill="#fff" opacity=".45"/>${mouth}${stache}${freck}${front}${specs(l, cx, eY, er * 1.25, eGap, false)}${hat(l, head, false)}`;
+  const skirt = C.skirt ? `<path d="M${n1(cx - tw1 / 2)} ${ty1 - 24} H${n1(cx + tw1 / 2)} L${n1(cx + tw1 / 2 + (C.longSkirt ? 20 : 14))} ${C.longSkirt ? 244 : ty1 + 20} Q${cx} ${C.longSkirt ? 252 : ty1 + 28} ${n1(cx - tw1 / 2 - (C.longSkirt ? 20 : 14))} ${C.longSkirt ? 244 : ty1 + 20} Z" fill="${C.skirt}"/>` : '';
+  const cape = C.cape ? `<path d="M${n1(cx - tw0 / 2 - 2)} ${ty0 + 4} H${n1(cx + tw0 / 2 + 2)} L${n1(cx + tw1 / 2 + 16)} ${ty1 + 24} Q${cx} ${ty1 + 30} ${n1(cx - tw1 / 2 - 16)} ${ty1 + 24} Z" fill="${C.cape}"/>` : '';
+  const collar = [-1, 1].map((sd) => `<path d="M${cx} ${ty0} Q${n1(cx + sd * 14)} ${ty0 - 2} ${n1(cx + sd * 15)} ${ty0 + 8} Q${n1(cx + sd * 6)} ${ty0 + 12} ${cx} ${ty0 + 4} Z" fill="${shade(C.top, 0.45)}"/>`).join('');
+  const buttons = l.outfit === 'overalls' ? '' : [0, 1].map((i) => `<circle cx="${cx}" cy="${n1(ty0 + 20 + i * 16)}" r="3.8" fill="${shade(C.top, -0.32)}"/><circle cx="${n1(cx - 1.1)}" cy="${n1(ty0 + 20 + i * 16)}" r=".8" fill="${shade(C.top, 0.3)}"/><circle cx="${n1(cx + 1.1)}" cy="${n1(ty0 + 20 + i * 16)}" r=".8" fill="${shade(C.top, 0.3)}"/>`).join('');
+  const overalls = l.outfit === 'overalls' ? `<path d="M${n1(cx - tw1 * 0.32)} ${n1(ty0 + 22)} H${n1(cx + tw1 * 0.32)} L${n1(cx + tw1 * 0.44)} ${ty1} H${n1(cx - tw1 * 0.44)} Z" fill="${C.legs}"/>${[-1, 1].map((sd) => `<circle cx="${n1(cx + sd * tw1 * 0.22)}" cy="${n1(ty0 + 28)}" r="3.4" fill="#e7b43c"/>`).join('')}` : '';
+  const body = `${cape}${legs}${shoes}<path d="${torso}" fill="${C.top}"/>${stripes(l, id, `<path d="${torso}"/>`, ty0, ty1)}${overalls}${buttons}${collar}${skirt}`;
+  const ears = [-1, 1].map((sd) => `<circle cx="${n1(cx + sd * hw * 0.98)}" cy="${n1(eY + 2)}" r="${n1(hw * 0.16)}" fill="${l.skin}"/>`).join('');
+  const face = `${back}${ears}<path d="${headPath}" fill="${l.skin}"/>${beard}${cheeks}<g class="bt-eyes">${eye(cx - eGap, -1)}${eye(cx + eGap, 1)}</g>${brows}${nose}${mouth}${stache}${freck}${front}${specs(l, cx, eY, er * 1.9, eGap, false, '#3a2a24')}${hat(l, head, false)}`;
+  return { svg: assemble(l, body, face, arm, A, head, held), head };
+}
+
+/* ═══════════════════════ SKETCHBOOK: PICTURE-BOOK SKETCH ═══════════════════════ */
+function sketch(l: Look, id: string): { svg: string; head: Head } {
+  const k = l.kind as 'baby' | 'kid' | 'adult' | 'elder';
+  const grown = k === 'adult' || k === 'elder';
+  const fw = 1 + 0.1 * sh(l, 'faceWidth'), fl = 1 + 0.08 * sh(l, 'faceLength');
+  // a loose picture-book drawing: tall, lanky grown-ups with small heads, long necks and big
+  // feet; round little ones; noses with character
+  const P = {
+    baby: { hw: 44, hh: 42, torso: [152, 214], tw: [40, 62], legW: 9, arm: 32, neck: 0 },
+    kid: { hw: 30, hh: 33, torso: [118, 200], tw: [32, 48], legW: 7, arm: 46, neck: 4 },
+    adult: { hw: 23, hh: 29, torso: [92, 190], tw: [34, 46], legW: 6.5, arm: 66, neck: 14 },
+    elder: { hw: 25, hh: 28, torso: [98, 192], tw: [40, 56], legW: 6.5, arm: 60, neck: 10 },
+  }[k];
+  const hw = P.hw * fw, hh = P.hh * fl, cx = 100, top = P.torso[0] - P.neck - hh * 2, cy = top + hh;
+  const head: Head = { cx, cy, rx: hw, ry: hh, top, chin: top + hh * 2 };
+  const C = clothes(l), A = armsOf(l), ex = exprOf(l);
+  const j = 1 + 0.1 * sh(l, 'jaw');
+  // an egg of a head: narrower at the crown for grown-ups, a round bun for babies
+  const crown = grown ? 0.82 : 0.95;
+  const headPath = `M${cx} ${n1(top)} C${n1(cx + hw * crown)} ${n1(top)} ${n1(cx + hw)} ${n1(cy - hh * 0.5)} ${n1(cx + hw)} ${n1(cy + hh * 0.05)} C${n1(cx + hw * j)} ${n1(cy + hh * 0.75)} ${n1(cx + hw * 0.55)} ${n1(top + hh * 2)} ${cx} ${n1(top + hh * 2)} C${n1(cx - hw * 0.55)} ${n1(top + hh * 2)} ${n1(cx - hw * j)} ${n1(cy + hh * 0.75)} ${n1(cx - hw)} ${n1(cy + hh * 0.05)} C${n1(cx - hw)} ${n1(cy - hh * 0.5)} ${n1(cx - hw * crown)} ${n1(top)} ${cx} ${n1(top)} Z`;
+  const er = (k === 'baby' ? 4.6 : k === 'kid' ? 3.6 : 3) * (1 + 0.12 * sh(l, 'eyeSize'));
+  const eY = cy - hh * (grown ? 0.05 : -0.04), eGap = hw * (grown ? 0.38 : 0.36) + 1.5 * sh(l, 'eyeGap');
+  const es = eyeOf(ex);
+  const graphite = '#3d3632';
+  const eye = (x: number, side: number) => es === 'closed' || (es === 'wink' && side > 0) || es === 'sleepy'
+    ? `<path d="M${n1(x - er * 1.5)} ${n1(eY)} Q${x} ${n1(eY + (es === 'sleepy' ? er * 0.6 : -er * 1.6))} ${n1(x + er * 1.5)} ${n1(eY)}" stroke="${graphite}" stroke-width="2" fill="none" stroke-linecap="round"/>`
+    : `<ellipse cx="${n1(x)}" cy="${n1(eY)}" rx="${n1(er * (es === 'wide' ? 1.3 : 1))}" ry="${n1(er * (es === 'wide' ? 1.5 : 1.2))}" fill="${l.eyes ?? '#5a3a22'}"/><circle cx="${n1(x)}" cy="${n1(eY + er * 0.15)}" r="${n1(er * 0.55)}" fill="#1d1512"/><circle cx="${n1(x - er * 0.35)}" cy="${n1(eY - er * 0.4)}" r="${n1(er * 0.25)}" fill="#fff"/>${l.lashes ? `<path d="M${n1(x + side * er)} ${n1(eY - er * 0.6)} l${n1(side * 3)} -3" stroke="${graphite}" stroke-width="1.4" stroke-linecap="round"/>` : ''}`;
+  // big expressive brows: they do most of the acting
+  const brows = es === 'closed' ? '' : [-1, 1].map((sd) => {
+    const bx = cx + sd * eGap, by = eY - er * (grown ? 3.2 : 2.6);
+    const inner = ex === 'worried' ? -4 : ex === 'brave' || ex === 'proud' ? 3 : ex === 'wow' || ex === 'starry' ? -3 : 0;
+    return `<path d="M${n1(bx - sd * er * 1.6)} ${n1(by + inner)} Q${n1(bx)} ${n1(by - 3.5)} ${n1(bx + sd * er * 1.9)} ${n1(by + 0.5)}" stroke="${shade(l.hair, -0.3)}" stroke-width="${grown ? 2.6 : 2}" fill="none" stroke-linecap="round"/>`;
+  }).join('');
+  // the nose has character: a long bulb on grown-ups, a button on kids, a dot on babies
+  const nz = (k === 'elder' ? 0.85 : 0.68) * (1 + 0.22 * sh(l, 'nose'));
+  const nY = eY + er * 0.8;
+  const nose = grown
+    ? `<path d="M${n1(cx - 1)} ${n1(nY - 2)} C${n1(cx + 2)} ${n1(nY + 8 * nz)} ${n1(cx + 11 * nz)} ${n1(nY + 10 * nz)} ${n1(cx + 10 * nz)} ${n1(nY + 16 * nz)} C${n1(cx + 9 * nz)} ${n1(nY + 21 * nz)} ${n1(cx - 1)} ${n1(nY + 21 * nz)} ${n1(cx - 5)} ${n1(nY + 18 * nz)} C${n1(cx - 7)} ${n1(nY + 15 * nz)} ${n1(cx - 3)} ${n1(nY + 6 * nz)} ${n1(cx - 1)} ${n1(nY - 2)} Z" fill="${shade(l.skin, -0.06)}"/>`
+    : k === 'kid' ? `<path d="M${n1(cx - 1)} ${n1(nY + 2)} q6 6 1 10 q-4 2 -6 -1" fill="${shade(l.skin, -0.06)}"/>`
+    : `<ellipse cx="${cx}" cy="${n1(nY + 7)}" rx="3" ry="2.2" fill="${shade(l.skin, -0.1)}"/>`;
+  const mY = grown ? nY + 21 * nz + 6 : nY + (k === 'kid' ? 17 : 14), mW = hw * (grown ? 0.42 : 0.3) * (1 + 0.1 * sh(l, 'mouth'));
+  const mk = mouthOf(ex);
+  const mouth = mk === 'open' || mk === 'grin' || mk === 'tongue'
+    ? `<path d="M${n1(cx - mW)} ${n1(mY)} Q${n1(cx + 2)} ${n1(mY + mW * 1.1)} ${n1(cx + mW)} ${n1(mY - 2)} Q${cx} ${n1(mY + 3)} ${n1(cx - mW)} ${n1(mY)} Z" fill="#7a3030"/>${mk === 'tongue' ? `<ellipse cx="${n1(cx + 2)}" cy="${n1(mY + mW * 0.5)}" rx="${n1(mW * 0.32)}" ry="${n1(mW * 0.24)}" fill="#ef7f8a"/>` : ''}`
+    : mk === 'o' ? `<ellipse cx="${cx}" cy="${n1(mY + 3)}" rx="${n1(mW * 0.25)}" ry="${n1(mW * 0.35)}" fill="#7a3030"/>`
+    : mk === 'flat' || mk === 'wobbly' ? `<path d="M${n1(cx - mW * 0.6)} ${n1(mY + 2)} q${n1(mW * 0.3)} ${mk === 'wobbly' ? -4 : 1} ${n1(mW * 0.6)} 0 t${n1(mW * 0.6)} 0" stroke="${graphite}" stroke-width="2" fill="none" stroke-linecap="round"/>`
+    : `<path d="M${n1(cx - mW)} ${n1(mY - 1)} Q${n1(cx + 2)} ${n1(mY + mW * 0.7)} ${n1(cx + mW)} ${n1(mY - 3)}" stroke="${graphite}" stroke-width="2.2" fill="none" stroke-linecap="round"/>`;
+  // rosy cheeks scribbled in with a few strokes of red pencil
+  const cheeks = [-1, 1].map((sd) => { const x = cx + sd * hw * 0.58, y = eY + hh * 0.36; return `<path d="M${n1(x - 5)} ${n1(y + 2)} l6 -5 M${n1(x - 3)} ${n1(y + 4)} l6 -5 M${n1(x - 1)} ${n1(y + 6)} l6 -5" stroke="#e8807a" stroke-width="1.6" stroke-linecap="round" opacity=".8"/>`; }).join('');
+  // scribbly hair: a shape in the hair colour, gone over with loose pencil strokes
+  const fam = FAM[l.hairStyle] ?? 'short', hc = l.hair, hd = shade(hc, -0.35);
+  const scrib = (d: string, w = 1.6) => `<path d="${d}" stroke="${hd}" stroke-width="${w}" fill="none" stroke-linecap="round"/>`;
+  const spikes = (n: number, y: number, x0: number, x1: number, up: number) => Array.from({ length: n }, (_, i) => { const x = x0 + ((x1 - x0) * i) / (n - 1); return `L${n1(x)} ${n1(y - (i % 2 ? up : up * 0.35))}`; }).join(' ');
+  const mop = `<path d="M${n1(cx - hw * 1.06)} ${n1(cy - hh * 0.05)} C${n1(cx - hw * 1.12)} ${n1(top - hh * 0.05)} ${n1(cx - hw * 0.6)} ${n1(top - hh * 0.12)} ${n1(cx - hw * 0.5)} ${n1(top - hh * 0.06)} ${spikes(7, top, cx - hw * 0.5, cx + hw * 0.7, hh * 0.22)} C${n1(cx + hw * 1.1)} ${n1(top)} ${n1(cx + hw * 1.12)} ${n1(cy - hh * 0.5)} ${n1(cx + hw * 1.06)} ${n1(cy - hh * 0.05)} Q${n1(cx + hw * 0.6)} ${n1(top + hh * 0.42)} ${n1(cx + hw * 0.1)} ${n1(top + hh * 0.34)} Q${n1(cx - hw * 0.5)} ${n1(top + hh * 0.5)} ${n1(cx - hw * 1.06)} ${n1(cy - hh * 0.05)} Z" fill="${hc}"/>`;
+  let back = '', front = '';
+  switch (fam) {
+    case 'none': break;
+    case 'sides': front = [-1, 1].map((sd) => `<path d="M${n1(cx + sd * hw * 0.82)} ${n1(cy - hh * 0.5)} q${n1(sd * 12)} 2 ${n1(sd * 9)} ${n1(hh * 0.45)} q${n1(-sd * 6)} -2 ${n1(-sd * 9)} ${n1(-hh * 0.1)} Z" fill="${hc}"/>${scrib(`M${n1(cx + sd * hw * 0.9)} ${n1(cy - hh * 0.4)} q${n1(sd * 8)} 6 ${n1(sd * 6)} ${n1(hh * 0.3)}`)}`).join('') + scrib(`M${n1(cx - 4)} ${n1(top + 1)} q2 -8 7 -9 M${n1(cx + 2)} ${n1(top + 1)} q4 -6 9 -5`, 1.5); break;
+    case 'tuft': front = scrib(`M${cx} ${n1(top + 2)} q-4 -12 4 -14 q8 0 5 7 q-3 4 -6 1`, 2.2) + scrib(`M${n1(cx - 6)} ${n1(top + 3)} q-2 -7 3 -9`, 1.6); break;
+    case 'buzz': front = mop.replace('fill=', 'opacity=".7" fill=') ; break;
+    case 'short': case 'side': case 'messy':
+      front = mop + scrib(`M${n1(cx - hw * 0.7)} ${n1(top + hh * 0.2)} q${n1(hw * 0.3)} -10 ${n1(hw * 0.6)} -6 M${n1(cx - hw * 0.1)} ${n1(top + hh * 0.15)} q${n1(hw * 0.3)} -10 ${n1(hw * 0.7)} -4 M${n1(cx + hw * 0.5)} ${n1(top + hh * 0.2)} q8 -6 ${n1(hw * 0.4)} 4`)
+        + (fam === 'messy' ? scrib(`M${n1(cx - hw * 0.4)} ${n1(top - 2)} l-5 -10 M${n1(cx + hw * 0.1)} ${n1(top - 4)} l2 -12 M${n1(cx + hw * 0.6)} ${n1(top)} l8 -8`, 2) : '')
+        + (fam === 'side' ? `<path d="M${n1(cx - hw * 0.5)} ${n1(top + 2)} Q${n1(cx + hw * 0.8)} ${n1(top - hh * 0.2)} ${n1(cx + hw * 1.1)} ${n1(cy - hh * 0.2)} Q${n1(cx + hw * 0.5)} ${n1(top + hh * 0.25)} ${n1(cx - hw * 0.5)} ${n1(top + 2)} Z" fill="${shade(hc, 0.08)}"/>` : '');
+      break;
+    case 'bob': case 'long': case 'curlyLong': {
+      const len = fam === 'bob' ? cy + hh * 0.85 : P.torso[0] + (grown ? 40 : 30);
+      back = `<path d="M${n1(cx - hw * 1.12)} ${n1(cy)} C${n1(cx - hw * 1.3)} ${n1(top - hh * 0.3)} ${n1(cx + hw * 1.3)} ${n1(top - hh * 0.3)} ${n1(cx + hw * 1.12)} ${n1(cy)} C${n1(cx + hw * 1.3)} ${n1(cy + hh * 0.8)} ${n1(cx + hw * 1.5)} ${n1(len - 10)} ${n1(cx + hw * 1.2)} ${n1(len)} Q${n1(cx + hw * 0.9)} ${n1(len - 8)} ${n1(cx + hw * 0.7)} ${n1(len - 2)} L${n1(cx + hw * 0.6)} ${n1(cy + hh * 0.6)} H${n1(cx - hw * 0.6)} L${n1(cx - hw * 0.7)} ${n1(len - 2)} Q${n1(cx - hw * 0.9)} ${n1(len - 8)} ${n1(cx - hw * 1.2)} ${n1(len)} C${n1(cx - hw * 1.5)} ${n1(len - 10)} ${n1(cx - hw * 1.3)} ${n1(cy + hh * 0.8)} ${n1(cx - hw * 1.12)} ${n1(cy)} Z" fill="${hc}"/>`
+        + [-1, 1].map((sd) => scrib(`M${n1(cx + sd * hw * 1.1)} ${n1(cy - hh * 0.3)} C${n1(cx + sd * hw * 1.3)} ${n1(cy + hh * 0.4)} ${n1(cx + sd * hw * 1.25)} ${n1(len - 20)} ${n1(cx + sd * hw * 1.15)} ${n1(len - 6)} M${n1(cx + sd * hw * 0.9)} ${n1(cy + hh * 0.3)} q${n1(sd * 6)} ${n1((len - cy) * 0.4)} ${n1(sd * 2)} ${n1((len - cy) * 0.7)}`)).join('')
+        + (fam === 'curlyLong' ? [-1, 1].map((sd) => scrib(`M${n1(cx + sd * hw * 1.2)} ${n1(len - 18)} c${n1(sd * 6)} -4 ${n1(sd * 8)} 6 ${n1(sd * 2)} 6 c${n1(-sd * 5)} 0 ${n1(-sd * 3)} -8 ${n1(sd * 2)} -6`, 1.8)).join('') : '');
+      front = `<path d="M${n1(cx - hw * 1.06)} ${n1(cy - hh * 0.05)} C${n1(cx - hw * 1.1)} ${n1(top - hh * 0.25)} ${n1(cx + hw * 1.1)} ${n1(top - hh * 0.25)} ${n1(cx + hw * 1.06)} ${n1(cy - hh * 0.05)} Q${n1(cx + hw * 0.5)} ${n1(top + hh * (l.hairStyle === 'bangs' ? 0.7 : 0.25))} ${n1(cx - hw * 0.2)} ${n1(top + hh * (l.hairStyle === 'bangs' ? 0.7 : 0.45))} Q${n1(cx - hw * 0.8)} ${n1(top + hh * 0.55)} ${n1(cx - hw * 1.06)} ${n1(cy - hh * 0.05)} Z" fill="${hc}"/>` + scrib(`M${n1(cx - hw * 0.2)} ${n1(top + hh * 0.4)} Q${n1(cx + hw * 0.3)} ${n1(top + hh * 0.05)} ${n1(cx + hw * 0.9)} ${n1(cy - hh * 0.25)} M${n1(cx - hw * 0.6)} ${n1(top + hh * 0.35)} Q${n1(cx - hw * 0.4)} ${n1(top + hh * 0.05)} ${n1(cx)} ${n1(top + hh * 0.02)}`);
+      break;
+    }
+    case 'curlyShort': case 'afro': {
+      const R = fam === 'afro' ? 1.38 : 1.12;
+      back = `<ellipse cx="${cx}" cy="${n1(cy - hh * (fam === 'afro' ? 0.25 : 0.12))}" rx="${n1(hw * R)}" ry="${n1(hh * R * 0.98)}" fill="${hc}"/>`
+        + Array.from({ length: fam === 'afro' ? 9 : 6 }, (_, i) => { const a = Math.PI * (1.0 + (i / (fam === 'afro' ? 8 : 5)) * 1.0); const x = cx + Math.cos(a) * hw * R * 0.78, y = cy - hh * 0.2 + Math.sin(a) * hh * R * 0.8; return scrib(`M${n1(x)} ${n1(y)} c4 -5 9 0 5 4 c-3 3 -7 -1 -3 -4`, 1.6); }).join('');
+      front = `<path d="M${n1(cx - hw)} ${n1(top + hh * 0.42)} Q${n1(cx - hw * 0.5)} ${n1(top + hh * 0.15)} ${cx} ${n1(top + hh * 0.3)} Q${n1(cx + hw * 0.5)} ${n1(top + hh * 0.12)} ${n1(cx + hw)} ${n1(top + hh * 0.42)} V${n1(top - 2)} H${n1(cx - hw)} Z" fill="${hc}"/>` + scrib(`M${n1(cx - hw * 0.6)} ${n1(top + hh * 0.22)} c3 -4 7 0 4 3 M${n1(cx + hw * 0.3)} ${n1(top + hh * 0.18)} c3 -4 7 0 4 3`, 1.6);
+      break;
+    }
+    case 'bun': back = `<circle cx="${n1(cx + 3)}" cy="${n1(top - hh * 0.24)}" r="${n1(hw * 0.42)}" fill="${hc}"/>${scrib(`M${n1(cx - hw * 0.25)} ${n1(top - hh * 0.25)} c6 -10 18 -6 14 4 c-3 6 -12 4 -10 -2`)}`; front = mop; break;
+    case 'pony': back = `<path d="M${n1(cx + hw * 0.6)} ${n1(top + 6)} Q${n1(cx + hw * 1.9)} ${n1(cy - hh * 0.2)} ${n1(cx + hw * 1.3)} ${n1(cy + hh * 1.2)} Q${n1(cx + hw * 1.25)} ${n1(cy)} ${n1(cx + hw * 0.5)} ${n1(top + 12)} Z" fill="${hc}"/>${scrib(`M${n1(cx + hw * 0.9)} ${n1(top + 10)} Q${n1(cx + hw * 1.6)} ${n1(cy)} ${n1(cx + hw * 1.3)} ${n1(cy + hh)}`)}`; front = mop; break;
+    case 'pigtails': back = [-1, 1].map((sd) => `<path d="M${n1(cx + sd * hw * 0.85)} ${n1(cy - hh * 0.4)} q${n1(sd * hw * 0.9)} ${n1(hh * 0.1)} ${n1(sd * hw * 0.55)} ${n1(hh * 0.9)} q${n1(-sd * hw * 0.2)} ${n1(-hh * 0.4)} ${n1(-sd * hw * 0.5)} ${n1(-hh * 0.5)} Z" fill="${hc}"/>`).join(''); front = mop; break;
+  }
+  const fh = facialOf(l);
+  const beard = fh === 'full' || fh === 'trim' ? `<path d="M${n1(cx - hw * 0.98)} ${n1(cy + hh * 0.05)} Q${n1(cx - hw * 1.05)} ${n1(top + hh * 2.35)} ${n1(cx + 3)} ${n1(top + hh * 2.45)} Q${n1(cx + hw * 1.05)} ${n1(top + hh * 2.3)} ${n1(cx + hw * 0.98)} ${n1(cy + hh * 0.05)} Q${n1(cx + mW)} ${n1(mY + 10)} ${cx} ${n1(mY + 9)} Q${n1(cx - mW)} ${n1(mY + 10)} ${n1(cx - hw * 0.98)} ${n1(cy + hh * 0.05)} Z" fill="${hc}"/>${scrib(`M${n1(cx - hw * 0.5)} ${n1(top + hh * 1.95)} l3 6 M${n1(cx)} ${n1(top + hh * 2.1)} l1 7 M${n1(cx + hw * 0.5)} ${n1(top + hh * 1.95)} l-2 6`)}` : '';
+  const stache = fh !== 'none' && fh !== 'stubble' ? `<path d="M${n1(cx + 2)} ${n1(mY - 6)} Q${n1(cx - mW * 0.8)} ${n1(mY - 9)} ${n1(cx - mW * 1.2)} ${n1(mY - 1)} Q${n1(cx - mW * 0.4)} ${n1(mY - 3)} ${n1(cx + 2)} ${n1(mY - 2)} Q${n1(cx + mW * 0.6)} ${n1(mY - 3)} ${n1(cx + mW * 1.3)} ${n1(mY - 2)} Q${n1(cx + mW * 0.9)} ${n1(mY - 10)} ${n1(cx + 2)} ${n1(mY - 6)} Z" fill="${hc}"/>` : '';
+  const freck = l.freckles ? [-1, 1].flatMap((sd) => [0, 1, 2].map((i) => `<circle cx="${n1(cx + sd * (hw * 0.45 + i * 3))}" cy="${n1(eY + hh * 0.22 + (i % 2) * 3)}" r="1.1" fill="${shade(l.skin, -0.35)}"/>`)).join('') : '';
+  // body: a long coat on grown-ups, a tunic on kids, a round romper on babies; spindly limbs
+  const [ty0, ty1] = P.torso, [tw0, tw1] = P.tw;
+  const torso = k === 'baby'
+    ? `M${cx} ${ty0} C${n1(cx + tw1 / 2 + 8)} ${ty0} ${n1(cx + tw1 / 2 + 6)} ${ty1} ${cx} ${ty1} C${n1(cx - tw1 / 2 - 6)} ${ty1} ${n1(cx - tw1 / 2 - 8)} ${ty0} ${cx} ${ty0} Z`
+    : `M${n1(cx - tw0 / 2)} ${ty0 + 6} Q${n1(cx - tw0 / 2 + 2)} ${ty0} ${n1(cx - tw0 / 2 + 8)} ${ty0} H${n1(cx + tw0 / 2 - 8)} Q${n1(cx + tw0 / 2 - 2)} ${ty0} ${n1(cx + tw0 / 2)} ${ty0 + 6} C${n1(cx + tw0 / 2 + 3)} ${n1((ty0 + ty1) / 2)} ${n1(cx + tw1 / 2 - 2)} ${n1(ty1 - 20)} ${n1(cx + tw1 / 2)} ${ty1} H${n1(cx - tw1 / 2)} C${n1(cx - tw1 / 2 + 2)} ${n1(ty1 - 20)} ${n1(cx - tw0 / 2 - 3)} ${n1((ty0 + ty1) / 2)} ${n1(cx - tw0 / 2)} ${ty0 + 6} Z`;
+  const neck = P.neck ? `<path d="M${n1(cx - 4)} ${n1(top + hh * 2 - 6)} L${n1(cx - 4.5)} ${ty0 + 2} H${n1(cx + 4.5)} L${n1(cx + 4)} ${n1(top + hh * 2 - 6)} Z" fill="${shade(l.skin, -0.06)}"/>` : '';
+  const footY = 246, hipY = ty1 - 2;
+  const [lg, rg] = legsAt(cx, hipY, footY, tw1 * 0.2, A.legs);
+  const legs = [lg, rg].map(([hx, hy, fx, fy]) => (C.longSkirt ? '' : limb(hx, hy, fx, fy, P.legW, P.legW * 0.85, C.legs))).join('');
+  // big feet, pointing out
+  const fL = k === 'baby' ? 9 : grown ? 15 : 11;
+  const shoes = [lg, rg].map(([, , fx, fy], i) => { const d = i ? 1 : -1; return `<path d="M${n1(fx - d * 4)} ${n1(fy - 3)} Q${n1(fx + d * fL * 0.5)} ${n1(fy - 6)} ${n1(fx + d * fL)} ${n1(fy + 1)} Q${n1(fx + d * fL * 1.05)} ${n1(fy + 5)} ${n1(fx + d * fL * 0.6)} ${n1(fy + 5)} H${n1(fx - d * 5)} Q${n1(fx - d * 7)} ${n1(fy + 2)} ${n1(fx - d * 4)} ${n1(fy - 3)} Z" fill="${C.shoes}"/>`; }).join('');
+  const sY = ty0 + 6, sX = tw0 / 2 - 1;
+  const arm = (side: -1 | 1, pose: 'down' | 'up' | 'forward' | 'hold') => {
+    const [hx, hy] = handAt(cx + side * sX, sY, P.arm, side, pose);
+    return limb(cx + side * sX, sY, hx, hy, k === 'baby' ? 10 : 7.5, k === 'baby' ? 9 : 6, C.sleeve, side * 2) + `<ellipse cx="${n1(hx)}" cy="${n1(hy + 1)}" rx="${k === 'baby' ? 6 : 4.6}" ry="${k === 'baby' ? 6.5 : 5.4}" fill="${l.skin}"/>`;
+  };
+  const skirt = C.skirt ? `<path d="M${n1(cx - tw1 / 2 + 2)} ${ty1 - 28} H${n1(cx + tw1 / 2 - 2)} Q${n1(cx + tw1 / 2 + 10)} ${n1(ty1 - 4)} ${n1(cx + tw1 / 2 + (C.longSkirt ? 22 : 16))} ${C.longSkirt ? 244 : ty1 + 18} Q${cx} ${C.longSkirt ? 250 : ty1 + 24} ${n1(cx - tw1 / 2 - (C.longSkirt ? 22 : 16))} ${C.longSkirt ? 244 : ty1 + 18} Q${n1(cx - tw1 / 2 - 10)} ${n1(ty1 - 4)} ${n1(cx - tw1 / 2 + 2)} ${ty1 - 28} Z" fill="${C.skirt}"/>` : '';
+  const cape = C.cape ? `<path d="M${n1(cx - tw0 / 2)} ${ty0 + 2} H${n1(cx + tw0 / 2)} Q${n1(cx + tw1 / 2 + 20)} ${n1((ty0 + ty1) / 2)} ${n1(cx + tw1 / 2 + 18)} ${ty1 + 22} Q${cx} ${ty1 + 28} ${n1(cx - tw1 / 2 - 18)} ${ty1 + 22} Q${n1(cx - tw1 / 2 - 20)} ${n1((ty0 + ty1) / 2)} ${n1(cx - tw0 / 2)} ${ty0 + 2} Z" fill="${C.cape}"/>` : '';
+  const placket = grown && (l.outfit === 'cardigan' || l.outfit === 'denim' || l.outfit === 'suit' || l.outfit === 'coat') ? `<path d="M${n1(cx + 1)} ${ty0 + 2} L${n1(cx + 2)} ${ty1}" stroke="${shade(C.top, -0.35)}" stroke-width="1.6"/>${[0, 1, 2].map((i) => `<circle cx="${n1(cx + 5)}" cy="${n1(ty0 + 18 + i * 22)}" r="1.8" fill="${shade(C.top, -0.4)}"/>`).join('')}` : '';
+  const overalls = l.outfit === 'overalls' ? `<path d="M${n1(cx - tw1 * 0.3)} ${n1(ty0 + (k === 'baby' ? 22 : 18))} H${n1(cx + tw1 * 0.3)} L${n1(cx + tw1 * 0.42)} ${ty1} H${n1(cx - tw1 * 0.42)} Z" fill="${C.legs}"/>` : '';
+  const body = `${cape}${legs}${shoes}${neck}<path d="${torso}" fill="${C.top}"/>${stripes(l, id, `<path d="${torso}"/>`, ty0, ty1)}${overalls}${placket}${skirt}`;
+  const ears = [-1, 1].map((sd) => `<ellipse cx="${n1(cx + sd * hw * 0.98)}" cy="${n1(eY + er)}" rx="${n1(Math.max(4, hw * 0.16))}" ry="${n1(Math.max(5.5, hw * 0.22))}" fill="${l.skin}"/>`).join('');
+  const face = `${back}${ears}<path d="${headPath}" fill="${l.skin}"/>${beard}${cheeks}<g class="bt-eyes">${eye(cx - eGap, -1)}${eye(cx + eGap, 1)}</g>${brows}${nose}${mouth}${stache}${freck}${front}${specs(l, cx, eY, er * 2.6, eGap, false, graphite)}${hat(l, head, false)}`;
   return { svg: assemble(l, body, face, arm, A, head, held), head };
 }
 
@@ -397,95 +559,6 @@ function paper(l: Look, id: string): { svg: string; head: Head } {
   return { svg: assemble(l, body, face, arm, A, head, held), head };
 }
 
-/* ═════════════════════════ COMIC ═════════════════════════ */
-function comic(l: Look, id: string): { svg: string; head: Head } {
-  const k = l.kind as 'baby' | 'kid' | 'adult' | 'elder';
-  const fw = 1 + 0.06 * sh(l, 'faceWidth'), fl = 1 + 0.05 * sh(l, 'faceLength');
-  const P = { baby: { hw: 60, hh: 58, torso: [168, 222], tw: [40, 58], legW: 15, arm: 30 }, kid: { hw: 56, hh: 56, torso: [158, 220], tw: [36, 50], legW: 13, arm: 36 }, adult: { hw: 52, hh: 56, torso: [150, 218], tw: [40, 52], legW: 13, arm: 44 }, elder: { hw: 54, hh: 54, torso: [150, 218], tw: [46, 58], legW: 13, arm: 42 } }[k];
-  const hw = P.hw * fw, hh = P.hh * fl, cx = 100, top = P.torso[0] - hh * 2 + 6, cy = top + hh;
-  const head: Head = { cx, cy, rx: hw, ry: hh, top, chin: top + hh * 2 };
-  const C = clothes(l), A = armsOf(l), ex = exprOf(l);
-  // a big round skull with a soft, pointed chin
-  const jaw = 0.55 + 0.1 * sh(l, 'jaw');
-  const headPath = `M${n1(cx - hw)} ${n1(cy - hh * 0.05)} A${n1(hw)} ${n1(hh * 0.95)} 0 0 1 ${n1(cx + hw)} ${n1(cy - hh * 0.05)} C${n1(cx + hw)} ${n1(cy + hh * 0.55)} ${n1(cx + hw * jaw)} ${n1(top + hh * 1.92)} ${cx} ${n1(top + hh * 2)} C${n1(cx - hw * jaw)} ${n1(top + hh * 1.92)} ${n1(cx - hw)} ${n1(cy + hh * 0.55)} ${n1(cx - hw)} ${n1(cy - hh * 0.05)} Z`;
-  // very large shining eyes, low on the face
-  const eY = cy + hh * 0.18, eGap = hw * 0.4 + 2 * sh(l, 'eyeGap');
-  const ew = hw * 0.25 * (1 + 0.08 * sh(l, 'eyeSize')), eh = ew * (k === 'adult' || k === 'elder' ? 1.15 : 1.35);
-  const es = eyeOf(ex), col = l.eyes ?? '#5a3a22';
-  const eye = (x: number, side: number) => {
-    if (es === 'closed' || (es === 'wink' && side > 0)) return `<path d="M${n1(x - ew)} ${n1(eY)} Q${x} ${n1(eY - eh * 0.9)} ${n1(x + ew)} ${n1(eY)}" stroke="#1a110e" stroke-width="3.4" fill="none" stroke-linecap="round"/>`;
-    if (es === 'sleepy') return `<path d="M${n1(x - ew)} ${n1(eY - 2)} H${n1(x + ew)}" stroke="#1a110e" stroke-width="3.4" stroke-linecap="round"/><path d="M${n1(x - ew * 0.8)} ${n1(eY - 2)} Q${x} ${n1(eY + eh * 0.5)} ${n1(x + ew * 0.8)} ${n1(eY - 2)} Z" fill="${col}"/>`;
-    const s = es === 'wide' ? 1.1 : 1;
-    return `<ellipse cx="${n1(x)}" cy="${n1(eY)}" rx="${n1(ew * s)}" ry="${n1(eh * s)}" fill="#fff"/><ellipse cx="${n1(x + side * -ew * 0.06)}" cy="${n1(eY + eh * 0.1)}" rx="${n1(ew * 0.8 * s)}" ry="${n1(eh * 0.86 * s)}" fill="${col}"/><ellipse cx="${n1(x + side * -ew * 0.06)}" cy="${n1(eY + eh * 0.22)}" rx="${n1(ew * 0.44)}" ry="${n1(eh * 0.5)}" fill="${shade(col, -0.55)}"/><ellipse cx="${n1(x - ew * 0.32)}" cy="${n1(eY - eh * 0.34)}" rx="${n1(ew * 0.34)}" ry="${n1(eh * 0.26)}" fill="#fff"/><circle cx="${n1(x + ew * 0.38)}" cy="${n1(eY + eh * 0.42)}" r="${n1(ew * 0.14)}" fill="#fff"/><path d="M${n1(x - ew * 1.1)} ${n1(eY - eh * 0.82)} Q${x} ${n1(eY - eh * 1.28)} ${n1(x + ew * 1.12)} ${n1(eY - eh * 0.7)}" stroke="#1a110e" stroke-width="${l.lashes ? 4.4 : 3.2}" fill="none" stroke-linecap="round"/>`;
-  };
-  const brows = [-1, 1].map((sd) => `<path d="M${n1(cx + sd * (eGap - ew * 0.8))} ${n1(eY - eh * 1.55 + (ex === 'worried' ? -3 : 0))} Q${n1(cx + sd * eGap)} ${n1(eY - eh * 1.75)} ${n1(cx + sd * (eGap + ew * 0.8))} ${n1(eY - eh * 1.5 + (ex === 'brave' ? -4 : 0))}" stroke="${shade(l.hair, -0.15)}" stroke-width="2.6" fill="none" stroke-linecap="round"/>`).join('');
-  const nY = eY + eh * 1.05;
-  const nose = `<path d="M${n1(cx - 1)} ${n1(nY)} l3 3" stroke="${shade(l.skin, -0.35)}" stroke-width="2" stroke-linecap="round"/>`;
-  const mY = nY + hh * 0.18, mW = hw * 0.14 * (1 + 0.1 * sh(l, 'mouth'));
-  const mk = mouthOf(ex);
-  const mouth = mk === 'open' || mk === 'grin' || mk === 'tongue' ? `<path d="M${n1(cx - mW * 1.4)} ${n1(mY)} Q${cx} ${n1(mY + mW * 2.2)} ${n1(cx + mW * 1.4)} ${n1(mY)} Z" fill="#7a2c2c"/><path d="M${n1(cx - mW * 0.8)} ${n1(mY + mW * 1.2)} Q${cx} ${n1(mY + mW * 0.6)} ${n1(cx + mW * 0.8)} ${n1(mY + mW * 1.2)} Q${cx} ${n1(mY + mW * 1.8)} ${n1(cx - mW * 0.8)} ${n1(mY + mW * 1.2)} Z" fill="#ef7f8a"/>`
-    : mk === 'o' ? `<ellipse cx="${cx}" cy="${n1(mY + 3)}" rx="${n1(mW * 0.5)}" ry="${n1(mW * 0.7)}" fill="#7a2c2c"/>`
-    : mk === 'wobbly' ? `<path d="M${n1(cx - mW)} ${n1(mY + 3)} q${n1(mW / 2)} -4 ${n1(mW)} 0 t${n1(mW)} 0" stroke="#7a2c2c" stroke-width="2.4" fill="none" stroke-linecap="round"/>`
-    : `<path d="M${n1(cx - mW)} ${n1(mY)} Q${cx} ${n1(mY + mW * 1.1)} ${n1(cx + mW)} ${n1(mY)}" stroke="#7a2c2c" stroke-width="2.6" fill="none" stroke-linecap="round"/>`;
-  const blush = [-1, 1].map((sd) => `<g opacity=".7">${[0, 1, 2].map((i) => `<path d="M${n1(cx + sd * (eGap + ew * 0.2) + i * 4 - 4)} ${n1(nY + 2)} l-3 5" stroke="#ef7f8a" stroke-width="2" stroke-linecap="round"/>`).join('')}</g>`).join('');
-  const fh = facialOf(l);
-  const beard = fh === 'full' || fh === 'trim' ? `<path d="M${n1(cx - hw * 0.8)} ${n1(cy + hh * 0.5)} Q${n1(cx - hw * 0.5)} ${n1(top + hh * 2.15)} ${cx} ${n1(top + hh * 2.15)} Q${n1(cx + hw * 0.5)} ${n1(top + hh * 2.15)} ${n1(cx + hw * 0.8)} ${n1(cy + hh * 0.5)} Q${cx} ${n1(mY + 12)} ${n1(cx - hw * 0.8)} ${n1(cy + hh * 0.5)} Z" fill="${l.hair}"/>` : '';
-  const stache = fh === 'moustache' || fh === 'trim' || fh === 'full' ? `<path d="M${n1(cx - mW * 1.8)} ${n1(mY - 2)} Q${cx} ${n1(mY - 10)} ${n1(cx + mW * 1.8)} ${n1(mY - 2)} Q${cx} ${n1(mY - 4)} ${n1(cx - mW * 1.8)} ${n1(mY - 2)} Z" fill="${l.hair}"/>` : '';
-  const freck = l.freckles ? [-1, 1].flatMap((sd) => [0, 1, 2].map((i) => `<circle cx="${n1(cx + sd * (eGap + i * 3 - 2))}" cy="${n1(nY + 8 + (i % 2) * 3)}" r="1.3" fill="${shade(l.skin, -0.3)}"/>`)).join('') : '';
-  // chunky pointed locks
-  const fam = FAM[l.hairStyle] ?? 'short', hc = l.hair;
-  const lock = (x: number, y: number, len: number, ang: number, w: number) => `<path d="M${n1(x - w)} ${n1(y)} Q${n1(x + Math.sin(ang) * len * 0.5 - w * 0.4)} ${n1(y + Math.cos(ang) * len * 0.6)} ${n1(x + Math.sin(ang) * len)} ${n1(y + Math.cos(ang) * len)} Q${n1(x + Math.sin(ang) * len * 0.4 + w * 0.6)} ${n1(y + Math.cos(ang) * len * 0.5)} ${n1(x + w)} ${n1(y)} Z" fill="${hc}"/>`;
-  const crown = `<path d="M${n1(cx - hw * 1.04)} ${n1(cy - hh * 0.12)} A${n1(hw * 1.04)} ${n1(hh * 1.02)} 0 0 1 ${n1(cx + hw * 1.04)} ${n1(cy - hh * 0.12)} C${n1(cx + hw * 0.8)} ${n1(top + hh * 0.42)} ${n1(cx - hw * 0.8)} ${n1(top + hh * 0.42)} ${n1(cx - hw * 1.03)} ${n1(cy - hh * 0.12)} Z" fill="${hc}"/>`;
-  // fringe locks rooted on the crown's curve, so none pokes out past the skull
-  const fringe = (n: number, len: number) => Array.from({ length: n }, (_, i) => {
-    const x = cx - hw * 0.72 + (i * hw * 1.44) / (n - 1), u = (x - cx) / (hw * 1.04);
-    const y = cy - hh * 0.12 - Math.sqrt(Math.max(0, 1 - u * u)) * hh * 1.02 + hh * 0.16;
-    return lock(x, y, len * (0.8 + (i % 2) * 0.35), (i - (n - 1) / 2) * 0.1, hw * 0.15);
-  }).join('');
-  let back = '', front = '';
-  switch (fam) {
-    case 'none': break;
-    case 'sides': front = [-1, 1].map((sd) => `<path d="M${n1(cx + sd * hw * 1.02)} ${n1(cy - hh * 0.35)} Q${n1(cx + sd * hw * 1.12)} ${n1(cy)} ${n1(cx + sd * hw * 0.98)} ${n1(cy + hh * 0.25)} Q${n1(cx + sd * hw * 0.88)} ${n1(cy - hh * 0.05)} ${n1(cx + sd * hw * 0.9)} ${n1(cy - hh * 0.3)} Z" fill="${hc}"/>`).join(''); break;
-    case 'tuft': front = lock(cx, top + 4, -hh * 0.4, 0.4, 6); break;
-    case 'buzz': front = `<path d="M${n1(cx - hw * 1.02)} ${n1(cy - hh * 0.1)} C${n1(cx - hw * 1.04)} ${n1(top - hh * 0.28)} ${n1(cx + hw * 1.04)} ${n1(top - hh * 0.28)} ${n1(cx + hw * 1.02)} ${n1(cy - hh * 0.1)} Q${cx} ${n1(top + hh * 0.05)} ${n1(cx - hw * 1.02)} ${n1(cy - hh * 0.1)} Z" fill="${hc}" opacity=".8"/>`; break;
-    case 'short': case 'side': case 'messy': case 'bun': case 'pony': case 'pigtails':
-      front = crown + fringe(fam === 'messy' ? 7 : 5, hh * (fam === 'side' ? 0.6 : 0.45)) + (fam === 'messy' ? [-0.5, 0, 0.5].map((t) => lock(cx + t * hw, top - hh * 0.1, -hh * 0.35, t, 8)).join('') : '');
-      if (fam === 'bun') back = `<circle cx="${cx}" cy="${n1(top - hh * 0.32)}" r="${n1(hw * 0.32)}" fill="${hc}"/>`;
-      if (fam === 'pony') back = lock(cx + hw * 0.7, top + hh * 0.2, hh * 1.4, -0.35, 14);
-      if (fam === 'pigtails') back = [-1, 1].map((sd) => lock(cx + sd * hw * 1.05, cy - hh * 0.2, hh * 1.0, sd * -0.5, 13)).join('');
-      break;
-    case 'bob': case 'long': case 'curlyLong': {
-      const len = fam === 'bob' ? hh * 1.0 : hh * 1.9;
-      back = `<path d="M${n1(cx - hw * 1.1)} ${n1(cy)} A${n1(hw * 1.1)} ${n1(hh * 1.08)} 0 0 1 ${n1(cx + hw * 1.1)} ${n1(cy)} C${n1(cx + hw * 1.16)} ${n1(cy + len * 0.6)} ${n1(cx + hw * 0.9)} ${n1(cy + len)} ${n1(cx + hw * 0.62)} ${n1(cy + len)} L${n1(cx + hw * 0.5)} ${n1(cy + len * 0.7)} L${n1(cx + hw * 0.3)} ${n1(cy + len * 0.9)} L${n1(cx - hw * 0.3)} ${n1(cy + len * 0.9)} L${n1(cx - hw * 0.5)} ${n1(cy + len * 0.7)} L${n1(cx - hw * 0.62)} ${n1(cy + len)} C${n1(cx - hw * 0.9)} ${n1(cy + len)} ${n1(cx - hw * 1.16)} ${n1(cy + len * 0.6)} ${n1(cx - hw * 1.1)} ${n1(cy)} Z" fill="${hc}"/>`;
-      front = crown + fringe(6, hh * (l.hairStyle === 'bangs' ? 0.62 : 0.42)) + [-1, 1].map((sd) => lock(cx + sd * hw * 0.92, cy - hh * 0.3, len * 0.75, sd * 0.05, 9)).join('');
-      break;
-    }
-    case 'curlyShort': case 'afro': {
-      const R = fam === 'afro' ? 1.32 : 1.08, n = fam === 'afro' ? 14 : 11;
-      back = Array.from({ length: n }, (_, i) => { const a = Math.PI * (0.94 + (i / (n - 1)) * 1.12); return `<circle cx="${n1(cx + Math.cos(a) * hw * R)}" cy="${n1(cy - hh * 0.05 + Math.sin(a) * hh * R)}" r="${n1(hw * (fam === 'afro' ? 0.3 : 0.2))}" fill="${hc}"/>`; }).join('');
-      front = Array.from({ length: 7 }, (_, i) => `<circle cx="${n1(cx - hw * 0.8 + i * hw * 0.27)}" cy="${n1(top + hh * 0.18 + (i % 2) * 6)}" r="${n1(hw * 0.17)}" fill="${hc}"/>`).join('');
-      break;
-    }
-  }
-  const [ty0, ty1] = P.torso, [tw0, tw1] = P.tw;
-  const torso = `M${n1(cx - tw0 / 2)} ${ty0} Q${cx} ${ty0 - 4} ${n1(cx + tw0 / 2)} ${ty0} L${n1(cx + tw1 / 2)} ${ty1} Q${cx} ${ty1 + 4} ${n1(cx - tw1 / 2)} ${ty1} Z`;
-  const footY = 250, hipY = ty1 - 4;
-  const [lg, rg] = legsAt(cx, hipY, footY, tw1 * 0.22, A.legs);
-  const legs = [lg, rg].map(([hx, hy, fx, fy]) => (C.longSkirt ? '' : limb(hx, hy, fx, fy, P.legW, P.legW * 0.85, C.legs))).join('');
-  const shoes = [lg, rg].map(([, , fx, fy], i) => `<ellipse cx="${n1(fx + (i ? 3 : -3))}" cy="${n1(fy + 2)}" rx="${n1(P.legW * 0.85)}" ry="${n1(P.legW * 0.5)}" fill="${C.shoes}"/>`).join('');
-  const sY = ty0 + 8, sX = tw0 / 2 + 1;
-  const arm = (side: -1 | 1, pose: 'down' | 'up' | 'forward' | 'hold') => {
-    const [hx, hy] = handAt(cx + side * sX, sY, P.arm, side, pose);
-    return limb(cx + side * sX, sY, hx, hy, 11, 10, C.sleeve) + `<circle cx="${n1(hx)}" cy="${n1(hy)}" r="7" fill="${l.skin}"/>`;
-  };
-  const skirt = C.skirt ? `<path d="M${n1(cx - tw1 / 2)} ${ty1 - 20} H${n1(cx + tw1 / 2)} L${n1(cx + tw1 / 2 + (C.longSkirt ? 14 : 10))} ${C.longSkirt ? 248 : ty1 + 14} Q${cx} ${C.longSkirt ? 252 : ty1 + 20} ${n1(cx - tw1 / 2 - (C.longSkirt ? 14 : 10))} ${C.longSkirt ? 248 : ty1 + 14} Z" fill="${C.skirt}"/>` : '';
-  const cape = C.cape ? `<path d="M${n1(cx - tw0 / 2)} ${ty0} H${n1(cx + tw0 / 2)} L${n1(cx + tw1 / 2 + 14)} ${ty1 + 18} Q${cx} ${ty1 + 26} ${n1(cx - tw1 / 2 - 14)} ${ty1 + 18} Z" fill="${C.cape}"/>` : '';
-  const body = `${cape}${legs}${shoes}<path d="${torso}" fill="${C.top}"/>${stripes(l, id, `<path d="${torso}"/>`, ty0, ty1)}${l.outfit === 'overalls' ? `<path d="M${n1(cx - tw1 * 0.32)} ${n1(ty0 + 22)} H${n1(cx + tw1 * 0.32)} L${n1(cx + tw1 * 0.46)} ${ty1} H${n1(cx - tw1 * 0.46)} Z" fill="${C.legs}"/>` : ''}${skirt}`;
-  const ears = [-1, 1].map((sd) => `<ellipse cx="${n1(cx + sd * hw * 0.98)}" cy="${n1(eY + 2)}" rx="7" ry="10" fill="${l.skin}"/>`).join('');
-  const face = `${back}${ears}<path d="${headPath}" fill="${l.skin}"/>${beard}${blush}<g class="bt-eyes">${eye(cx - eGap, -1)}${eye(cx + eGap, 1)}</g>${brows}${nose}${mouth}${stache}${freck}${front}${specs(l, cx, eY, ew * 1.35, eGap, false)}${hat(l, head, false)}`;
-  return { svg: assemble(l, body, face, arm, A, head, held), head };
-}
-
 /* ── put it together: back arm, body, head, front arm, pose ── */
 function assemble(l: Look, body: string, face: string, arm: (side: -1 | 1, pose: 'down' | 'up' | 'forward' | 'hold') => string, A: Arms, h: Head, hold: (l: Look, x: number, y: number) => string): string {
   const shadow = `<ellipse cx="100" cy="255" rx="50" ry="6" fill="#000" opacity=".1"/>`;
@@ -497,7 +570,7 @@ function assemble(l: Look, body: string, face: string, arm: (side: -1 | 1, pose:
   return `${shadow}<g class="bt-body" transform="translate(0 ${-A.lift})${lean}">${body}${left}<g class="bt-head">${face}</g>${right}${thing}</g>`;
 }
 
-const DRAW: Record<DesignMode, (l: Look, id: string) => { svg: string; head: Head }> = { pocketlight: clay, gouache: retro, wondercut: paper, inked: comic };
+const DRAW: Record<DesignMode, (l: Look, id: string) => { svg: string; head: Head }> = { pocketlight: ragdoll, gouache: retro, wondercut: paper, inked: sketch };
 
 /** The character in a look's own design, or null when the old renderer should draw it (pets, image faces, drawings). */
 export function designCharacter(l: Look, mode: StyleMode, id: string): { svg: string; head: Head } | null {

@@ -1725,6 +1725,8 @@ function finish(markup: string, l: Look, id: string): string {
     // a world draws with its own defs, so the paper filters may not be there yet
     if (MODE !== 'wondercut') out = out.replace(/^(\s*<g\b[^>]*>)/, `$1<defs>${styleFilters('wondercut', id)}</defs>`);
   }
+  // sketchbook: every shape gets a line, which looks.ts turns to graphite
+  else if (LOOK === 'inked') out = stylizeShapes(markup, 'inked', id, ink);
   else out = imgs(markup);
   return finishInLook(out, LOOK, `${id}L`);
 }

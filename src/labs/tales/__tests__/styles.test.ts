@@ -23,11 +23,9 @@ test('every mode has a complete configuration', () => {
 
 test('each look is made of something different', () => {
   const out = Object.fromEntries(STYLE_MODES.map((m) => [m, characterMarkup(look, { style: m })]));
-  // Retro and Paper cut build their own characters; Plush and Pencil are the Tales characters in another material
+  // every look builds its own characters: rag dolls, sketches, retro shapes, paper cut-outs
   const shapes = (svg: string) => (svg.match(/<(path|ellipse|circle|rect)\b/g) ?? []).length;
-  assert.notEqual(shapes(out.gouache), shapes(out.tales));
-  assert.notEqual(shapes(out.wondercut), shapes(out.tales));
-  assert.notEqual(shapes(out.gouache), shapes(out.wondercut));
+  assert.equal(new Set(STYLE_MODES.map((m) => shapes(out[m]))).size, STYLE_MODES.length, 'every look draws a different construction');
   // patchwork: felt patches on a quilt; sketchbook: graphite drawing with coloured pencil over it
   assert.match(out.pocketlight, /feDisplacementMap[\s\S]*feDiffuseLighting/);
   assert.doesNotMatch(out.pocketlight, /feSpecularLighting/, 'no clay sheen any more');
