@@ -52,8 +52,13 @@ export class BrowserMediaProvider implements MediaProvider {
       try {
         const t = db.transaction(STORE, mode);
         const r = fn(t.objectStore(STORE));
-        r.onsuccess = () => resolve(r.result);
-        r.onerror = () => reject(r.error);
+        // only report success once the transaction has committed: a full disk shows up as an
+        // abort after the request itself has already succeeded
+        let result: T | undefined;
+        r.onsuccess = () => { result = r.result; };
+        t.oncomplete = () => resolve(result);
+        t.onabort = () => reject(t.error ?? r.error ?? new Error('Storage transaction aborted'));
+        t.onerror = () => reject(t.error ?? r.error);
       } catch (e) {
         reject(e);
       }
@@ -130,6 +135,21 @@ export class BrowserMediaProvider implements MediaProvider {
       return [...keys.map(String), ...this.mem.keys()];
     } catch {
       return [...this.mem.keys()];
+    }
+  }
+
+  /**
+   * Whether a file is really on this device's disk (not just held in memory after a failed
+   * write). null when this browser has no disk storage at all (e.g. some private windows).
+   */
+  async onDisk(key: string): Promise<boolean | null> {
+    const db = await this.dbp;
+    if (!db) return null;
+    try {
+      const r = (await this.tx('readonly', (s) => s.get(key))) as Row | undefined;
+      return !!r?.blob;
+    } catch {
+      return false;
     }
   }
 

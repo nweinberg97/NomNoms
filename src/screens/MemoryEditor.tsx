@@ -37,7 +37,7 @@ interface Local {
  * a photo can be saved with nothing but the date it was taken.
  */
 export function MemoryEditor({ editId }: { editId?: string }) {
-  const { baby, memories, addMemory, updateMemory, ingest, forgetMedia, media } = useApp();
+  const { baby, memories, addMemory, updateMemory, ingest, forgetMedia, mediaSaved, media } = useApp();
   const { query } = useRoute();
   const editing = editId ? memories.find((m) => m.id === editId) : undefined;
   const kindParam = (query.get('kind') as MemoryType | 'voice' | null) ?? undefined;
@@ -163,11 +163,16 @@ export function MemoryEditor({ editId }: { editId?: string }) {
       if (editing) {
         // new files first, then the memory gets the strip's order; removed photos are tidied up last
         const fresh = locals.length ? await ingest(locals.map((l) => l.file)) : [];
+        if (fresh.length && !(await mediaSaved(fresh.map((f) => f.id)))) {
+          // nothing in the memory is changed if the new photos couldn't be stored
+          toast('This device is out of space, so the new photos couldn’t be saved. Nothing was changed.', { icon: 'x', ms: 4000 });
+          return;
+        }
         const idOf = new Map(locals.map((l, i) => [`n:${l.url}`, fresh[i]?.id]));
         const mediaIds = tiles.map((k) => (k.startsWith('s:') ? k.slice(2) : idOf.get(k))).filter((x): x is string => !!x);
         const changed = mediaIds.join() !== editing.mediaIds.join();
         await updateMemory(editing.id, { title: title.trim() || undefined, caption: caption.trim() || undefined, date, type, people, location: location.trim() || undefined, favorite, ...(changed ? { mediaIds } : {}) });
-        if (removedSaved.length) await forgetMedia(removedSaved);
+        if (removedSaved.length) await forgetMedia(removedSaved, editing.id);
         toast(removedSaved.length ? `Saved · ${plural(removedSaved.length, 'photo')} removed` : 'Saved', { icon: 'check' });
         navigate(`/memory/${editing.id}`, { replace: true });
         return;

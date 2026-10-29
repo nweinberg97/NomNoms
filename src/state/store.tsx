@@ -47,11 +47,14 @@ interface Actions {
   toggleFavorite(id: string): Promise<void>;
   addMediaToMemory(id: string, files: Blob[]): Promise<void>;
   /**
-   * Photos/videos the parent took out of a memory: removed from the book's pages and cover,
-   * and deleted from this device when nothing else (another memory, a first, the baby's
-   * picture) still uses them.
+   * Photos/videos the parent took out of one memory: removed from that memory's book pages,
+   * and deleted from this device only when nothing else still uses them (another memory, a
+   * first, the baby's picture, the cover, another page) and the memory's new state is safely
+   * saved. When in doubt, the file is kept.
    */
-  forgetMedia(ids: string[]): Promise<void>;
+  forgetMedia(ids: string[], fromMemoryId: string): Promise<void>;
+  /** True when every one of these media files can be read back from this device's storage. */
+  mediaSaved(ids: string[]): Promise<boolean>;
   /** 'update' (default when a book exists) keeps every manual edit and adds new memories; 'fresh' redesigns everything. */
   buildBook(mode?: 'update' | 'fresh'): Promise<Book>;
   saveBook(book: Book): Promise<void>;
@@ -278,32 +281,61 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (m) await actions.updateMemory(id, { mediaIds: [...m.mediaIds, ...items.map((i) => i.id)] });
     },
 
-    async forgetMedia(ids) {
+    async mediaSaved(ids) {
+      const s = stateRef.current;
+      for (const id of ids) {
+        const item = s.media.get(id);
+        if (!item) return false;
+        if (item.storageProvider !== 'browser') continue;
+        // on disk, not only in memory (a failed write is kept in memory until the page closes)
+        if ((await MediaService.browser.onDisk(item.storageKey)) === false) return false;
+      }
+      return true;
+    },
+
+    async forgetMedia(ids, fromMemoryId) {
       const s = stateRef.current;
       if (!s.baby || !ids.length) return;
+      const babyId = s.baby.id, r = repo();
+      // decide from what is actually saved, not this screen's copy (another tab may have changed things)
+      const [memories, milestones, babies, book, media] = await Promise.all([
+        r.memories.listMemories(babyId), r.milestones.listMilestones(babyId), r.babies.getBabies(), r.books.getBook(babyId), r.media.listMedia(babyId),
+      ]);
+      const mem = memories.find((m) => m.id === fromMemoryId);
+      // the memory's new state must be saved, and everything it now shows must be on this device;
+      // otherwise keep the old files (a full disk can make a save fail quietly)
+      if (!mem || ids.some((id) => mem.mediaIds.includes(id))) return;
+      const known = new Map(media.map((m) => [m.id, m]));
+      for (const id of mem.mediaIds) {
+        const it = known.get(id);
+        if (!it) return;
+        if (it.storageProvider === 'browser' && (await MediaService.browser.onDisk(it.storageKey)) === false) return;
+      }
+      const baby = babies.find((x) => x.id === babyId);
       const used = (id: string) =>
-        s.memories.some((m) => m.mediaIds.includes(id)) || s.milestones.some((m) => m.photoMediaId === id) || s.baby?.photoMediaId === id;
+        memories.some((m) => m.mediaIds.includes(id)) || milestones.some((m) => m.photoMediaId === id) || baby?.photoMediaId === id
+        || book?.coverMediaId === id || !!book?.pages.some((p) => !p.memoryIds.includes(fromMemoryId) && p.mediaIds.includes(id));
       const gone = ids.filter((id) => !used(id));
       if (!gone.length) return;
       const drop = new Set(gone);
-      if (s.book && (s.book.pages.some((p) => p.mediaIds.some((id) => drop.has(id))) || (s.book.coverMediaId && drop.has(s.book.coverMediaId)))) {
-        const book: Book = {
-          ...s.book,
-          coverMediaId: s.book.coverMediaId && drop.has(s.book.coverMediaId) ? undefined : s.book.coverMediaId,
-          pages: s.book.pages.map((p) => (p.mediaIds.some((id) => drop.has(id)) ? { ...p, mediaIds: p.mediaIds.filter((id) => !drop.has(id)) } : p)),
+      // only this memory's own pages lose the photo; anything the parent placed elsewhere stays
+      if (book && book.pages.some((p) => p.memoryIds.includes(fromMemoryId) && p.mediaIds.some((id) => drop.has(id)))) {
+        const next: Book = {
+          ...book,
+          pages: book.pages.map((p) => (p.memoryIds.includes(fromMemoryId) && p.mediaIds.some((id) => drop.has(id)) ? { ...p, mediaIds: p.mediaIds.filter((id) => !drop.has(id)) } : p)),
           updatedAt: nowISO(),
         };
-        await repo().books.saveBook(book);
-        stateRef.current = { ...stateRef.current, book };
-        setState((st) => ({ ...st, book }));
+        await r.books.saveBook(next);
+        stateRef.current = { ...stateRef.current, book: next };
+        setState((st) => ({ ...st, book: next }));
       }
       for (const id of gone) {
-        const item = s.media.get(id);
+        const item = known.get(id) ?? s.media.get(id);
         if (!item || item.storageProvider === 'demo') continue;
         await MediaService.remove(item);
-        await repo().media.deleteMedia(s.baby.id, id);
+        await r.media.deleteMedia(babyId, id);
       }
-      setState((st) => { const media = new Map(st.media); for (const id of gone) if (media.get(id)?.storageProvider !== 'demo') media.delete(id); return { ...st, media }; });
+      setState((st) => { const m2 = new Map(st.media); for (const id of gone) if (m2.get(id)?.storageProvider !== 'demo') m2.delete(id); return { ...st, media: m2 }; });
     },
 
     async buildBook(mode = 'update') {
