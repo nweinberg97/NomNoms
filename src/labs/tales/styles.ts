@@ -51,7 +51,7 @@ export const STYLES: Record<StyleMode, StyleConfig> = {
   pocketlight: {
     id: 'pocketlight',
     name: 'Clay',
-    blurb: 'Little models made of soft clay, lit like a stop-motion film',
+    blurb: 'Stop-motion puppets: bean heads, goggle eyes, big grins and big shoes',
     palette: { swatches: ['#f6c9a8', '#e8907a', '#f2c14e', '#8fbf9f', '#7fa8d1', '#b9a5e3', '#fbf3e6', '#5a4a42'], ink: '#4a3a33', shadow: '#5a3f3a', paper: '#fbf7f0', light: '#fff1d6' },
     colour: { pull: 0.15, saturation: 1.05, brightness: 1.04, warmth: 0.06 },
     materials: { shading: 'soft-volume', contrast: 1, gloss: 1 },
@@ -64,8 +64,8 @@ export const STYLES: Record<StyleMode, StyleConfig> = {
   },
   gouache: {
     id: 'gouache',
-    name: 'Watercolour',
-    blurb: 'Loose washes of paint and a pencil line, like a classic picture book',
+    name: 'Retro',
+    blurb: 'Bold shapes from a mid-century picture book: square grown-ups, round little ones',
     palette: { swatches: ['#e9b38c', '#d9776b', '#e8b64a', '#7fae7a', '#6f97b8', '#a48fc4', '#f4ead8', '#4f4038'], ink: '#4f4038', shadow: '#6b5446', paper: '#f4ecdf', light: '#fff4dd' },
     colour: { pull: 0.3, saturation: 0.88, brightness: 1.02, warmth: 0.08 },
     materials: { shading: 'painted', contrast: 0.45, gloss: 0 },
@@ -79,7 +79,7 @@ export const STYLES: Record<StyleMode, StyleConfig> = {
   wondercut: {
     id: 'wondercut',
     name: 'Paper cut',
-    blurb: 'Bold shapes cut from coloured paper and layered up',
+    blurb: 'Cut from coloured paper: round heads, scalloped hair, little A-line bodies',
     palette: { swatches: ['#f2b896', '#e66a52', '#f4c23c', '#5fa36a', '#4f86c6', '#9a7ad1', '#fbf6ec', '#3a3330'], ink: '#3a3330', shadow: '#3a2a22', paper: '#f7f0e2', light: '#fffaf0' },
     colour: { pull: 0.45, saturation: 1.12, brightness: 1.02, warmth: 0.02 },
     materials: { shading: 'flat', contrast: 0, gloss: 0 },
@@ -93,7 +93,7 @@ export const STYLES: Record<StyleMode, StyleConfig> = {
   inked: {
     id: 'inked',
     name: 'Comic',
-    blurb: 'Bold black ink and halftone dots, like a Sunday comic strip',
+    blurb: 'Big heads, huge shining eyes and bold ink, like a comic book',
     palette: { swatches: ['#f0c39e', '#d9654f', '#efb94a', '#6aa36b', '#5b8fc9', '#8e6bb8', '#fbf5ea', '#3b2a26'], ink: '#3b2a26', shadow: '#5d4250', paper: '#fbf5ea', light: '#fff4dc' },
     colour: { pull: 0.2, saturation: 1.08, brightness: 1, warmth: 0.04 },
     materials: { shading: 'cel', contrast: 1, gloss: 0.4 },

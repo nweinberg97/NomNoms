@@ -21,40 +21,40 @@ test('every mode has a complete configuration', () => {
   }
 });
 
-test('looks are made of different things, not colour filters', () => {
+test('each look builds people its own way, and is made of something different', () => {
   const out = Object.fromEntries(STYLE_MODES.map((m) => [m, characterMarkup(look, { style: m })]));
-  // clay: lit as a 3D surface (a height map from the drawing's own shapes)
-  assert.match(out.pocketlight, /feDiffuseLighting[\s\S]*feSpecularLighting/, 'clay is lit like a model');
-  assert.doesNotMatch(out.pocketlight, /paint-order="stroke"/, 'clay has no drawn lines');
-  // watercolour: a bled wash and a pencil line found from the visible edges
-  assert.match(out.gouache, /feDisplacementMap/, 'watercolour wash bleeds');
-  assert.match(out.gouache, /feConvolveMatrix/, 'watercolour has a pencil line on visible edges');
-  // paper cut: each piece its own slip of paper, the whole figure cut out with a white edge
-  assert.match(out.wondercut, /filter="url\(#cut/, 'paper cut lifts each piece');
-  assert.match(out.wondercut, /feMorphology[^>]*operator="dilate"[\s\S]*flood-color="#fffaf1"/, 'paper cut has a white cut edge');
-  // comic: black ink on every shape and a halftone dot screen in the shadow
-  assert.match(out.inked, /stroke="#1d1412"[^>]*paint-order="stroke"/, 'comic inks every shape in black');
-  assert.match(out.inked, /<pattern id="ht/, 'comic has a halftone screen');
-  // tales: the soft coloured line of the default look
+  // different character designs, not one puppet re-coloured: the drawings themselves differ
+  const shapes = (svg: string) => (svg.match(/<(path|ellipse|circle|rect)\b/g) ?? []).length;
+  assert.equal(new Set(STYLE_MODES.map((m) => shapes(out[m]))).size, STYLE_MODES.length, 'every look draws a different construction');
+  // clay: lit like a model, no drawn lines; retro: a print with an off-register dark ink
+  assert.match(out.pocketlight, /feDiffuseLighting[\s\S]*feSpecularLighting/);
+  assert.doesNotMatch(out.pocketlight, /paint-order="stroke"/);
+  assert.match(out.gouache, /feOffset in="darks"/, 'retro print');
+  assert.doesNotMatch(out.gouache, /feConvolveMatrix/, 'no watercolour any more');
+  // paper cut: pieces lifted with a white cut edge; comic: black ink and halftone
+  assert.match(out.wondercut, /filter="url\(#cut/);
+  assert.match(out.wondercut, /flood-color="#fffaf1"/);
+  assert.match(out.inked, /stroke="#1d1412"[^>]*paint-order="stroke"/);
+  assert.match(out.inked, /<pattern id="ht/);
   assert.match(out.tales, /paint-order="stroke"/);
-  assert.doesNotMatch(out.tales, /feDiffuseLighting|feConvolveMatrix/);
 });
 
 test('a look applies in every story world, not just everyday', () => {
   for (const world of ['fairytale', 'adventure', 'mythic'] as const) {
     const w = { ...look, world };
     assert.match(characterMarkup(w, { style: 'pocketlight' }), /feDiffuseLighting/, `${world}: clay`);
-    assert.match(characterMarkup(w, { style: 'gouache' }), /feConvolveMatrix/, `${world}: watercolour`);
+    assert.match(characterMarkup(w, { style: 'gouache' }), /feOffset in="darks"/, `${world}: retro`);
     assert.match(characterMarkup(w, { style: 'inked' }), /<pattern id="ht/, `${world}: comic`);
   }
 });
 
-test('a character keeps its DNA in every mode', () => {
+test('a character keeps its DNA in every look', () => {
   for (const m of STYLE_MODES) {
     const svg = characterMarkup(look, { style: m });
     assert.ok(svg.includes(look.skin), `${m}: skin`);
     assert.ok(svg.includes(look.hair), `${m}: hair colour`);
-    assert.ok(/<circle cx="78" cy="\d+" r="17"/.test(svg), `${m}: round glasses`);
+    assert.ok(look.eyes && svg.includes(look.eyes) || m === 'gouache', `${m}: eye colour`);
+    assert.match(svg, /stroke-width="[\d.]+"\/>[\s\S]*<path d="M[\d.]+ [\d.]+ Q/, `${m}: glasses drawn`);
     assert.ok(svg.includes(`st-${m}`));
   }
 });

@@ -8,8 +8,8 @@ import type { StyleMode } from './styles';
  *  - Tales      film animation: soft cel shading and a warm line (the default)
  *  - Clay       claymation: puffy, rounded forms lit like little models, no lines,
  *               a fingerprinted surface and a soft studio light
- *  - Watercolour  a picture book: loose washes that pool at the edges, a sketchy
- *               pencil line over the top, grainy paper showing through
+ *  - Retro      a mid-century print: flat inks on warm paper, a little grain, the dark
+ *               ink a hair off-register
  *  - Paper cut  layered paper: flat bold colour, every piece cut out with a white
  *               edge and lifted off the page with a sharp shadow
  *  - Comic ink  a comic strip: heavy black outlines, hard two-tone shadow and a
@@ -43,28 +43,17 @@ export function lookFilters(mode: StyleMode, id: string, part: 'character' | 'ba
         <feMerge><feMergeNode in="litIn"/><feMergeNode in="dentsIn"/><feMergeNode in="specIn"/></feMerge>
       </filter>`;
     case 'gouache':
-      // watercolour: a loose, slightly bled wash that pools darker at its edges, a pencil line that
-      // follows only the edges you can see, and grainy paper
-      return `<filter id="lk${id}" x="-8%" y="-8%" width="116%" height="116%" color-interpolation-filters="sRGB">
-        <feTurbulence type="fractalNoise" baseFrequency="0.03" numOctaves="3" seed="4" result="warp"/>
-        <feDisplacementMap in="SourceGraphic" in2="warp" scale="4.5" xChannelSelector="R" yChannelSelector="G" result="bled"/>
-        <feGaussianBlur in="bled" stdDeviation="0.7" result="wash"/>
-        <feMorphology in="wash" operator="erode" radius="1.6" result="inner"/>
-        <feComposite in="wash" in2="inner" operator="out" result="rim"/>
-        <feColorMatrix in="rim" type="matrix" values="0.66 0 0 0 0  0 0.62 0 0 0  0 0 0.6 0 0  0 0 0 0.5 0" result="pool"/>
-        <feComponentTransfer in="wash" result="light"><feFuncR type="linear" slope=".86" intercept=".13"/><feFuncG type="linear" slope=".86" intercept=".13"/><feFuncB type="linear" slope=".86" intercept=".12"/></feComponentTransfer>
-        <feConvolveMatrix in="SourceGraphic" order="3" kernelMatrix="-1 -1 -1  -1 8 -1  -1 -1 -1" preserveAlpha="true" result="edgeRGB"/>
-        <feColorMatrix in="edgeRGB" type="matrix" values="0 0 0 0 0.29  0 0 0 0 0.25  0 0 0 0 0.22  1 1 1 0 -0.2" result="inside"/>
-        <feMorphology in="SourceAlpha" operator="dilate" radius="0.9" result="fatA"/>
-        <feComposite in="fatA" in2="SourceAlpha" operator="out" result="ring"/>
-        <feColorMatrix in="ring" type="matrix" values="0 0 0 0 0.29  0 0 0 0 0.25  0 0 0 0 0.22  0 0 0 0.85 0" result="outline"/>
-        <feMerge result="lines"><feMergeNode in="inside"/><feMergeNode in="outline"/></feMerge>
-        <feTurbulence type="fractalNoise" baseFrequency="0.09" numOctaves="2" seed="13" result="w2"/>
-        <feDisplacementMap in="lines" in2="w2" scale="2" xChannelSelector="R" yChannelSelector="G" result="pencil"/>
-        <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="2" seed="2" result="grain"/>
-        <feColorMatrix in="grain" type="matrix" values="0 0 0 0 0.4  0 0 0 0 0.34  0 0 0 0 0.28  0 0 0 ${part === 'backdrop' ? 0.16 : 0.24} -0.08" result="speck"/>
-        <feComposite in="speck" in2="wash" operator="in" result="speckIn"/>
-        <feMerge><feMergeNode in="light"/><feMergeNode in="pool"/><feMergeNode in="speckIn"/><feMergeNode in="pencil"/></feMerge>
+      // retro print: flat inks on warm paper, a touch of grain, and the dark ink printed
+      // a hair off-register, like a mid-century picture book
+      return `<filter id="lk${id}" x="-6%" y="-6%" width="112%" height="112%" color-interpolation-filters="sRGB">
+        <feColorMatrix in="SourceGraphic" type="saturate" values="0.9" result="flat"/>
+        <feColorMatrix in="SourceGraphic" type="matrix" values="0 0 0 0 0.16  0 0 0 0 0.12  0 0 0 0 0.12  -0.5 -0.9 -0.2 0 0.85" result="darks"/>
+        <feOffset in="darks" dx="1.6" dy="1.1" result="ghost"/>
+        <feComposite in="ghost" in2="SourceAlpha" operator="in" result="ghostIn"/>
+        <feTurbulence type="fractalNoise" baseFrequency="${part === 'backdrop' ? 0.7 : 0.9}" numOctaves="2" seed="5" result="grain"/>
+        <feColorMatrix in="grain" type="matrix" values="0 0 0 0 0.3  0 0 0 0 0.24  0 0 0 0 0.18  0 0 0 0.22 -0.06" result="speck"/>
+        <feComposite in="speck" in2="SourceAlpha" operator="in" result="speckIn"/>
+        <feMerge><feMergeNode in="flat"/><feMergeNode in="ghostIn"/><feMergeNode in="speckIn"/></feMerge>
       </filter>`;
     case 'wondercut':
       // paper cut: the whole figure cut out of paper with a white edge, lifted off the page

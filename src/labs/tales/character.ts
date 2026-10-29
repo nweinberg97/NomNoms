@@ -1,3 +1,4 @@
+import { designCharacter, designHead, hasDesign } from './designs';
 import { finishInLook } from './looks';
 import { STYLES, darken, hexToRgb, rgbToHex, styleFilters, stylizeShapes, type StyleMode } from './styles';
 import { thingArt } from './things';
@@ -1206,7 +1207,7 @@ function petFace(id: string, l: Look) {
 }
 
 /* ── bodies and clothes ───────────────────────────────────── */
-interface Outfit { top: string; sleeve: 'short' | 'long' | 'none'; bottom: string; skirt?: string; shoes: string; bare?: boolean }
+export interface Outfit { top: string; sleeve: 'short' | 'long' | 'none'; bottom: string; skirt?: string; shoes: string; bare?: boolean }
 const OUTFIT: Record<string, Outfit> = {
   tee: { top: '#5e8fb8', sleeve: 'short', bottom: '#3f5f86', shoes: '#f5f1ea' },
   overalls: { top: '#f5efe4', sleeve: 'short', bottom: '#5a7ea7', shoes: '#e86f5b' },
@@ -1255,6 +1256,13 @@ export function accentOf(outfit: string): string | undefined {
   return best && sat(best) > 0.2 ? best : undefined;
 }
 const WORLD_TINTED = ['gown', 'ftunic', 'cloak', 'armour', 'sunrobe', 'ranger', 'explorer'];
+/** The colours of someone's outfit (with a world costume's own tint), for the other character designs (designs.ts). */
+export function outfitColours(l: Look): Outfit {
+  let o = l.outfit === 'drawn' ? OUTFIT.none : OUTFIT[l.outfit] ?? OUTFIT.tee;
+  const tint = l.accent && WORLD_TINTED.includes(l.outfit) ? l.accent : undefined;
+  if (tint && (l.outfit === 'ftunic' || l.outfit === 'gown')) o = { ...o, top: tint, skirt: o.skirt ? shade(tint, -0.12) : undefined };
+  return o;
+}
 const TORSO = 'M64 158 C68 146 132 146 136 158 L141 220 C128 230 72 230 59 220 Z';
 
 /**
@@ -1580,9 +1588,17 @@ export function characterMarkup(l: Look, opts: { animated?: boolean; style?: Sty
   LOOK = MODE;
   // in a story world, people are drawn in the world's own style (pets keep the book's look)
   WORLD = isPet(l.kind) || l.face || l.drawing ? 'everyday' : l.world ?? 'everyday';
-  if (isArt(WORLD) && MODE !== 'tales') MODE = 'pocketlight';
   const id = `c${++uid}`;
   const motion = l.personality ? ` m-${PERSONALITIES[l.personality].motion}` : '';
+  // every look except Tales builds people its own way (designs.ts), in every world
+  const designed = opts.style ? designCharacter(l, LOOK, id) : null;
+  if (designed) {
+    // the story world still lights them: its glow round the head, a hero's gold rim light
+    const aura = WORLD !== 'everyday' ? `<g class="bt-aura">${worldAura(id, designed.head.cy)}</g><!--aura-->` : '';
+    const rim = WORLD === 'mythic' ? `<path d="M${(designed.head.cx + designed.head.rx * 0.9).toFixed(1)} ${(designed.head.cy - designed.head.ry * 0.3).toFixed(1)} q8 ${(designed.head.ry * 0.6).toFixed(1)} 0 ${(designed.head.ry * 1.1).toFixed(1)}" stroke="#ffd36b" stroke-width="3.4" fill="none" stroke-linecap="round" opacity=".75"/>` : '';
+    return finish(`<g class="${opts.animated ? 'bt-char is-animated' : 'bt-char'}${motion} st-${LOOK}"><defs>${styleFilters(LOOK, id)}</defs>${aura}${designed.svg}${rim}</g>`, l, id);
+  }
+  if (isArt(WORLD) && MODE !== 'tales') MODE = 'pocketlight';
   const cls = `${opts.animated ? 'bt-char is-animated' : 'bt-char'}${motion} st-${MODE}`;
   if (l.drawing) {
     // a child's drawing is never edited; the mode's treatment is a filter on top
@@ -1663,6 +1679,15 @@ const legExtraOf = (l: Look, storyLook: boolean, mode: StyleMode = MODE) => (sto
  */
 export function fitViewBox(vb: string, l: Look, mode: StyleMode = 'pocketlight'): string {
   if (isPet(l.kind) || l.drawing) return vb;
+  if (hasDesign(mode) && !l.face) {
+    // a look's own design: centre the crop on its head, sized to it
+    const h = designHead(l, mode);
+    if (h) {
+      const [, , w] = vb.split(/\s+/).map(Number);
+      const S = Math.max(h.rx * 2.5, h.ry * 2.4) * (w / 148);
+      return `${(h.cx - S / 2).toFixed(1)} ${(h.cy - S * 0.54).toFixed(1)} ${S.toFixed(1)} ${S.toFixed(1)}`;
+    }
+  }
   const art = !l.face && (l.world ?? 'everyday') !== 'everyday' && mode !== 'tales';
   const m: StyleMode = art ? 'pocketlight' : mode;
   const b = PROPORTIONS[m][l.kind as 'baby' | 'kid' | 'adult' | 'elder'], wb = worldBody(l.world, l.kind);
