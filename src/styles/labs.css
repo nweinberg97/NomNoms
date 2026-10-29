@@ -173,9 +173,14 @@
 .dp-strip-page { flex: none; width: 64px; padding: 0; border: 0; background: none; cursor: pointer; outline: 2px solid transparent; outline-offset: 2px; border-radius: 2px; box-shadow: var(--shadow-sm); }
 .dp-strip-page.is-on { outline-color: var(--accent); }
 .dp-tools { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
-.dp-decor { position: absolute; inset: 0; pointer-events: none; z-index: 4; }
-.dp-decor span { position: absolute; line-height: 1; font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif; filter: drop-shadow(0 .4cqmin .8cqmin rgba(0, 0, 0, .12)); }
-.dp-decor i { position: absolute; width: 1.2cqmin; height: 1.2cqmin; border-radius: 50%; opacity: .55; }
+.dp-decor { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 4; overflow: visible; filter: drop-shadow(0 .3cqmin .5cqmin rgba(0, 0, 0, .12)); }
+.dp-occ-emoji svg { display: block; }
+.dp-swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 6px; }
+.dp-swatch { font: inherit; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 4px 5px; border-radius: 12px; border: 1.5px solid var(--line, rgba(0,0,0,.08)); background: var(--paper, #fff); cursor: pointer; color: var(--ink-2); }
+.dp-swatch svg { width: 100%; height: 22px; display: block; }
+.dp-swatch.is-garland svg { height: 20px; }
+.dp-swatch small { font-size: 11px; }
+.dp-swatch[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
 
 @media (min-width: 640px) {
   .bt-names, .dp-find { grid-template-columns: repeat(2, minmax(0, 1fr)); }

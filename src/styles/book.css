@@ -24,7 +24,14 @@
   background: radial-gradient(120% 90% at 50% 40%, transparent 60%, rgba(120, 96, 70, .05));
   z-index: 3;
 }
-.bp-photo { position: relative; overflow: hidden; background: var(--paper-2); }
+.bp-photo { position: relative; overflow: var(--dp-photo-overflow, hidden); background: var(--paper-2); }
+/* Dumplings: each photo held on the page by two strips of washi tape in the occasion's pattern */
+.bp-photo::before, .bp-photo::after { content: ''; display: var(--dp-tape-show, none); position: absolute; z-index: 3; width: 12cqmin; height: 3cqmin; top: -.6cqmin; background: var(--dp-tape) center / 100% 100% no-repeat; opacity: .93; filter: drop-shadow(0 .25cqmin .35cqmin rgba(0, 0, 0, .14)); pointer-events: none; }
+.bp-photo::before { left: -3.4cqmin; transform: rotate(-36deg); }
+.bp-photo::after { right: -3.4cqmin; transform: rotate(36deg); }
+.bp-photo img { border-radius: inherit; }
+.bp-cover-photo::before, .bp-cover-photo::after, .bp-fullbleed .bp-photo::before, .bp-fullbleed .bp-photo::after, .bp-split-photo::before, .bp-split-photo::after, .bp-chapter-photo::before, .bp-chapter-photo::after { display: none; }
+.bp-collage-grid .bp-photo::after, .bp-four-grid .bp-photo::after, .bp-three-grid .bp-photo:not(.slot-0)::after { display: none; }
 .bp-photo img { width: 100%; height: 100%; object-fit: cover; }
 .bp-num {
   position: absolute; bottom: 3.6cqmin; left: 0; right: 0; text-align: center;

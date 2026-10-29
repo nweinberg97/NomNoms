@@ -12,6 +12,8 @@ import { useAppOptional } from '../../state/store';
 import { DemoNote, LabsHeader } from '../LabsHeader';
 import { appendPhotos, buildDumpling, memoryPhoto, samplePhotosFor, type Density } from './generator';
 import { CATEGORIES, OCCASIONS, occasionVars, suggestFor, type Category, type Occasion } from './occasions';
+import { GARLANDS, kitDecor, kitFor, kitVars, occasionIcon, PATTERNS, type Kit, type Level } from './kits';
+import { garlandSvg, patternDef } from './ornaments';
 
 /**
  * NomNoms Dumplings, the try-it demo: pick an occasion, drop in photos, get a
@@ -31,24 +33,14 @@ const LENGTHS: { id: Density; label: string; hint: string }[] = [
   { id: 'compact', label: 'Fewer pages', hint: '2–4 photos a page' },
 ];
 
-function Decor({ o, page }: { o: Occasion; page: BookPage }) {
-  if (!['cover', 'chapter', 'closing'].includes(page.layout)) return null;
-  const spots = page.layout === 'cover'
-    ? [[2, 2, 10, -12], [86, 3, 9, 10], [4, 91, 5.5, 8], [90, 91, 5.5, -6]]
-    : page.layout === 'chapter'
-      ? [[78, 8, 9, 10], [88, 26, 6, -8], [8, 6, 6, -10]]
-      : [[14, 18, 9, -10], [80, 16, 8, 12], [20, 78, 7, 8], [76, 80, 9, -8], [48, 10, 6, 0]];
-  return (
-    <div className="dp-decor" aria-hidden="true">
-      {spots.map(([x, y, s, r], i) => (
-        <span key={i} style={{ left: `${x}%`, top: `${y}%`, fontSize: `${s}cqmin`, transform: `rotate(${r}deg)` }}>{o.motifs[i % o.motifs.length]}</span>
-      ))}
-      {page.layout !== 'chapter' && Array.from({ length: 14 }, (_, i) => (
-        <i key={`c${i}`} style={{ left: `${(i * 37) % 100}%`, top: `${page.layout === 'cover' ? 94 + ((i * 53) % 5) : (i * 29) % 100}%`, background: i % 2 ? o.colors.accent : o.colors.soft }} />
-      ))}
-    </div>
-  );
+/** The occasion's drawn decorations for a page: garlands, motifs and corner stamps (see kits.ts). */
+function Decor({ o, kit, page, index }: { o: Occasion; kit: Kit; page: BookPage; index: number }) {
+  const svg = kitDecor(o, kit, page.layout, Math.max(0, index));
+  if (!svg) return null;
+  return <svg className="dp-decor" viewBox="0 0 100 100" aria-hidden="true" dangerouslySetInnerHTML={{ __html: svg }} />;
 }
+
+const LEVELS: { id: Level; label: string }[] = [{ id: 'lots', label: 'Lots' }, { id: 'some', label: 'A little' }, { id: 'none', label: 'None' }];
 
 type Picking = { mode: 'replace' | 'add' | 'new-page' | 'cover' } | null;
 
@@ -65,6 +57,10 @@ export function DumplingsDemo() {
   const [sampleSeed, setSampleSeed] = useState(3);
   const [pool, setPool] = useState<MediaItem[]>(() => samplePhotosFor(occasion, 3));
   const [designSeed, setDesignSeed] = useState(11);
+  /** The parent's own choices of garland, tape pattern and amount; a new occasion starts from its own kit. */
+  const [kitEdit, setKitEdit] = useState<Partial<Kit>>({});
+  useEffect(() => setKitEdit({}), [occasion.id]);
+  const kit = useMemo<Kit>(() => ({ ...kitFor(occasion), ...kitEdit }), [occasion, kitEdit]);
   const [book, setBook] = useState<Book>();
   const [memories, setMemories] = useState<Memory[]>([]);
   const [cur, setCur] = useState(0);
@@ -110,8 +106,9 @@ export function DumplingsDemo() {
 
   const media = useMemo(() => new Map(pool.map((p) => [p.id, p])), [pool]);
   const memMap = useMemo(() => new Map(memories.map((m) => [m.id, m])), [memories]);
-  const vars = useMemo(() => occasionVars(occasion), [occasion]);
-  const ctx: PageContext = useMemo(() => ({ memories: memMap, media, interactive: false, style: book?.style, vars, decorate: (p: BookPage) => <Decor o={occasion} page={p} /> }), [memMap, media, book?.style, vars, occasion]);
+  const vars = useMemo(() => ({ ...occasionVars(occasion), ...kitVars(occasion, kit) }), [occasion, kit]);
+  const pageIndex = useMemo(() => new Map((book?.pages ?? []).map((p, i) => [p.id, i])), [book?.pages]);
+  const ctx: PageContext = useMemo(() => ({ memories: memMap, media, interactive: false, style: book?.style, vars, decorate: (p: BookPage) => <Decor o={occasion} kit={kit} page={p} index={pageIndex.get(p.id) ?? 0} /> }), [memMap, media, book?.style, vars, occasion, kit, pageIndex]);
 
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -279,7 +276,7 @@ export function DumplingsDemo() {
               <div className="dp-occasions">
                 {shown.map((o) => (
                   <button key={o.id} type="button" className="dp-occ" aria-pressed={occasion.id === o.id} onClick={() => chooseOccasion(o)} style={{ background: o.colors.paper, color: o.colors.ink }} data-testid={`occ-${o.id}`}>
-                    <span className="dp-occ-emoji">{o.emoji}</span>
+                    <span className="dp-occ-emoji" dangerouslySetInnerHTML={{ __html: occasionIcon(o) }} />
                     <strong>{o.name}</strong>
                     <small style={{ color: o.colors.accent }}>{o.category}</small>
                   </button>
@@ -396,7 +393,33 @@ export function DumplingsDemo() {
                 </div>
                 <div className="lab-card">
                   <h3>The whole book</h3>
-                  <p className="lab-sub">{occasion.emoji} {occasion.name} design · {total} pages · {pool.length} photos · 8 × 8 in</p>
+                  <p className="lab-sub">{occasion.name} design · {total} pages · {pool.length} photos · 8 × 8 in</p>
+                  <p className="lab-sub">Decorations</p>
+                  <div className="lab-chips" role="radiogroup" aria-label="Decorations">
+                    {LEVELS.map((l) => <button key={l.id} type="button" className="lab-chip" aria-pressed={kit.level === l.id} onClick={() => setKitEdit((k) => ({ ...k, level: l.id }))} data-testid={`dp-level-${l.id}`}>{l.label}</button>)}
+                  </div>
+                  {kit.level !== 'none' && (
+                    <>
+                      <p className="lab-sub">Garland</p>
+                      <div className="dp-swatches" role="radiogroup" aria-label="Garland">
+                        {GARLANDS.map((g) => (
+                          <button key={g.id} type="button" className="dp-swatch is-garland" aria-pressed={kit.garland === g.id} onClick={() => setKitEdit((k) => ({ ...k, garland: g.id }))} title={g.label} data-testid={`dp-garland-${g.id}`}>
+                            <svg viewBox="0 4 100 22" aria-hidden="true" dangerouslySetInnerHTML={{ __html: garlandSvg(g.id, { a: occasion.colors.accent, s: occasion.colors.soft, i: occasion.colors.ink, p: occasion.colors.paper }) }} />
+                            <small>{g.label}</small>
+                          </button>
+                        ))}
+                      </div>
+                      <p className="lab-sub">Photo tape</p>
+                      <div className="dp-swatches" role="radiogroup" aria-label="Photo tape pattern">
+                        {PATTERNS.map((t) => (
+                          <button key={t.id} type="button" className="dp-swatch" aria-pressed={kit.pattern === t.id} onClick={() => setKitEdit((k) => ({ ...k, pattern: t.id }))} title={t.label} data-testid={`dp-pattern-${t.id}`}>
+                            <svg viewBox="0 0 60 24" aria-hidden="true" dangerouslySetInnerHTML={{ __html: `<defs>${patternDef(`sw${t.id}`, t.id, { a: occasion.colors.accent, s: occasion.colors.soft, i: occasion.colors.ink, p: occasion.colors.paper })}</defs><rect width="60" height="24" rx="3" fill="url(#sw${t.id})"/>` }} />
+                            <small>{t.label}</small>
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
                   <p className="lab-sub">Book length</p>
                   <div className="lab-chips" role="radiogroup" aria-label="Book length">
                     {LENGTHS.map((l) => (
