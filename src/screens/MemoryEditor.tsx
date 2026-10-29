@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '../components/Icon';
 import { MediaImg } from '../components/Media';
-import { Spinner, toast } from '../components/ui';
+import { Confirm, Spinner, toast } from '../components/ui';
 import { navigate, useRoute } from '../lib/router';
 import type { Memory, MemoryType } from '../lib/types';
 import { cx, firstName, fmtLong, fmtMonthYear, plural, toISODate, todayISO } from '../lib/util';
@@ -37,7 +37,8 @@ interface Local {
  * a photo can be saved with nothing but the date it was taken.
  */
 export function MemoryEditor({ editId }: { editId?: string }) {
-  const { baby, memories, addMemory, updateMemory, ingest, forgetMedia, mediaSaved, media } = useApp();
+  const { baby, memories, addMemory, updateMemory, deleteMemory, ingest, forgetMedia, mediaSaved, media } = useApp();
+  const [askEmpty, setAskEmpty] = useState(false);
   const { query } = useRoute();
   const editing = editId ? memories.find((m) => m.id === editId) : undefined;
   const kindParam = (query.get('kind') as MemoryType | 'voice' | null) ?? undefined;
@@ -153,11 +154,15 @@ export function MemoryEditor({ editId }: { editId?: string }) {
       : isMilestoneFlow || type === 'milestone' || type === 'first' ? `What happened? How did it feel?`
         : locals.length ? 'What happened? (optional)' : `What do you want to remember?`;
 
-  const canSave = !!(tiles.length || caption.trim() || title.trim());
+  const empty = !(tiles.length || caption.trim() || title.trim());
+  // editing: Save is always there (removing the last photo is a change too); a new memory needs something in it
+  const canSave = editing ? true : !empty;
   const removedSaved = editing ? editing.mediaIds.filter((id) => !saved.includes(id)) : [];
 
   const save = async () => {
     if (!canSave) return;
+    // nothing left in it: offer to remove the whole memory rather than keep an empty one
+    if (editing && empty) { setAskEmpty(true); return; }
     setBusy(true);
     try {
       if (editing) {
@@ -355,6 +360,11 @@ export function MemoryEditor({ editId }: { editId?: string }) {
         )}
       </div>
 
+      {editing && (
+        <Confirm open={askEmpty} onClose={() => setAskEmpty(false)} danger confirmLabel="Delete memory"
+          title="Delete this memory?" body="With the photo removed, there’s nothing left in it. Delete the whole memory? To keep it, close this and add a few words or another photo."
+          onConfirm={async () => { setAskEmpty(false); await deleteMemory(editing.id); toast('Memory deleted', { icon: 'trash' }); navigate('/memories', { replace: true }); }} />
+      )}
       <div className="editor-foot">
         <button className="btn btn-primary btn-lg btn-block" onClick={save} disabled={!canSave || busy} data-testid="save-memory">
           {busy ? <Spinner /> : <Icon name="check" size={18} />} {editing ? 'Save changes' : multiDay && groupByDay ? `Add ${days.size} memories to NomNoms` : 'Add to NomNoms'}
