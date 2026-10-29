@@ -907,3 +907,13 @@
 
 .detail-edit-photos { display: inline-flex; align-items: center; gap: 6px; margin: 10px auto 0; font-size: 13px; color: var(--ink-3); }
 .detail-media { display: flex; flex-direction: column; }
+.licenses { min-height: 100vh; background: var(--paper); }
+.licenses-top { padding: 18px 24px; border-bottom: 1px solid var(--line); }
+.licenses-body { max-width: 680px; margin: 0 auto; padding: 32px 20px 64px; }
+.licenses-body h1 { font-size: 34px; margin-bottom: 8px; }
+.licenses-body ul { list-style: none; padding: 0; margin: 24px 0 0; display: grid; gap: 14px; }
+.licenses-body li { display: grid; gap: 3px; padding: 14px 16px; border-radius: 14px; background: var(--card); border: 1px solid var(--line); }
+.licenses-body li span { font-size: 14px; color: var(--ink-2); }
+.licenses-body a { color: var(--accent-ink); text-decoration: underline; }
+.set-fine { margin-top: 12px; font-size: 13px; }
+.set-fine a { color: var(--ink-3); text-decoration: underline; }

@@ -1,8 +1,28 @@
 Face reader used by NomNoms Baby Tales (runs entirely in the browser).
 
-human.esm.js — @vladmandic/human 3.3.6, MIT License (LICENSE-human.txt),
-  https://github.com/vladmandic/human. Bundles TensorFlow.js (Apache License 2.0).
-models/blazeface, facemesh, iris, faceres (age estimate), selfie — from vladmandic/human and
-  vladmandic/human-models; originally Google MediaPipe models, Apache License 2.0.
+human.esm.js
+  @vladmandic/human 3.3.6 (https://github.com/vladmandic/human).
+  MIT License: see LICENSE-human.txt.
+  It bundles TensorFlow.js 4.22.0 (https://github.com/tensorflow/tfjs),
+  Apache License 2.0: see LICENSE-Apache-2.0.txt.
 
-Photos given to these models are processed on the device and never uploaded.
+models/  (the library's own licence does not cover these; each keeps the
+          licence of its original source)
+
+  selfie.json, selfie.bin  (person outline)
+    MediaPipe Selfie Segmentation (Google), converted by PINTO0309's model zoo
+    and by vladmandic. Apache License 2.0, per Google's model card for MediaPipe
+    Selfie Segmentation: see LICENSE-Apache-2.0.txt.
+
+  blazeface.json/.bin, facemesh.json/.bin, iris.json/.bin  (face, face points, irises)
+    Google MediaPipe models (BlazeFace, Face Mesh, Iris), converted by vladmandic,
+    per each file's own metadata. Google's MediaPipe model cards that could be
+    checked state Apache License 2.0, but the cards for these exact versions have
+    not yet been confirmed. UNRESOLVED: confirm before relying on this notice.
+
+No age, gender or face-recognition model is included. (An age model, "faceres",
+was removed in October 2026 because its commercial-use terms could not be
+confirmed.)
+
+Photos given to these models are read on the device: they are not uploaded,
+and they are not saved.

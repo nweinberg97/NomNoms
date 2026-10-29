@@ -117,6 +117,7 @@ export function Settings() {
             <button className="btn btn-ghost btn-sm" onClick={() => setConfirm('demo')}>Load the demo family</button>
             <button className="btn btn-danger-ghost btn-sm" onClick={() => setConfirm('reset')}>Delete all data</button>
           </div>
+          <p className="set-fine"><a href="#/licenses">Open-source licences</a></p>
         </section>
       </div>
 

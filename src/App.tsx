@@ -1,4 +1,5 @@
 import { LikenessDebug } from './labs/tales/likeness/LikenessDebug';
+import { Licenses } from './screens/Licenses';
 import React, { useEffect } from 'react';
 import { AddSheet } from './components/AddSheet';
 import { DropZone } from './components/DropZone';
@@ -39,6 +40,7 @@ function Routes() {
   const shared = match('/b/:token', path);
   if (shared) return <SharedBook token={shared.token} />;
 
+  if (path === '/licenses') return <Licenses />;
   // try-it demos: open to everyone, signed in or not; they never save anything
   if (path === '/labs/baby-tales') return <BabyTalesDemo />;
   if (path === '/labs/dumplings') return <DumplingsDemo />;

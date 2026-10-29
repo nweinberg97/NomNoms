@@ -33,7 +33,7 @@ export function ComingSoonSection({ heading = true }: { heading?: boolean }) {
           <span className="cs-pill">Coming soon</span>
           <h3 className="display">NomNoms Baby Tales</h3>
           <p className="cs-one">Turn your little one and their favourite people into storybook characters, starring in adventures made just for them.</p>
-          <ul className="cs-chips"><li>Avatars made with Genmoji</li><li>Hats, glasses and costumes</li><li>Printed or digital</li></ul>
+          <ul className="cs-chips"><li>Characters made from your photos</li><li>Hats, glasses and costumes</li><li>Printed or digital</li></ul>
           <button type="button" className="btn btn-primary cs-try" onClick={() => navigate('/labs/baby-tales')} data-testid="try-baby-tales">Try the demo <Icon name="arrow-right" size={16} /></button>
         </div>
       </article>
@@ -55,7 +55,7 @@ export function ComingSoonSection({ heading = true }: { heading?: boolean }) {
         </div>
       </article>
 
-      <p className="cs-fine">Illustrations are previews. Baby Tales avatars use Genmoji, on Apple devices with Apple Intelligence.</p>
+      <p className="cs-fine">Illustrations are previews. Baby Tales characters are drawn on your device from your photos; the photos aren’t uploaded.</p>
     </section>
   );
 }

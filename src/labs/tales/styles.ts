@@ -163,7 +163,7 @@ export function styleFilters(mode: StyleMode, id: string): string {
 /**
  * Rewrite drawn shapes for a mode, outside <defs> and <clipPath> blocks:
  * Classic Ink gives every filled shape a coloured ink line; Wondercut gives
- * every shape its own paper shadow; drawings and Genmoji images get the
+ * every shape its own paper shadow; drawings and face images get the
  * mode's image treatment. The original markup is never changed in place —
  * this works on the string that is about to be drawn.
  */

@@ -10,7 +10,7 @@ import { thingArt } from './things';
  * looks the same in the cast list, the dress-up studio and every story page.
  *
  * Geometry: a 200 × 260 box, head centred at (100, 94). Hats, glasses and
- * extras are separate layers, so they fit every face, drawn or Genmoji.
+ * extras are separate layers, so they fit every face, drawn or pasted in.
  */
 
 export type Kind = 'baby' | 'kid' | 'adult' | 'elder' | 'dog' | 'cat' | 'bunny';
@@ -43,7 +43,7 @@ export interface Look {
   extra: string;
   /** Drawn wardrobe pieces, used when that slot is set to "drawn". */
   worn?: Partial<Record<WearSlot, string>>;
-  /** A Genmoji (or other image) used as the face. */
+  /** An image used as the face (a parent's own picture). */
   face?: string;
   faceScale?: number;
   faceY?: number;
@@ -109,7 +109,7 @@ const WORLD_ART: Record<WorldId, { eye: [number, number]; brow: [number, number]
   adventure: { eye: [1.04, 1.04], brow: [1.12, 1] },
   mythic: { eye: [1.04, 0.88], brow: [1.4, 4] },
 };
-/** The world being drawn right now (set by characterMarkup; 'everyday' for pets, drawings and Genmoji faces). */
+/** The world being drawn right now (set by characterMarkup; 'everyday' for pets, drawings and image faces). */
 let WORLD: WorldId = 'everyday';
 
 /** A face proportion, clamped, and softened for babies and kids, whose storybook proportions lead. */
