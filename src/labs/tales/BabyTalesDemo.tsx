@@ -249,7 +249,7 @@ export function BabyTalesDemo() {
   const members = cast.map((p) => p.member);
   const membership = cast.map((p) => `${p.member.id}:${p.member.inStory}`).join();
   /* ── the look, and the family's places and things ───── */
-  const [mode, setMode] = useState<StyleMode>('pocketlight');
+  const [mode, setMode] = useState<StyleMode>('tales');
   /** The story world (art direction for the whole book) and what people wear in each one. */
   const [world, setWorld] = useState<WorldId>('everyday');
   const [worldWear, setWorldWear] = useState<Record<string, Partial<Look>>>({});

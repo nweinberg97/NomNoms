@@ -21,16 +21,32 @@ test('every mode has a complete configuration', () => {
   }
 });
 
-test('modes are meaningfully different, not colour filters', () => {
+test('looks are made of different things, not colour filters', () => {
   const out = Object.fromEntries(STYLE_MODES.map((m) => [m, characterMarkup(look, { style: m })]));
-  assert.match(out.gouache, /filter="url\(#pnt/, 'gouache paints each shape');
-  assert.match(out.gouache, /feDisplacementMap/);
-  assert.match(out.wondercut, /filter="url\(#cut/, 'wondercut gives each piece a paper shadow');
-  assert.match(out.inked, /stroke-width="3.2"[^>]*paint-order="stroke"/, 'classic ink outlines shapes');
-  assert.doesNotMatch(out.pocketlight, /url\(#(pnt|cut)/);
-  assert.match(out.pocketlight, /opacity="0.35"/, 'pocketlight adds a rim light');
-  // cel shading has a hard edge: two stops at the same offset
-  assert.match(out.inked, /offset="0.76" stop-color="[^"]+"\/><stop offset="0.76"/);
+  // clay: lit as a 3D surface (a height map from the drawing's own shapes)
+  assert.match(out.pocketlight, /feDiffuseLighting[\s\S]*feSpecularLighting/, 'clay is lit like a model');
+  assert.doesNotMatch(out.pocketlight, /paint-order="stroke"/, 'clay has no drawn lines');
+  // watercolour: a bled wash and a pencil line found from the visible edges
+  assert.match(out.gouache, /feDisplacementMap/, 'watercolour wash bleeds');
+  assert.match(out.gouache, /feConvolveMatrix/, 'watercolour has a pencil line on visible edges');
+  // paper cut: each piece its own slip of paper, the whole figure cut out with a white edge
+  assert.match(out.wondercut, /filter="url\(#cut/, 'paper cut lifts each piece');
+  assert.match(out.wondercut, /feMorphology[^>]*operator="dilate"[\s\S]*flood-color="#fffaf1"/, 'paper cut has a white cut edge');
+  // comic: black ink on every shape and a halftone dot screen in the shadow
+  assert.match(out.inked, /stroke="#1d1412"[^>]*paint-order="stroke"/, 'comic inks every shape in black');
+  assert.match(out.inked, /<pattern id="ht/, 'comic has a halftone screen');
+  // tales: the soft coloured line of the default look
+  assert.match(out.tales, /paint-order="stroke"/);
+  assert.doesNotMatch(out.tales, /feDiffuseLighting|feConvolveMatrix/);
+});
+
+test('a look applies in every story world, not just everyday', () => {
+  for (const world of ['fairytale', 'adventure', 'mythic'] as const) {
+    const w = { ...look, world };
+    assert.match(characterMarkup(w, { style: 'pocketlight' }), /feDiffuseLighting/, `${world}: clay`);
+    assert.match(characterMarkup(w, { style: 'gouache' }), /feConvolveMatrix/, `${world}: watercolour`);
+    assert.match(characterMarkup(w, { style: 'inked' }), /<pattern id="ht/, `${world}: comic`);
+  }
 });
 
 test('a character keeps its DNA in every mode', () => {

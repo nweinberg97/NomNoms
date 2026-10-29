@@ -1,3 +1,4 @@
+import { finishInLook } from './looks';
 import { STYLES, darken, hexToRgb, rgbToHex, styleFilters, stylizeShapes, type StyleMode } from './styles';
 import { thingArt } from './things';
 
@@ -194,6 +195,8 @@ export const shade = (hex: string, k: number) => {
 /* ── shared gradients ─────────────────────────────────────── */
 /** The mode of the character being drawn right now (set by characterMarkup). */
 let MODE: StyleMode = 'pocketlight';
+/** The look chosen for the book (MODE can be swapped for a world's own drawing; the look's medium still applies). */
+let LOOK: StyleMode = 'pocketlight';
 
 function defs(id: string, l: Look, skin: string, fur: string) {
   if (storybook()) return coreDefs(id, l, skin, fur);
@@ -1574,6 +1577,7 @@ function extra(l: Look) {
 /** SVG markup (no outer <svg>) for a character in a 200 × 260 box, drawn in an illustration mode. */
 export function characterMarkup(l: Look, opts: { animated?: boolean; style?: StyleMode } = {}): string {
   MODE = opts.style ?? 'pocketlight';
+  LOOK = MODE;
   // in a story world, people are drawn in the world's own style (pets keep the book's look)
   WORLD = isPet(l.kind) || l.face || l.drawing ? 'everyday' : l.world ?? 'everyday';
   if (isArt(WORLD) && MODE !== 'tales') MODE = 'pocketlight';
@@ -1670,9 +1674,8 @@ export function fitViewBox(vb: string, l: Look, mode: StyleMode = 'pocketlight')
   return `${nx.toFixed(1)} ${ny.toFixed(1)} ${(w * pr.head).toFixed(1)} ${(h * pr.head).toFixed(1)}`;
 }
 
-/** Applies the mode's line, shadow and texture treatment to finished markup. */
+/** Applies the look's line, material and texture to finished markup (see looks.ts). */
 function finish(markup: string, l: Look, id: string): string {
-  if (storybook() && !l.drawing) return coreInk(markup, l, id);
   const ink = (fill: string): string | null => {
     const k = STYLES.inked.outline.darken;
     if (fill.startsWith('#')) return darken(fill.length === 4 ? `#${fill[1]}${fill[1]}${fill[2]}${fill[2]}${fill[3]}${fill[3]}` : fill, k);
@@ -1680,10 +1683,22 @@ function finish(markup: string, l: Look, id: string): string {
     if (fill.startsWith(`url(#hr${id}`) || fill.startsWith(`url(#fu${id}`)) return darken(l.hair, k);
     return null;
   };
-  const styled = stylizeShapes(markup, MODE, id, ink);
-  if (MODE === 'gouache') return styled.replace(/^<g class="([^"]*)">/, `<g class="$1"><g filter="url(#grain${id})">`).replace(/<\/g>\s*$/, '</g></g>');
-  if (MODE === 'wondercut') return styled.replace(/^<g class="([^"]*)">/, `<g class="$1"><g filter="url(#paper${id})">`).replace(/<\/g>\s*$/, '</g></g>');
-  return styled;
+  if (l.drawing) {
+    // a child's drawing is never redrawn; the look's treatment of images sits on top
+    if (storybook()) return coreInk(markup, l, id);
+    return stylizeShapes(markup, MODE, id, ink);
+  }
+  const imgs = (x: string) => x.replace(/<image\b(?![^>]*\bfilter=)/g, `<image filter="url(#img${id})"`);
+  let out: string;
+  if (LOOK === 'tales') out = storybook() ? coreInk(markup, l, id) : stylizeShapes(markup, MODE, id, ink);
+  // paper cut: every piece is its own slip of paper with its own little shadow
+  else if (LOOK === 'wondercut') {
+    out = stylizeShapes(markup, 'wondercut', id, ink);
+    // a world draws with its own defs, so the paper filters may not be there yet
+    if (MODE !== 'wondercut') out = out.replace(/^(\s*<g\b[^>]*>)/, `$1<defs>${styleFilters('wondercut', id)}</defs>`);
+  }
+  else out = imgs(markup);
+  return finishInLook(out, LOOK, `${id}L`);
 }
 
 /** A standalone <svg> for a character. */

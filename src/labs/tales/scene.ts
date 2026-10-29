@@ -3,6 +3,7 @@ import type { WorldId } from './character';
 import { PLACES, type Place } from './catalog';
 import { characterMarkup, isPet, type Look } from './character';
 import { rng } from './generator';
+import { finishInLook } from './looks';
 import { softLook, STYLES, darken, styleFilters, stylizeShapes, type StyleMode } from './styles';
 import { askMark, hasThing, thingArt } from './things';
 
@@ -113,11 +114,11 @@ export function sceneSvg(opts: {
   }
   // the mode's background treatment
   const inkFor = (fill: string) => (fill.startsWith('#') && fill.length === 7 ? darken(fill, 0.35) : null);
-  if (!opts.photo) {
-    if (mode === 'gouache') back = `<g filter="url(#grain${id})">${stylizeShapes(back, 'gouache', id, inkFor)}</g>`;
-    else if (mode === 'wondercut') back = `<g filter="url(#paper${id})">${stylizeShapes(back, 'wondercut', id, inkFor)}</g>`;
-    else if (mode === 'inked') back = `<g filter="url(#bg${id})">${back}</g>`;
-  }
+  if (!opts.photo && !opts.drawn) {
+    // the place is made in the look's medium too: clay hills, washes of paint, layers of paper, inked lines
+    if (mode === 'wondercut') back = `<g filter="url(#paper${id})">${stylizeShapes(back, 'wondercut', id, inkFor)}</g>`;
+    else back = finishInLook(`<g>${back}</g>`, mode, `${id}B`, 'backdrop');
+  } else if (opts.drawn && mode === 'gouache') back = `<g filter="url(#grain${id})">${back}</g>`;
   let s = `<defs>${styleFilters(mode, id)}</defs>${back}`;
   // things made from photos stand on the ground, sized against a grown-up
   const box = (key: string, x: number, y: number, w: number, h: number, inner: string, ax = x + w / 2, ay = y + h) => {
