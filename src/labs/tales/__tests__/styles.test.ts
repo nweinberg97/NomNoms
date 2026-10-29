@@ -28,7 +28,7 @@ test('each look is made of something different', () => {
   assert.notEqual(shapes(out.gouache), shapes(out.tales));
   assert.notEqual(shapes(out.wondercut), shapes(out.tales));
   assert.notEqual(shapes(out.gouache), shapes(out.wondercut));
-  // plush: felt — fuzzy edge, puffed up, fibre; pencil: strokes through a hatch mask over a light first layer
+  // patchwork: felt patches on a quilt; sketchbook: graphite drawing with coloured pencil over it
   assert.match(out.pocketlight, /feDisplacementMap[\s\S]*feDiffuseLighting/);
   assert.doesNotMatch(out.pocketlight, /feSpecularLighting/, 'no clay sheen any more');
   assert.match(out.inked, /<mask id="hm[^"]*"[\s\S]*mask="url\(#hm/);
@@ -41,9 +41,9 @@ test('each look is made of something different', () => {
 test('a look applies in every story world, not just everyday', () => {
   for (const world of ['fairytale', 'adventure', 'mythic'] as const) {
     const w = { ...look, world };
-    assert.match(characterMarkup(w, { style: 'pocketlight' }), /feDiffuseLighting/, `${world}: plush`);
+    assert.match(characterMarkup(w, { style: 'pocketlight' }), /feDiffuseLighting/, `${world}: patchwork`);
     assert.match(characterMarkup(w, { style: 'gouache' }), /feOffset in="darks"/, `${world}: retro`);
-    assert.match(characterMarkup(w, { style: 'inked' }), /<pattern id="ht/, `${world}: pencil`);
+    assert.match(characterMarkup(w, { style: 'inked' }), /<pattern id="ht/, `${world}: sketchbook`);
   }
 });
 

@@ -39,7 +39,24 @@ export function lookFilters(mode: StyleMode, id: string, part: 'character' | 'ba
         <feColorMatrix in="fibre" type="matrix" values="0 0 0 0 0.25  0 0 0 0 0.18  0 0 0 0 0.14  0 0 ${part === 'backdrop' ? '0.2 0 -0.09' : '0.6 0 -0.26'}" result="fibreDark"/>
         <feMerge result="felt"><feMergeNode in="lit"/>${part === 'backdrop' ? '' : '<feMergeNode in="fibreLight"/><feMergeNode in="fibreDark"/>'}</feMerge>
         <feComposite in="felt" in2="fuzzy" operator="in"/>
-      </filter>`;
+      </filter>
+      <filter id="pb${id}" x="-15%" y="-12%" width="130%" height="126%" color-interpolation-filters="sRGB">
+        <feMorphology in="SourceAlpha" operator="dilate" radius="5.5" result="pad"/>
+        <feTurbulence type="fractalNoise" baseFrequency="0.7" numOctaves="2" seed="4" result="fz"/>
+        <feDisplacementMap in="pad" in2="fz" scale="2.4" xChannelSelector="R" yChannelSelector="G" result="padF"/>
+        <feFlood flood-color="#fbf1df"/><feComposite in2="padF" operator="in" result="felt"/>
+        <feGaussianBlur in="padF" stdDeviation="2.2" result="sb"/><feOffset in="sb" dx="1.5" dy="3" result="so"/>
+        <feFlood flood-color="#3b2a20" flood-opacity=".3"/><feComposite in2="so" operator="in" result="shadow"/>
+        <feMerge><feMergeNode in="shadow"/><feMergeNode in="felt"/></feMerge>
+      </filter>
+      <filter id="ps${id}" x="-15%" y="-12%" width="130%" height="126%">
+        <feMorphology in="SourceAlpha" operator="dilate" radius="3.6" result="o"/>
+        <feMorphology in="SourceAlpha" operator="dilate" radius="2.3" result="i"/>
+        <feComposite in="o" in2="i" operator="out" result="ring"/>
+        <feFlood flood-color="#b0644f"/><feComposite in2="ring" operator="in"/>
+      </filter>
+      <pattern id="sp${id}" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="2.6" height="5" fill="#fff"/></pattern>
+      <mask id="sm${id}" maskContentUnits="userSpaceOnUse"><rect x="-300" y="-300" width="1000" height="900" fill="url(#sp${id})"/></mask>`;
     case 'gouache':
       // retro print: flat inks on warm paper, a touch of grain, and the dark ink printed
       // a hair off-register, like a mid-century picture book
@@ -66,34 +83,88 @@ export function lookFilters(mode: StyleMode, id: string, part: 'character' | 'ba
         <feMerge><feMergeNode in="lift"/><feMergeNode in="paperEdge"/><feMergeNode in="SourceGraphic"/><feMergeNode in="fibreIn"/></feMerge>
       </filter>`;
     case 'inked':
-      // pencil: coloured pencil on paper. Colour goes down in diagonal strokes with the paper
-      // showing through, the line is graphite, and every edge has a hand-drawn waver
+      // sketchbook: a pencil drawing on white paper. The colour is a light coloured-pencil layer
+      // laid in strokes (paper between them); the line is graphite, a little wobbly, gone over twice
       return `<pattern id="ht${id}" width="64" height="64" patternUnits="userSpaceOnUse" patternTransform="rotate(-38)">
         <rect width="64" height="64" fill="#fff" filter="url(#hf${id})"/></pattern>
       <filter id="hf${id}" x="0" y="0" width="100%" height="100%">
-        <feTurbulence type="fractalNoise" baseFrequency="${part === 'backdrop' ? '0.05 0.9' : '0.06 1.1'}" numOctaves="2" seed="8" stitchTiles="stitch" result="t"/>
-        <feColorMatrix in="t" type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0 1" result="w"/>
-        <feComponentTransfer in="t" result="k"><feFuncR type="linear" slope="2.6" intercept="-0.55"/><feFuncG type="linear" slope="2.6" intercept="-0.55"/><feFuncB type="linear" slope="2.6" intercept="-0.55"/></feComponentTransfer>
-        <feColorMatrix in="k" type="matrix" values="1 0 0 0 ${part === 'backdrop' ? 0.28 : 0.4}  1 0 0 0 ${part === 'backdrop' ? 0.28 : 0.4}  1 0 0 0 ${part === 'backdrop' ? 0.28 : 0.4}  0 0 0 0 1"/>
+        <feTurbulence type="fractalNoise" baseFrequency="0.05 0.8" numOctaves="2" seed="8" stitchTiles="stitch" result="t"/>
+        <feComponentTransfer in="t" result="k"><feFuncR type="linear" slope="3" intercept="-0.75"/><feFuncG type="linear" slope="3" intercept="-0.75"/><feFuncB type="linear" slope="3" intercept="-0.75"/></feComponentTransfer>
+        <feColorMatrix in="k" type="matrix" values="1 0 0 0 0.15  1 0 0 0 0.15  1 0 0 0 0.15  0 0 0 0 1"/>
       </filter>
-      <mask id="hm${id}" maskContentUnits="userSpaceOnUse"><rect x="-200" y="-200" width="900" height="800" fill="url(#ht${id})"/></mask>
+      <mask id="hm${id}" maskContentUnits="userSpaceOnUse"><rect x="-300" y="-300" width="1000" height="900" fill="url(#ht${id})"/></mask>
       <filter id="lk${id}" x="-6%" y="-6%" width="112%" height="112%" color-interpolation-filters="sRGB">
-        <feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="2" seed="13" result="wv"/>
-        <feDisplacementMap in="SourceGraphic" in2="wv" scale="2.4" xChannelSelector="R" yChannelSelector="G" result="waver"/>
-        <feColorMatrix in="waver" type="saturate" values="${part === 'backdrop' ? 0.8 : 0.92}" result="soft"/>
-        <feComponentTransfer in="soft"><feFuncR type="linear" slope=".9" intercept=".1"/><feFuncG type="linear" slope=".9" intercept=".1"/><feFuncB type="linear" slope=".9" intercept=".09"/></feComponentTransfer>
+        <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="2" seed="13" result="wv"/>
+        <feDisplacementMap in="SourceGraphic" in2="wv" scale="3" xChannelSelector="R" yChannelSelector="G" result="waver"/>
+        <feColorMatrix in="waver" type="saturate" values="0.85" result="soft"/>
+        <feComponentTransfer in="soft"><feFuncR type="linear" slope="${part === 'backdrop' ? 0.46 : 0.72}" intercept="${part === 'backdrop' ? 0.54 : 0.28}"/><feFuncG type="linear" slope="${part === 'backdrop' ? 0.46 : 0.72}" intercept="${part === 'backdrop' ? 0.53 : 0.27}"/><feFuncB type="linear" slope="${part === 'backdrop' ? 0.46 : 0.72}" intercept="${part === 'backdrop' ? 0.5 : 0.25}"/></feComponentTransfer>
+      </filter>
+      <filter id="ln${id}" x="-6%" y="-6%" width="112%" height="112%" color-interpolation-filters="sRGB">
+        <feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="2" seed="21" result="wv"/>
+        <feDisplacementMap in="SourceGraphic" in2="wv" scale="2.2" xChannelSelector="R" yChannelSelector="G" result="a"/>
+        <feOffset in="a" dx=".9" dy="-.6" result="b"/>
+        <feComponentTransfer in="b" result="b2"><feFuncA type="linear" slope=".35"/></feComponentTransfer>
+        <feMerge><feMergeNode in="b2"/><feMergeNode in="a"/></feMerge>
+      </filter>
+      <filter id="ed${id}" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+        <feColorMatrix in="SourceGraphic" type="luminanceToAlpha" result="lum"/>
+        <feConvolveMatrix in="lum" order="3" kernelMatrix="-1 -1 -1 -1 8 -1 -1 -1 -1" divisor="1" preserveAlpha="false" result="edge"/>
+        <feComponentTransfer in="edge" result="edgeK"><feFuncA type="linear" slope="5" intercept="-0.12"/></feComponentTransfer>
+        <feFlood flood-color="#5a534d"/><feComposite in2="edgeK" operator="in" result="lines"/>
+        <feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="2" seed="5" result="wv"/>
+        <feDisplacementMap in="lines" in2="wv" scale="2.5" xChannelSelector="R" yChannelSelector="G"/>
       </filter>`;
     default:
       return '';
   }
 }
 
-/** A sewing thread a shade darker than the felt it's sewn on. */
-const thread = (hex: string) => {
-  const h = hex.length === 4 ? `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}` : hex;
-  const n = parseInt(h.slice(1, 7), 16);
-  return `#${[n >> 16, (n >> 8) & 255, n & 255].map((c) => Math.round(c * 0.62).toString(16).padStart(2, '0')).join('')}`;
-};
+/**
+ * The drawing's lines alone, in graphite: every outlined shape loses its fill and its line
+ * turns pencil grey; eyes (iris and pupil) stay, so faces keep their look; anything else
+ * without a line is left to the colour layer.
+ */
+function pencilLines(svg: string): string {
+  const parts = svg.split(/(<defs>[\s\S]*?<\/defs>|<clipPath[\s\S]*?<\/clipPath>|<pattern[\s\S]*?<\/pattern>|<mask[\s\S]*?<\/mask>)/);
+  return parts.map((part, i) => (i % 2 === 1 ? part.replace(/\bid="[^"]+"/g, '') : part.replace(/<(path|ellipse|circle|rect|polygon|image)\b([^>]*?)(\/?)>(<\/\1>)?/g, (all, tag: string, attrs: string, close: string) => {
+    if (tag === 'image') return '';
+    const fill = /\bfill="([^"]+)"/.exec(attrs)?.[1] ?? '#000';
+    const stroke = /\bstroke="([^"]+)"/.exec(attrs)?.[1];
+    const eye = /url\(#ir/.test(fill) || /^#(120d0b|1[0-9a-f]{5}|2[0-9a-f]{5})$/i.test(fill);
+    if (eye) return all;
+    const filled = fill !== 'none' && !/\bfill-opacity=|\bopacity=/.test(attrs);
+    if (!stroke || stroke === 'none' || /^#fff/i.test(stroke)) return filled ? `<${tag}${attrs.replace(/\bfill="[^"]*"/, 'fill="#fdfcf8"')}${close}>` : '';
+    let a = attrs.replace(/\bfill="[^"]*"/, `fill="${filled ? '#fdfcf8' : 'none'}"`).replace(/\bstroke="[^"]*"/, 'stroke="#4b4540"');
+    if (!/\bfill=/.test(a)) a += ' fill="#fdfcf8"';
+    a = a.replace(/\bstroke-width="([\d.]+)"/, (_m, w: string) => `stroke-width="${Math.max(1.3, Math.min(2.6, parseFloat(w) * 0.85)).toFixed(2)}"`);
+    return `<${tag}${a}${close}>`;
+  }))).join('');
+}
+
+/** A quilt laid over the place: fabric squares (gingham, dots, stripes, plain) and stitched seams. */
+function quilt(id: string): string {
+  const cols = 6, rows = 5, w = 400 / cols, h = 300 / rows;
+  const fab = ['gq', 'dq', 'sq', 'pq'];
+  let squares = '';
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+    const f = fab[(r * 2 + c * 3 + (r * c) % 3) % fab.length];
+    const tone = (r + c) % 2 ? '#fff' : '#3a2a20';
+    squares += `<rect x="${(c * w).toFixed(1)}" y="${(r * h).toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" fill="${tone}" fill-opacity=".06"/>`;
+    if (f !== 'pq') squares += `<rect x="${(c * w).toFixed(1)}" y="${(r * h).toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" fill="url(#${f}${id})"/>`;
+  }
+  let seams = '';
+  for (let c = 1; c < cols; c++) seams += `<path d="M${(c * w).toFixed(1)} 0 V300"/>`;
+  for (let r = 1; r < rows; r++) seams += `<path d="M0 ${(r * h).toFixed(1)} H400"/>`;
+  return `<defs>
+      <pattern id="gq${id}" width="10" height="10" patternUnits="userSpaceOnUse"><rect width="5" height="10" fill="#fff" fill-opacity=".2"/><rect width="10" height="5" fill="#fff" fill-opacity=".2"/></pattern>
+      <pattern id="dq${id}" width="11" height="11" patternUnits="userSpaceOnUse"><circle cx="3" cy="3" r="1.7" fill="#fff" fill-opacity=".45"/><circle cx="8.5" cy="8.5" r="1.7" fill="#fff" fill-opacity=".45"/></pattern>
+      <pattern id="sq${id}" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(90)"><rect width="3" height="8" fill="#3a2a20" fill-opacity=".09"/></pattern>
+    </defs>${squares}
+    <g stroke="#3a2a20" stroke-opacity=".22" stroke-width="2.2" fill="none">${seams}</g>
+    <g stroke="#fff6e6" stroke-opacity=".85" stroke-width="1.2" stroke-dasharray="3.2 2.6" stroke-linecap="round" fill="none" transform="translate(-2.4 -2.4)">${seams}</g>
+    <g stroke="#fff6e6" stroke-opacity=".85" stroke-width="1.2" stroke-dasharray="3.2 2.6" stroke-linecap="round" fill="none" transform="translate(2.4 2.4)">${seams}</g>`;
+}
+
 
 /** Every filled shape (outside defs and clip paths) gets a stroke from `strokeFor`. */
 function stroke(svg: string, attrsFor: (fill: string, tag: string, attrs: string) => string | null): string {
@@ -125,24 +196,30 @@ export function finishInLook(markup: string, mode: StyleMode, id: string, part: 
   head = `${head0}${auras.join('')}`;
   const defs = `<defs>${lookFilters(mode, id, part)}</defs>`;
   switch (mode) {
-    case 'pocketlight': {
-      // a running stitch round every felt piece, in a thread a shade darker than the felt
-      const sewn = part === 'backdrop' ? body : stroke(body, (fill, tag, attrs) => {
-        const r = /\br="([\d.]+)"/.exec(attrs);
-        if (tag === 'circle' && r && parseFloat(r[1]) < 7) return null;
-        if (!fill.startsWith('#') || /^#(fff|ffffff|000|000000)$/i.test(fill)) return null;
-        return `stroke="${thread(fill)}" stroke-width="1.4" stroke-dasharray="3 2.6" stroke-linecap="round" stroke-opacity=".9"`;
-      });
-      return `${head}${defs}<g filter="url(#lk${id})">${sewn}</g></g>`;
-    }
+    case 'pocketlight':
+      if (part === 'backdrop') return `${head}${defs}<g filter="url(#lk${id})">${body}</g>${quilt(id)}</g>`;
+      // a felt patch sewn on: a cream felt border, a running stitch round it, a little shadow
+      {
+        // the patch's outline: the figure only, not its shadow on the ground or a world's glow
+        const patch = body.replace(/\bid="[^"]+"/g, '').replace(/<ellipse\b[^>]*fill="#000"[^>]*\/>/g, '');
+        return `${head}${defs}<g filter="url(#pb${id})">${patch}</g><g mask="url(#sm${id})"><g filter="url(#ps${id})">${patch}</g></g><g filter="url(#lk${id})">${body}</g></g>`;
+      }
     case 'gouache':
       return `${head}${defs}<g filter="url(#lk${id})">${body}</g></g>`;
     case 'wondercut':
       if (part === 'backdrop') return `${head}${defs}${body}</g>`;
       return `${head}${defs}<g filter="url(#lk${id})">${body}</g></g>`;
-    case 'inked':
-      // a light first layer of colour, then the pencil strokes over it with paper between them
-      return `${head}${defs}<g filter="url(#lk${id})"><g opacity="${part === 'backdrop' ? 0.5 : 0.42}">${body}</g><g mask="url(#hm${id})">${body.replace(/\bid="[^"]+"/g, '')}</g></g></g>`;
+    case 'inked': {
+      if (part === 'backdrop') {
+        // the place: pale pencil colour on white paper, its edges drawn in graphite
+        return `${head}${defs}<rect x="-50" y="-50" width="500" height="400" fill="#fdfcf8"/><g mask="url(#hm${id})"><g filter="url(#lk${id})">${body}</g></g><g opacity=".55" filter="url(#ed${id})">${body.replace(/\bid="[^"]+"/g, '')}</g></g>`;
+      }
+      // colour: a light coloured-pencil layer in strokes; then the drawing in graphite on top
+      // the drawing first (shapes filled with paper, so lines behind a shape stay hidden), then the
+      // colour laid over it like pencil on paper (multiplied, so the line shows through)
+      const colour = `<g style="mix-blend-mode:multiply" filter="url(#lk${id})"><g opacity=".3">${body}</g><g mask="url(#hm${id})">${body.replace(/\bid="[^"]+"/g, '')}</g></g>`;
+      return `${head}${defs}<g filter="url(#ln${id})">${pencilLines(body)}</g>${colour}</g>`;
+    }
     default:
       return markup;
   }
