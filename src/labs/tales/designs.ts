@@ -25,7 +25,9 @@ import { thingArt } from './things';
  */
 
 export type DesignMode = Exclude<StyleMode, 'tales'>;
-export const hasDesign = (m: StyleMode): m is DesignMode => m !== 'tales';
+/** Plush and Pencil draw the Tales characters; only Retro and Paper cut build their own. */
+export const onTalesDrawing = (m: StyleMode) => m === 'pocketlight' || m === 'inked';
+export const hasDesign = (m: StyleMode): m is DesignMode => m === 'gouache' || m === 'wondercut';
 
 /* ── shared helpers ─────────────────────────────────────── */
 type Fam = 'none' | 'buzz' | 'tuft' | 'short' | 'side' | 'messy' | 'bob' | 'long' | 'curlyShort' | 'curlyLong' | 'afro' | 'bun' | 'pony' | 'pigtails' | 'sides';

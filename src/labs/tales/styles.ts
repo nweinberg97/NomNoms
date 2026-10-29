@@ -50,8 +50,8 @@ export const STYLES: Record<StyleMode, StyleConfig> = {
   },
   pocketlight: {
     id: 'pocketlight',
-    name: 'Clay',
-    blurb: 'Stop-motion puppets: bean heads, goggle eyes, big grins and big shoes',
+    name: 'Plush',
+    blurb: 'Sewn from soft felt, like a favourite toy: fuzzy, puffy and cosy',
     palette: { swatches: ['#f6c9a8', '#e8907a', '#f2c14e', '#8fbf9f', '#7fa8d1', '#b9a5e3', '#fbf3e6', '#5a4a42'], ink: '#4a3a33', shadow: '#5a3f3a', paper: '#fbf7f0', light: '#fff1d6' },
     colour: { pull: 0.15, saturation: 1.05, brightness: 1.04, warmth: 0.06 },
     materials: { shading: 'soft-volume', contrast: 1, gloss: 1 },
@@ -92,8 +92,8 @@ export const STYLES: Record<StyleMode, StyleConfig> = {
   },
   inked: {
     id: 'inked',
-    name: 'Comic',
-    blurb: 'Big heads, huge shining eyes and bold ink, like a comic book',
+    name: 'Pencil',
+    blurb: 'Coloured pencil on paper, like a classic picture book: soft strokes, paper showing through',
     palette: { swatches: ['#f0c39e', '#d9654f', '#efb94a', '#6aa36b', '#5b8fc9', '#8e6bb8', '#fbf5ea', '#3b2a26'], ink: '#3b2a26', shadow: '#5d4250', paper: '#fbf5ea', light: '#fff4dc' },
     colour: { pull: 0.2, saturation: 1.08, brightness: 1, warmth: 0.04 },
     materials: { shading: 'cel', contrast: 1, gloss: 0.4 },

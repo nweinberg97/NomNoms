@@ -1,4 +1,4 @@
-import { designCharacter, designHead, hasDesign } from './designs';
+import { designCharacter, designHead, hasDesign, onTalesDrawing } from './designs';
 import { finishInLook } from './looks';
 import { STYLES, darken, hexToRgb, rgbToHex, styleFilters, stylizeShapes, type StyleMode } from './styles';
 import { thingArt } from './things';
@@ -1586,6 +1586,8 @@ function extra(l: Look) {
 export function characterMarkup(l: Look, opts: { animated?: boolean; style?: StyleMode } = {}): string {
   MODE = opts.style ?? 'pocketlight';
   LOOK = MODE;
+  // Plush and Pencil are the Tales characters made in another material
+  if (opts.style && onTalesDrawing(opts.style)) MODE = 'tales';
   // in a story world, people are drawn in the world's own style (pets keep the book's look)
   WORLD = isPet(l.kind) || l.face || l.drawing ? 'everyday' : l.world ?? 'everyday';
   const id = `c${++uid}`;
@@ -1599,7 +1601,7 @@ export function characterMarkup(l: Look, opts: { animated?: boolean; style?: Sty
     return finish(`<g class="${opts.animated ? 'bt-char is-animated' : 'bt-char'}${motion} st-${LOOK}"><defs>${styleFilters(LOOK, id)}</defs>${aura}${designed.svg}${rim}</g>`, l, id);
   }
   if (isArt(WORLD) && MODE !== 'tales') MODE = 'pocketlight';
-  const cls = `${opts.animated ? 'bt-char is-animated' : 'bt-char'}${motion} st-${MODE}`;
+  const cls = `${opts.animated ? 'bt-char is-animated' : 'bt-char'}${motion} st-${LOOK}`;
   if (l.drawing) {
     // a child's drawing is never edited; the mode's treatment is a filter on top
     const img = `<image href="${l.drawing.replace(/"/g, '&quot;')}" x="-10" y="-20" width="220" height="282" preserveAspectRatio="xMidYMax meet"/>`;
@@ -1688,6 +1690,7 @@ export function fitViewBox(vb: string, l: Look, mode: StyleMode = 'pocketlight')
       return `${(h.cx - S / 2).toFixed(1)} ${(h.cy - S * 0.54).toFixed(1)} ${S.toFixed(1)} ${S.toFixed(1)}`;
     }
   }
+  if (onTalesDrawing(mode)) mode = 'tales';
   const art = !l.face && (l.world ?? 'everyday') !== 'everyday' && mode !== 'tales';
   const m: StyleMode = art ? 'pocketlight' : mode;
   const b = PROPORTIONS[m][l.kind as 'baby' | 'kid' | 'adult' | 'elder'], wb = worldBody(l.world, l.kind);
@@ -1715,7 +1718,7 @@ function finish(markup: string, l: Look, id: string): string {
   }
   const imgs = (x: string) => x.replace(/<image\b(?![^>]*\bfilter=)/g, `<image filter="url(#img${id})"`);
   let out: string;
-  if (LOOK === 'tales') out = storybook() ? coreInk(markup, l, id) : stylizeShapes(markup, MODE, id, ink);
+  if (LOOK === 'tales' || onTalesDrawing(LOOK)) out = storybook() ? coreInk(markup, l, id) : stylizeShapes(markup, MODE, id, ink);
   // paper cut: every piece is its own slip of paper with its own little shadow
   else if (LOOK === 'wondercut') {
     out = stylizeShapes(markup, 'wondercut', id, ink);
