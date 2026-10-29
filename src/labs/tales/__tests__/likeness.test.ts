@@ -206,12 +206,24 @@ test('the photo picks baby, kid, grown-up or grandparent, and a parent can overr
   assert.equal(at(8).ageGroup.value, 'kid');
   assert.equal(at(29).ageGroup.value, 'adult', 'the astronaut portrait reads 29');
   assert.equal(at(69).ageGroup.value, 'elder', 'the Grace Hopper portrait reads 69');
-  assert.equal(at(undefined).ageGroup.status, 'missing', 'no age model, no guess');
+  // with no age estimate, the face's own proportions decide: both test portraits are grown-ups
+  assert.equal(at(undefined).ageGroup.value, 'adult', 'a grown-up face reads as a grown-up');
+  assert.equal(measure({ ...faceOf(astronaut) }, paint(astronaut)).ageGroup.value, 'adult');
   for (const a of [1.5, 8, 29, 69]) assert.equal(at(a).ageGroup.status, 'inferred', 'always a best guess');
   // a grown-up photo on the baby star makes a grown-up, not the person as a baby
   assert.equal(kindFor(at(29), 'baby', false), 'adult');
   assert.equal(kindFor(at(29), 'baby', true), 'baby', 'a parent’s choice wins');
-  assert.equal(kindFor(at(undefined), 'kid', false), 'kid', 'no guess keeps what was there');
+  assert.equal(kindFor(at(undefined), 'baby', false), 'adult', 'an adult photo on the baby card makes a grown-up');
+  // a baby's face: the same face with a much shorter nose and lower face (baby proportions)
+  const babyish = (k: number) => {
+    const f = faceOf(grace), m = f.mesh.map((p) => [...p]);
+    const eyeY = (m[33][1] + m[263][1]) / 2;
+    for (const p of m) if (p[1] > eyeY) p[1] = eyeY + (p[1] - eyeY) * k;
+    return measure({ ...f, mesh: m }, paint(grace));
+  };
+  assert.equal(babyish(0.62).ageGroup.value, 'baby', 'baby proportions read as a baby');
+  assert.equal(kindFor(babyish(0.62), 'adult', false), 'baby');
+  assert.equal(kindFor(babyish(0.8), 'baby', false), 'baby', 'an unsure "child" never makes a baby bigger');
   assert.equal(kindFor(at(29), 'dog', false), 'dog', 'pets stay pets');
 });
 

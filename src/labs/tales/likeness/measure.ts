@@ -578,7 +578,7 @@ export function measure(face: FaceInput | null, px: PixelInput): Measurements {
     quality: { score: round(face.score, 3), faces: face.faces, iodPx: round(iodPx, 1), yaw: yaw === undefined ? undefined : round(yaw, 3), pitch: pitch === undefined ? undefined : round(pitch, 3), roll: round(f.angle, 3), mouthOpen: round(mouthOpen, 3), smile: round(smile, 3), brightness: skinLab ? round(skinLab[0], 1) : undefined },
     shape, skin, eyes, hair, hairLength, hairVolume, hairTexture, bangs, hairPart, hairUp, facialHair,
     glasses: missing('Glasses aren’t detected; choose them in the wardrobe.'),
-    ageGroup: ageGroupOf(face.age, hairLab, sizeConf),
+    ageGroup: face.age !== undefined ? ageGroupOf(face.age, hairLab, sizeConf) : ageFromShape(L, r.mouthOpen - AVERAGE.mouthOpen, pitch, hairLab, sizeConf),
     warnings,
     debug: {
       oval: FACE_OVAL.map((i) => pt(i)),
@@ -599,6 +599,35 @@ export function measure(face: FaceInput | null, px: PixelInput): Measurements {
       hairPixels,
     },
   };
+}
+
+/**
+ * Baby, child or grown-up from the shape of the face alone (no age model).
+ *
+ * Faces change shape as people grow: the nose and the lower face get much longer
+ * compared with the distance between the eyes. On 87 adult photos this landmark model
+ * reads the nose (between the eyes to under the nose) at 0.84 ± 0.06 pupil distances,
+ * and the lower face (under the nose to the chin) at 1.14 ± 0.17. Published facial
+ * measurements put babies near 0.5–0.6 for the nose and young children near 0.7.
+ * So a clearly adult face is read as a grown-up, a clearly baby face as a baby, and the
+ * overlap in between as a child, always as a best guess with a one-tap correction.
+ * Grey or white hair on a grown-up face reads as a grandparent.
+ * Not checked on photos of children (none are used for testing).
+ */
+export const NOSE_ADULT = 0.74, NOSE_BABY = 0.64;
+function ageFromShape(L: (i: number) => P, mouthOpen: number, pitch: number | undefined, hairLab: number[] | null, sizeConf: number): Measurement<'baby' | 'kid' | 'adult' | 'elder'> {
+  if (pitch !== undefined && Math.abs(pitch) > 0.35) return missing('The head is tipped up or down, so age wasn’t read. Pick the age group.');
+  const nose = dist(L(168), L(2)), lower = dist(L(2), L(152));
+  const grownLower = mouthOpen > 0.08 || lower >= 1.0;
+  // silver or white, clearly: light, and almost no colour (light brown and blonde have colour)
+  const grey = !!hairLab && hairLab[0] > 70 && Math.hypot(hairLab[1], hairLab[2]) < 7;
+  let value: 'baby' | 'kid' | 'adult' | 'elder';
+  let conf: number;
+  if (nose >= NOSE_ADULT || (nose >= 0.69 && lower >= 1.08)) { value = grey ? 'elder' : 'adult'; conf = Math.min(0.85, 0.5 + (nose - 0.69) * 4); }
+  else if (nose < NOSE_BABY && !grownLower) { value = 'baby'; conf = Math.min(0.75, 0.45 + (NOSE_BABY - nose) * 4); }
+  else if (nose < NOSE_BABY) { value = 'baby'; conf = 0.4; }
+  else { value = 'kid'; conf = 0.35; }
+  return { status: 'inferred', value, confidence: round(conf * sizeConf, 2), raw: round(nose, 3), why: value === 'elder' ? 'Grown-up face and grey or white hair' : 'From the shape of the face; check it' };
 }
 
 /**

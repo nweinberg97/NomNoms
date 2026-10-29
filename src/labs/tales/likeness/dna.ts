@@ -108,7 +108,9 @@ function pickFacial(kind: Kind, m: Measurement<{ moustache: number; chin: number
 
 /** The age group to draw: the parent's choice if they made one, else the photo's guess, else the current one. */
 export const kindFor = (m: Measurements, current: Kind, chosenByParent: boolean): Kind =>
-  chosenByParent || isPetKind(current) || m.ageGroup.status === 'missing' || !m.ageGroup.value ? current : m.ageGroup.value;
+  chosenByParent || isPetKind(current) || m.ageGroup.status === 'missing' || !m.ageGroup.value
+    // "a child" is the unsure middle: it never turns a baby into a bigger kid
+    || (m.ageGroup.value === 'kid' && current === 'baby') ? current : m.ageGroup.value;
 const isPetKind = (k: Kind) => !['baby', 'kid', 'adult', 'elder'].includes(k);
 
 /** Turn photo measurements into DNA. Parent-chosen traits in `keep` are carried over untouched. */
