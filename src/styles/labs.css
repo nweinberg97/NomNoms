@@ -26,7 +26,7 @@
 .lab-chips { display: flex; gap: 8px; flex-wrap: wrap; }
 .lab-chips.is-scroll { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
 .lab-chip { flex: none; font: inherit; font-size: 13px; padding: 7px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--paper); color: var(--ink-2); cursor: pointer; white-space: nowrap; transition: background .2s, border-color .2s, color .2s; }
-.lab-chip[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+.lab-chip[aria-pressed="true"], .lab-chip[role="radio"][aria-checked="true"] { background: var(--ink); border-color: var(--ink); color: var(--paper); }
 .lab-chip:disabled { opacity: .55; cursor: default; }
 .lab-switch { display: inline-flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--ink-2); cursor: pointer; }
 .lab-switch input { width: 18px; height: 18px; accent-color: var(--accent); }
@@ -75,7 +75,7 @@
 .bt-fit .btn { grid-column: 1 / -1; justify-self: start; }
 .bt-swatches { display: flex; gap: 8px; flex-wrap: wrap; }
 .bt-swatch { width: 32px; height: 32px; border-radius: 50%; border: 0; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .1); cursor: pointer; outline: 2px solid transparent; outline-offset: 2px; }
-.bt-swatch[aria-pressed="true"] { outline-color: var(--accent); }
+.bt-swatch[aria-pressed="true"], .bt-swatch[aria-checked="true"] { outline-color: var(--accent); }
 .bt-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(82px, 1fr)); gap: 8px; }
 .bt-tile { font: inherit; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 4px 8px; border-radius: 16px; border: 1.5px solid var(--line); background: var(--paper); color: var(--ink-2); cursor: pointer; }
 .bt-tile span { width: 64px; height: 72px; display: block; }
@@ -361,6 +361,16 @@
 .bt-kindpick { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 6px 0; font-size: 12.5px; }
 .bt-kindpick .lab-chip { font-size: 12.5px; padding: 4px 10px; }
 .bt-kindpick > span { color: var(--ink-3, #7a6f66); }
+.bt-quickpick { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 6px 10px; margin: 6px 0; font-size: 12.5px; }
+.bt-quickpick > span { color: var(--ink-3, #7a6f66); }
+.bt-swatches.is-small { gap: 6px; }
+.bt-swatches.is-small .bt-swatch { width: 22px; height: 22px; outline-offset: 1px; }
+.bt-facepick { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 6px 0; font-size: 12.5px; }
+.bt-facepick > span { color: var(--ink-3, #7a6f66); }
+.bt-facechip { position: relative; width: 44px; height: 44px; border-radius: 50%; overflow: hidden; padding: 0; border: 0; cursor: pointer; outline: 2px solid transparent; outline-offset: 2px; background: var(--paper-2, #eee); }
+.bt-facechip img { position: absolute; max-width: none; }
+.bt-facechip[aria-checked="true"] { outline-color: var(--accent); }
+.bt-facechip:disabled { opacity: .5; cursor: progress; }
 .bt-kindpick .lab-chip[aria-checked="true"] { background: var(--ink, #2a201c); color: #fff; border-color: var(--ink, #2a201c); }
 
 /* a just-added person: clearly new, clearly theirs */

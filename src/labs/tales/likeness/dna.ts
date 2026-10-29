@@ -1,4 +1,5 @@
 import { EYE_COLOURS, HAIR_COLOURS, SKIN_TONES, type Facial, type HairStyle, type Kind, type Look } from '../character';
+import { rgbToLab } from '../assets/pipeline';
 import { SHAPE_KEYS, type HairLength, type HairTexture, type Measurement, type Measurements, type ShapeKey } from './measure';
 
 /**
@@ -48,6 +49,23 @@ const hex = (c: number[]) => `#${c.map((v) => Math.round(Math.max(0, Math.min(25
 const nearest = (c: number[], palette: string[]) => palette.reduce((best, h) => { const d = (p: number[]) => Math.hypot(p[0] - c[0], p[1] - c[1], p[2] - c[2]); return d(rgb(h)) < d(rgb(best)) ? h : best; }, palette[0]);
 /** Pull a photo colour part-way toward the nearest illustration colour, so a dim photo doesn't make a muddy character. */
 export const tame = (h: string, palette: string[], k: number) => { const c = rgb(h), p = rgb(nearest(c, palette)); return hex(c.map((v, i) => v * (1 - k) + p[i] * k)); };
+
+/**
+ * The illustration's skin tone for a daylight-corrected skin colour (measure.ts).
+ * Lightness decides most of it; ITA (how yellow-brown versus light the skin is, the
+ * measure dermatologists use) nudges it, which separates a brightly lit deeper tone
+ * from a lighter one better than lightness alone. Photos still read a little darker
+ * than people look, so the cut-offs sit below the palette's own lightness.
+ * Calibrated on adult photos (several lighting conditions, a range of skin tones).
+ */
+const SKIN_CUTS = [80, 74, 69, 64, 59, 54, 48, 42, 36];
+export function skinToneFor(h: string): string {
+  const [L, , b] = rgbToLab(...(rgb(h) as [number, number, number]));
+  const ita = (Math.atan2(L - 50, b) * 180) / Math.PI;
+  const score = L + 0.15 * (ita - 50);
+  const i = SKIN_CUTS.findIndex((c) => score >= c);
+  return SKIN_TONES[i < 0 ? SKIN_TONES.length - 1 : i];
+}
 
 /* ── hairstyle: chosen from readings, never at random ──────────── */
 export function pickHairStyle(kind: Kind, d: CharacterDNA['hairDetail']): Trait<HairStyle> | undefined {
@@ -128,7 +146,7 @@ export function buildDNA(m: Measurements, kind: Kind, keep: Partial<Pick<Charact
  */
 export function applyDNA(look: Look, dna: CharacterDNA): Look {
   const next: Look = { ...look, kind: dna.kind };
-  if (dna.skin) next.skin = dna.skin.source === 'parent' ? dna.skin.value : tame(dna.skin.value, SKIN_TONES, 0.35);
+  if (dna.skin) next.skin = dna.skin.source === 'parent' ? dna.skin.value : skinToneFor(dna.skin.value);
   if (dna.hair) next.hair = dna.hair.source === 'parent' ? dna.hair.value : tame(dna.hair.value, HAIR_COLOURS, 0.4);
   if (dna.eyes) next.eyes = dna.eyes.source === 'parent' ? dna.eyes.value : tame(dna.eyes.value, EYE_COLOURS, 0.5);
   if (dna.hairStyle) next.hairStyle = dna.hairStyle.value;

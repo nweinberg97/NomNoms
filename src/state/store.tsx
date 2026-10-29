@@ -46,6 +46,12 @@ interface Actions {
   deleteMemory(id: string): Promise<void>;
   toggleFavorite(id: string): Promise<void>;
   addMediaToMemory(id: string, files: Blob[]): Promise<void>;
+  /**
+   * Photos/videos the parent took out of a memory: removed from the book's pages and cover,
+   * and deleted from this device when nothing else (another memory, a first, the baby's
+   * picture) still uses them.
+   */
+  forgetMedia(ids: string[]): Promise<void>;
   /** 'update' (default when a book exists) keeps every manual edit and adds new memories; 'fresh' redesigns everything. */
   buildBook(mode?: 'update' | 'fresh'): Promise<Book>;
   saveBook(book: Book): Promise<void>;
@@ -229,7 +235,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           const firstPhoto = next.mediaIds.find((id) => s.media.get(id)?.kind === 'photo') ?? next.mediaIds.find((id) => s.media.get(id)?.kind === 'video');
           const upd = {
             ...ms, title: next.title || ms.title, date: next.date, description: next.caption,
-            photoMediaId: photoGone ? firstPhoto : ms.photoMediaId,
+            // the memory's first photo is its main one, so a reorder changes the first's picture too
+            photoMediaId: photoGone ? firstPhoto : patch.mediaIds ? firstPhoto ?? ms.photoMediaId : ms.photoMediaId,
           };
           await repo().milestones.saveMilestone(upd);
           milestones = s.milestones.map((m) => (m.id === upd.id ? upd : m));
@@ -269,6 +276,34 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const items = await ingest(files);
       const m = stateRef.current.memories.find((x) => x.id === id);
       if (m) await actions.updateMemory(id, { mediaIds: [...m.mediaIds, ...items.map((i) => i.id)] });
+    },
+
+    async forgetMedia(ids) {
+      const s = stateRef.current;
+      if (!s.baby || !ids.length) return;
+      const used = (id: string) =>
+        s.memories.some((m) => m.mediaIds.includes(id)) || s.milestones.some((m) => m.photoMediaId === id) || s.baby?.photoMediaId === id;
+      const gone = ids.filter((id) => !used(id));
+      if (!gone.length) return;
+      const drop = new Set(gone);
+      if (s.book && (s.book.pages.some((p) => p.mediaIds.some((id) => drop.has(id))) || (s.book.coverMediaId && drop.has(s.book.coverMediaId)))) {
+        const book: Book = {
+          ...s.book,
+          coverMediaId: s.book.coverMediaId && drop.has(s.book.coverMediaId) ? undefined : s.book.coverMediaId,
+          pages: s.book.pages.map((p) => (p.mediaIds.some((id) => drop.has(id)) ? { ...p, mediaIds: p.mediaIds.filter((id) => !drop.has(id)) } : p)),
+          updatedAt: nowISO(),
+        };
+        await repo().books.saveBook(book);
+        stateRef.current = { ...stateRef.current, book };
+        setState((st) => ({ ...st, book }));
+      }
+      for (const id of gone) {
+        const item = s.media.get(id);
+        if (!item || item.storageProvider === 'demo') continue;
+        await MediaService.remove(item);
+        await repo().media.deleteMedia(s.baby.id, id);
+      }
+      setState((st) => { const media = new Map(st.media); for (const id of gone) if (media.get(id)?.storageProvider !== 'demo') media.delete(id); return { ...st, media }; });
     },
 
     async buildBook(mode = 'update') {

@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { makeRaster, type Raster } from '../assets/pipeline';
-import { characterMarkup, type Look } from '../character';
-import { applyDNA, buildDNA, kindFor, parentTraits, parseDNA, serializeDNA } from '../likeness/dna';
+import { characterMarkup, SKIN_TONES, type Look } from '../character';
+import { applyDNA, buildDNA, kindFor, parentTraits, parseDNA, serializeDNA, skinToneFor } from '../likeness/dna';
 import { FACE_OVAL, measure, SHAPE_KEYS, type FaceInput } from '../likeness/measure';
 import astronaut from './fixtures/astronaut.landmarks.json';
 import grace from './fixtures/grace.landmarks.json';
@@ -159,7 +159,9 @@ test('skin and hair are read from the right places, and say where they came from
   assert.equal(m.skin.status, 'measured');
   const hex = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
   const near = (h: string, c: number[], tol: number) => hex(h).every((v, i) => Math.abs(v - c[i]) <= tol);
-  assert.ok(near(m.skin.value!, [222, 176, 146], 6), `skin ${m.skin.value}`);
+  // the painted cheeks are [222, 176, 146]; skin is read as in daylight, so it may come out a touch lighter, never darker
+  const sk = hex(m.skin.value!);
+  assert.ok(sk.every((v, i) => v >= [222, 176, 146][i] - 6 && v <= [222, 176, 146][i] + 40), `skin ${m.skin.value}`);
   assert.equal(m.hair.status, 'measured');
   assert.ok(near(m.hair.value!, [60, 38, 22], 6), `hair ${m.hair.value}`);
   assert.equal(m.hairTexture.status === 'missing' || m.hairTexture.status === 'inferred', true, 'curls are only ever a best guess');
@@ -169,6 +171,20 @@ test('skin and hair are read from the right places, and say where they came from
   const dna = buildDNA(bald, 'elder');
   assert.ok(dna.hairStyle && ['sides', 'buzz'].includes(dna.hairStyle.value));
   assert.equal(dna.hairStyle.source, 'inferred');
+});
+
+test('the same face in a dim room or lamp light keeps its skin tone (a light-skinned baby must not read as dark)', () => {
+  const base = paint(grace);
+  const lin = (c: number) => { c /= 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
+  const gam = (c: number) => 255 * (c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055);
+  const lit = (k: number[]) => { const d = new Uint8ClampedArray(base.raster.data); for (let i = 0; i < d.length; i += 4) for (let c = 0; c < 3; c++) d[i + c] = gam(Math.min(1, lin(d[i + c]) * k[c])); return { ...base, raster: { ...base.raster, data: d } }; };
+  const tone = (px: ReturnType<typeof paint>) => SKIN_TONES.indexOf(skinToneFor(measure(faceOf(grace), px).skin.value!));
+  const daylight = tone(base);
+  assert.ok(daylight <= 3, `light skin reads light (tone ${daylight})`);
+  for (const [name, k] of [['dim room', [0.35, 0.35, 0.35]], ['lamp light', [1, 0.72, 0.42]], ['dim lamp light', [0.45, 0.32, 0.18]], ['blue shade', [0.8, 0.9, 1.1]]] as const) {
+    const t = tone(lit([...k]));
+    assert.ok(Math.abs(t - daylight) <= 2 && t <= 4, `${name}: tone ${t} vs ${daylight} in daylight`);
+  }
 });
 
 test('without a person outline, the reader says background may be mistaken for hair', () => {

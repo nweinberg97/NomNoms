@@ -5,8 +5,9 @@ import { applyDNA, buildDNA, kindFor, parentTraits, type CharacterDNA, type Iden
 import type { Look } from '../character';
 
 /**
- * The face reader: MediaPipe face landmarks and person segmentation, run by
- * @vladmandic/human inside this browser tab. The library and its models are
+ * The face reader: MediaPipe face landmarks, irises and person segmentation, run
+ * by @vladmandic/human inside this browser tab. No age, gender or face-recognition
+ * model is loaded (the age group is the parent's choice). The library and its models are
  * served from NomNoms' own site (public/vendor/human) and loaded only the first
  * time someone uses a photo. The photo itself never leaves the device, is never
  * written to storage, and its pixels are wiped as soon as it has been read.
@@ -38,7 +39,7 @@ export function loadReader(): Promise<HumanLike> {
         backend: 'webgl', modelBasePath: `${base}models/`, cacheModels: false, debug: false, async: true, warmup: 'none', cacheSensitivity: 0, filter: { enabled: false },
         face: {
           enabled: true, detector: { rotation: true, maxDetected: 4, minConfidence: 0.4, return: false }, mesh: { enabled: true }, iris: { enabled: true },
-          description: { enabled: true }, emotion: { enabled: false }, antispoof: { enabled: false }, liveness: { enabled: false }, attention: { enabled: false },
+          description: { enabled: false }, emotion: { enabled: false }, antispoof: { enabled: false }, liveness: { enabled: false }, attention: { enabled: false },
         },
         body: { enabled: false }, hand: { enabled: false }, object: { enabled: false }, gesture: { enabled: false },
         segmentation: { enabled: true, modelPath: 'selfie.json', mode: 'alpha' },
@@ -56,12 +57,16 @@ export function loadReader(): Promise<HumanLike> {
 
 export interface Reading {
   measurements: Measurements;
+  /** Every face found, biggest first, as fractions of the photo [x, y, w, h], so a parent can pick the right one. */
+  faces: number[][];
+  /** Which of `faces` was read. */
+  faceIndex: number;
   /** Everything needed to redraw the debug view; only kept when asked for. */
   debug?: { raster: Raster; person?: Uint8Array; box?: number[]; mesh?: number[][]; faces: number; backend: string; ms: number };
 }
 
 /** Read one photo. The raster is wiped afterwards unless `keepForDebug`. */
-export async function readFace(raster: Raster, opts: { keepForDebug?: boolean } = {}): Promise<Reading> {
+export async function readFace(raster: Raster, opts: { keepForDebug?: boolean; faceIndex?: number } = {}): Promise<Reading> {
   const human = await loadReader();
   const t0 = performance.now();
   const canvas = rasterToCanvas(raster);
@@ -69,11 +74,15 @@ export async function readFace(raster: Raster, opts: { keepForDebug?: boolean } 
   let face: FaceInput | null = null;
   let box: number[] | undefined;
   let mesh: number[][] | undefined;
+  let boxes: number[][] = [];
+  let faceIndex = 0;
   try {
     const res = await human.detect(canvas);
-    const faces = (res.face ?? []).filter((f: any) => f.mesh?.length >= 468);
+    const faces = (res.face ?? []).filter((f: any) => f.mesh?.length >= 468).sort((a: any, b: any) => b.box[2] * b.box[3] - a.box[2] * a.box[3]);
+    boxes = faces.map((f: any) => [f.box[0] / raster.w, f.box[1] / raster.h, f.box[2] / raster.w, f.box[3] / raster.h]);
     if (faces.length) {
-      const big = faces.reduce((a: any, b: any) => (b.box[2] * b.box[3] > a.box[2] * a.box[3] ? b : a));
+      faceIndex = Math.max(0, Math.min(faces.length - 1, opts.faceIndex ?? 0));
+      const big = faces[faceIndex];
       box = big.box;
       mesh = big.mesh;
       face = { mesh: big.mesh, score: big.faceScore ?? big.score ?? 0, rotation: big.rotation?.angle, faces: faces.length, age: typeof big.age === 'number' ? big.age : undefined };
@@ -91,11 +100,11 @@ export async function readFace(raster: Raster, opts: { keepForDebug?: boolean } 
   }
   const measurements = measure(face, { raster, person });
   const ms = Math.round(performance.now() - t0);
-  if (opts.keepForDebug) return { measurements, debug: { raster, person, box, mesh, faces: face?.faces ?? 0, backend: human.tf.getBackend?.() ?? '?', ms } };
+  if (opts.keepForDebug) return { measurements, faces: boxes, faceIndex, debug: { raster, person, box, mesh, faces: face?.faces ?? 0, backend: human.tf.getBackend?.() ?? '?', ms } };
   wipe(raster);
   person?.fill(0);
   delete (measurements.debug as { hairPixels?: Uint8Array }).hairPixels;
-  return { measurements };
+  return { measurements, faces: boxes, faceIndex };
 }
 
 /** Open a photo from a file or a URL as pixels, upright, at reading size. */
@@ -110,9 +119,9 @@ export async function openPhoto(src: Blob | string): Promise<Raster> {
 }
 
 /** Photo → DNA → look, keeping whatever the parent already chose by hand. */
-export async function likenessFromPhoto(src: Blob | string, look: Look, chosen: IdentityKey[]): Promise<{ dna: CharacterDNA; look: Look; measurements: Measurements }> {
+export async function likenessFromPhoto(src: Blob | string, look: Look, chosen: IdentityKey[], faceIndex = 0): Promise<{ dna: CharacterDNA; look: Look; measurements: Measurements; faces: number[][]; faceIndex: number }> {
   const raster = await openPhoto(src);
-  const { measurements } = await readFace(raster);
+  const { measurements, faces, faceIndex: used } = await readFace(raster, { faceIndex });
   const dna = buildDNA(measurements, kindFor(measurements, look.kind, chosen.includes('kind')), parentTraits(look, chosen));
-  return { dna, look: applyDNA(look, dna), measurements };
+  return { dna, look: applyDNA(look, dna), measurements, faces, faceIndex: used };
 }

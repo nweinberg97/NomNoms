@@ -75,6 +75,7 @@ export function MemoryDetail({ id }: { id: string }) {
                 {visuals.map((v, j) => <button key={v!.id} className={cx(j === idx && 'is-on')} onClick={() => setIdx(j)} aria-label={`Photo ${j + 1}`} />)}
               </div>
             )}
+            <button className="link-btn detail-edit-photos" onClick={() => navigate(`/memory/${m.id}/edit`)} data-testid="edit-photos"><Icon name="image" size={14} /> {visuals.length > 1 ? 'Remove, replace or reorder photos' : 'Remove or replace this photo'}</button>
           </div>
         )}
 

@@ -147,7 +147,8 @@ export function sceneSvg(opts: {
     const small = c.size === 'small' || isPet(c.look.kind);
     // little ones are drawn little: a baby comes up to about a grown-up's chest
     const age = KIND_SCALE[c.look.kind as keyof typeof KIND_SCALE] ?? 1;
-    const w = (small ? slot.w * 0.78 : slot.w * age) * (pl.scale ?? 1);
+    const tall = small ? 1 : 1 + 0.12 * Math.max(-1, Math.min(1, c.look.height ?? 0));
+    const w = (small ? slot.w * 0.78 : slot.w * age) * tall * (pl.scale ?? 1);
     const h = w * (314 / 240);
     const fx = pl.x ?? slot.x + slot.w / 2, fy = pl.y ?? 296 + (small ? 4 : 0);
     const x = fx - w / 2, y = fy - h;

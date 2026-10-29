@@ -48,7 +48,7 @@ export interface FaceInput {
   rotation?: { yaw: number; pitch: number; roll: number };
   /** How many faces were found in the photo. */
   faces: number;
-  /** The age model's estimate, in years, when it ran. */
+  /** An age estimate in years, if a future reader provides one. NomNoms doesn't load an age model, so this is unset. */
   age?: number;
 }
 export interface PixelInput {
@@ -113,6 +113,63 @@ export const median = (xs: number[]) => { if (!xs.length) return NaN; const s = 
 const medianLab = (xs: number[][]) => [0, 1, 2].map((k) => median(xs.map((p) => p[k])));
 const hexOf = (lab: number[]) => `#${labToRgb(lab[0], lab[1], lab[2]).map((v) => Math.round(v).toString(16).padStart(2, '0')).join('')}`;
 const missing = <T,>(why: string): Measurement<T> => ({ status: 'missing', confidence: 0, why });
+const EYE_R = [33, 246, 161, 160, 159, 158, 157, 173, 133, 155, 154, 153, 145, 144, 163, 7];
+const EYE_L = [263, 466, 388, 387, 386, 385, 384, 398, 362, 382, 381, 380, 374, 373, 390, 249];
+const linear = (c: number) => { c /= 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
+const toByte = (c: number) => 255 * (c <= 0.0031308 ? 12.92 * c : 1.055 * Math.max(0, c) ** (1 / 2.4) - 0.055);
+/** How eye whites usually read in well-lit photos (red/green and blue/green, linear; median of 79 adult photos). */
+const SCLERA_RG = 1.47, SCLERA_BG = 0.89;
+const luma = (p: number[]) => 0.2126 * p[0] + 0.7152 * p[1] + 0.0722 * p[2];
+
+/** The photo's brightest whites (99th percentile of each pixel's brightest channel), linear: how exposed it is. */
+export function photoWhite(r: Raster): number {
+  const vals: number[] = [];
+  const step = Math.max(1, Math.floor(Math.sqrt((r.w * r.h) / 40000)));
+  for (let y = 0; y < r.h; y += step) for (let x = 0; x < r.w; x += step) {
+    const i = (y * r.w + x) * 4;
+    vals.push(linear(Math.max(r.data[i], r.data[i + 1], r.data[i + 2])));
+  }
+  vals.sort((a, b) => a - b);
+  return vals.length ? vals[Math.floor(vals.length * 0.99)] : 1;
+}
+
+/**
+ * Skin as it would look in plain daylight, from cheek pixels (Lab, as photographed).
+ *
+ * Photos of the same face vary a lot: a lamp makes skin orange, a dim room makes it
+ * several shades darker, shade makes it blue. Three corrections, each limited so a
+ * strange photo can't push the result far:
+ *  1. Colour of the light, from the whites of the eyes (nearly neutral in everyone):
+ *     the cheeks are rebalanced by however much the eyes' whites are tinted.
+ *  2. Exposure: when even the photo's brightest whites are dim, the whole photo was
+ *     underexposed, so it is brightened (at most 2.5×; a well-exposed photo is unchanged).
+ *  3. The lit side: shading only ever darkens skin, so the brighter part of the cheeks
+ *     (70th percentile) is closer to the real tone than the middle.
+ * Checked on adult photos under simulated lamp, dim, cool and bright light, and on
+ * people across a range of skin tones (none of them children).
+ */
+export function skinInDaylight(cheekLabs: number[][], sclera: number[] | null, white: number): { lab: number[]; gain: number; cast: number } {
+  const lins = cheekLabs.map((v) => labToRgb(v[0], v[1], v[2]).map(linear));
+  lins.sort((p, q) => luma(p) - luma(q));
+  let c = lins[Math.min(lins.length - 1, Math.floor(lins.length * 0.7))].slice();
+  let cast = 0;
+  if (sclera && luma(sclera) > 0.01 && sclera[1] > 1e-4) {
+    // eye whites aren't pure white and vary a lot from photo to photo (pink corners, lids), so
+    // only a tint well beyond that normal range counts as coloured light, and only the excess is removed
+    const dead = Math.log(1.3);
+    const fix = (ratio: number, usual: number) => { const d = Math.log(ratio / usual); const e = Math.sign(d) * Math.max(0, Math.abs(d) - dead); return Math.exp(-Math.max(-0.5, Math.min(0.5, e))); };
+    const gains = [fix(sclera[0] / sclera[1], SCLERA_RG), 1, fix(sclera[2] / sclera[1], SCLERA_BG)];
+    cast = Math.max(...gains.map((v) => Math.abs(Math.log(v))));
+    const before = luma(c);
+    c = c.map((v, k) => v * gains[k]);
+    const after = luma(c) || 1;
+    c = c.map((v) => (v * before) / after);
+  }
+  const gain = Math.min(2.5, Math.max(1, 0.9 / Math.max(white, 1e-3)));
+  c = c.map((v) => Math.min(1, v * gain));
+  return { lab: rgbToLab(toByte(c[0]), toByte(c[1]), toByte(c[2])), gain, cast };
+}
+
 
 /** A face-local frame: origin between the eyes, x along the eye line, 1 unit = pupil distance. */
 export interface Frame { o: P; angle: number; iod: number; toLocal: (p: P) => P; toImage: (p: P) => P }
@@ -175,7 +232,7 @@ export function measure(face: FaceInput | null, px: PixelInput): Measurements {
   const r = ratios(pt);
   const yaw = face.rotation?.yaw, pitch = face.rotation?.pitch;
   const iodPx = f.iod;
-  if (face.faces > 1) warnings.push(`${face.faces} faces in this photo; the biggest one was used.`);
+  if (face.faces > 1) warnings.push(`${face.faces} faces in this photo. If this isn’t the right person, tap the right face.`);
   if (iodPx < 12) return allMissing('The face is too small in this photo. Try one where the face fills more of the picture.');
 
   /* ── shape ─────────────────────────────────────────────────────── */
@@ -243,6 +300,27 @@ export function measure(face: FaceInput | null, px: PixelInput): Measurements {
   const ovalLocal = FACE_OVAL.map((i) => L(i));
   const inOval = (p: P) => pointInPoly(p, ovalLocal);
 
+  /** The whites of the eyes, as linear RGB: nearly neutral in every face, so they show the colour of the light. */
+  const scleraOf = (): number[] | null => {
+    if (face.mesh.length < 478 || r.eyeOpen < 0.08) return null;
+    const px: number[][] = [];
+    for (const [poly, ic] of [[EYE_R, 468], [EYE_L, 473]] as const) {
+      const P = poly.map((i) => pt(i)), c = pt(ic);
+      const R = [1, 2, 3, 4].reduce((s2, k) => s2 + dist(c, pt(ic + k)), 0) / 4;
+      const xs = P.map((p) => p[0]), ys = P.map((p) => p[1]);
+      for (let y = Math.floor(Math.min(...ys)); y <= Math.max(...ys); y++) for (let x = Math.floor(Math.min(...xs)); x <= Math.max(...xs); x++) {
+        if (x < 0 || y < 0 || x >= W || y >= H || Math.hypot(x - c[0], y - c[1]) < R * 1.1 || !pointInPoly([x + 0.5, y + 0.5], P)) continue;
+        const i = (y * W + x) * 4;
+        px.push([linear(data[i]), linear(data[i + 1]), linear(data[i + 2])]);
+      }
+    }
+    if (px.length < 8) return null;
+    // the brighter part: lashes, lids and shadow are darker
+    px.sort((p, q) => luma(q) - luma(p));
+    const top = px.slice(0, Math.max(4, Math.floor(px.length * 0.4)));
+    return [0, 1, 2].map((k) => median(top.map((p) => p[k])));
+  };
+
   // skin: two patches on each cheek. Glasses frames, shine and shadow are dropped
   // as outliers: anything far from the patches' typical colour isn't skin.
   const patchR = 0.16;
@@ -265,16 +343,22 @@ export function measure(face: FaceInput | null, px: PixelInput): Measurements {
   else {
     const Ls = both.map((p) => p[0]).sort((a, b) => a - b);
     const lo = Ls[Math.floor(Ls.length * 0.1)], hi = Ls[Math.floor(Ls.length * 0.9)];
+    // skinLab is the colour as photographed: hair and brows are told apart from it, in the same light
     skinLab = medianLab(both.filter((p) => p[0] >= lo && p[0] <= hi));
-    let conf = 0.9, status: Status = 'measured';
-    const why: string[] = [];
+    // the skin tone itself is read as if in plain daylight: lamps, dim rooms and blue shade otherwise
+    // turn the same skin several shades darker or a different colour (see skinInDaylight)
+    const daylight = skinInDaylight(both, scleraOf(), photoWhite(raster));
+    let conf = 0.85, status: Status = 'inferred';
+    const why: string[] = ['Read from the photo’s light'];
     const sideL = sides.map((s) => (s.length ? median(s.map((p) => p[0])) : NaN));
-    if (Number.isFinite(sideL[0]) && Number.isFinite(sideL[1]) && Math.abs(sideL[0] - sideL[1]) > 12) { conf *= 0.7; why.push('Light is brighter on one side'); }
-    if (skinLab[0] < 25) { conf *= 0.5; status = 'inferred'; why.push('The photo is dark'); }
-    if (skinLab[0] > 90) { conf *= 0.5; status = 'inferred'; why.push('The photo is very bright'); }
-    if (Math.abs(skinLab[2]) > 45 || skinLab[1] > 40 || skinLab[1] < -5) { conf *= 0.5; status = 'inferred'; why.push('Coloured light may be tinting the skin'); }
-    skin = { status, value: hexOf(skinLab), confidence: round(conf, 2), raw: round(skinLab[0], 1), ...(why.length ? { why: why.join('; ') } : {}) };
-    if (why.length) warnings.push(`Skin tone: ${why.join('; ').toLowerCase()}. Check it looks right.`);
+    if (Number.isFinite(sideL[0]) && Number.isFinite(sideL[1]) && Math.abs(sideL[0] - sideL[1]) > 12) { conf *= 0.7; why.push('light is brighter on one side'); }
+    if (skinLab[0] < 25) { conf *= 0.6; why.push('the photo is dark'); }
+    if (skinLab[0] > 92) { conf *= 0.6; why.push('the photo is very bright'); }
+    if (daylight.cast > 0.05) { conf *= 0.8; why.push('coloured light was corrected'); }
+    if (daylight.gain > 1.4) { conf *= 0.8; why.push('a dim photo was brightened'); }
+    status = conf >= 0.7 && why.length === 1 ? 'measured' : 'inferred';
+    skin = { status, value: hexOf(daylight.lab), confidence: round(conf, 2), raw: round(daylight.lab[0], 1), why: why.join('; ') };
+    if (why.length > 1) warnings.push(`Skin tone: ${why.slice(1).join('; ')}. Check it looks right.`);
   }
 
   // background model, used only when there is no person outline
@@ -518,14 +602,15 @@ export function measure(face: FaceInput | null, px: PixelInput): Measurements {
 }
 
 /**
- * Age group from the age model. On adult test photos it reads 10–15 years young
+ * Age group from an age estimate, when there is one (none is read today: NomNoms
+ * doesn't load an age model, so the parent picks). An earlier model read adults 10–15 years young
  * (a 42-year-old as 29, a 79-year-old as 69), so the cut-offs sit low. It has
  * not been checked on children's photos (none are used for testing), so it is
  * always a best guess with a one-tap correction.
  */
 export const AGE_CUTS = { baby: 3.5, kid: 14, elder: 58 } as const;
 function ageGroupOf(age: number | undefined, hairLab: number[] | null, sizeConf: number): Measurement<'baby' | 'kid' | 'adult' | 'elder'> {
-  if (age === undefined || !Number.isFinite(age)) return missing('The age model didn’t run.');
+  if (age === undefined || !Number.isFinite(age)) return missing('Pick the age group: it isn’t read from photos.');
   const grey = !!hairLab && hairLab[0] > 62 && Math.hypot(hairLab[1], hairLab[2]) < 12;
   const value = age < AGE_CUTS.baby ? 'baby' : age < AGE_CUTS.kid ? 'kid' : age >= AGE_CUTS.elder || (grey && age >= 40) ? 'elder' : 'adult';
   // near a cut-off, say so

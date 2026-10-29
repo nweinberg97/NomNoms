@@ -65,6 +65,8 @@ export interface Look {
   world?: WorldId;
   /** A world costume's signature colour, carried over from the person's everyday clothes. */
   accent?: string;
+  /** Taller or shorter than most people their age, −1…1 (story pictures only; photos can't tell height). */
+  height?: number;
 }
 export type Pose = 'stand' | 'point' | 'hips' | 'cheer' | 'wave';
 /** What someone is doing in a picture. */

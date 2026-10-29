@@ -176,7 +176,9 @@ export function BabyTalesDemo() {
   const [editorTab, setEditorTab] = useState<EditorTab>('face');
   const [showAllTypes, setShowAllTypes] = useState(false);
   const [busy, setBusy] = useState<string>();
-  const [result, setResult] = useState<{ who: string; from: string; matched: { label: string; sure: boolean }[]; notes: string[]; kept: IdentityKey[]; accepted?: boolean } | null>(null);
+  const [result, setResult] = useState<{ who: string; from: string; matched: { label: string; sure: boolean }[]; notes: string[]; kept: IdentityKey[]; accepted?: boolean; faces?: number[][]; faceIndex?: number } | null>(null);
+  /** The photo being read, held in memory only until the parent accepts the result, so another face in it can be picked. */
+  const lastPhoto = useRef<{ src: string | Blob; label: string; from: string; id: string } | null>(null);
   /** Identity traits a parent set by hand, per person: a new photo never overwrites these. */
   const [chosen, setChosen] = useState<Record<string, IdentityKey[]>>({});
   const [dropping, setDropping] = useState<'new' | 'current' | false>(false);
@@ -351,7 +353,7 @@ export function BabyTalesDemo() {
    * Photo → character. `target` is the selected person, or 'new' to add someone.
    * The photo decides baby / kid / grown-up / grandparent unless a parent chose it.
    */
-  const fromPhoto = async (src: string | Blob, label: string, from: string, target: 'current' | 'new' = 'current') => {
+  const fromPhoto = async (src: string | Blob, label: string, from: string, target: 'current' | 'new' = 'current', faceIndex = 0) => {
     setBusy(label);
     setStatus('Reading the face on this device… (the first time takes a moment)');
     setResult(null);
@@ -359,7 +361,8 @@ export function BabyTalesDemo() {
     const who = fresh ?? person;
     const id = who.member.id, kept = fresh ? [] : chosen[id] ?? [];
     try {
-      const [r, thumb] = await Promise.all([likenessFromPhoto(src, who.look, kept), photoThumb(src).catch(() => '')]);
+      const [r, thumb] = await Promise.all([likenessFromPhoto(src, who.look, kept, faceIndex), photoThumb(src).catch(() => '')]);
+      lastPhoto.current = { src, label, from, id };
       const m = r.measurements;
       const found = m.skin.status !== 'missing' || SHAPE_KEYS.some((k) => m.shape[k].status !== 'missing');
       if (!found) { setStatus(`${m.warnings[0] ?? 'No face was found.'} Nothing was changed.`); return; }
@@ -377,7 +380,7 @@ export function BabyTalesDemo() {
       } else setCast((cs) => cs.map((p) => (p.member.id === id ? { ...p, look } : p)));
       setReadings((rs) => ({ ...rs, [id]: m }));
       // a small preview of the photo, kept only on this screen until it's accepted, so you can check it read the right one
-      setEditorTab('photo'); setResult({ who: fresh ? 'Someone new' : who.member.name, from: thumb || from, matched: describeDNA(r.dna), notes: r.dna.warnings, kept });
+      setEditorTab('photo'); setResult({ who: fresh ? 'Someone new' : who.member.name, from: thumb || from, matched: describeDNA(r.dna), notes: r.dna.warnings, kept, faces: r.faces, faceIndex: r.faceIndex });
       setStatus(fresh || id === pendingId ? 'Added! Give them a name below.' : undefined);
       undoToast(fresh ? 'Added someone new from the photo' : `Made ${who.member.name || 'them'} from the photo`);
     } catch (e) {
@@ -1056,7 +1059,7 @@ export function BabyTalesDemo() {
                       onDragOver={(e) => { if (![...e.dataTransfer.types].includes('Files')) return; e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; setDropping('current'); }}
                       onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDropping(false); }}
                       onDrop={(e) => { e.preventDefault(); setDropping(false); const f = [...e.dataTransfer.files].find((x) => x.type.startsWith('image/') || /\.(heic|heif|jpe?g|png|webp)$/i.test(x.name)); if (f && !busy) void fromPhoto(f, 'own', ''); else if (!f) setStatus('That isn’t a photo. Drop a JPEG or PNG.'); }}>
-                      <p className="lab-sub">NomNoms finds the face on this device and draws {person.member.name || 'them'}: skin, hair, eyes, face shape and age. The photo is never uploaded or saved.</p>
+                      <p className="lab-sub">NomNoms finds the face on this device and draws {person.member.name || 'them'}: skin, hair, eyes and face shape. The photo is never uploaded or saved.</p>
                       <div className="bt-photos">
                         <button type="button" className="bt-photo is-own" onClick={() => fileRef.current?.click()} disabled={!!busy} data-testid="own-photo">
                           <Icon name="camera" size={20} /><span>Your photo</span><small className="bt-drop-hint">or drop one here</small>
@@ -1080,15 +1083,34 @@ export function BabyTalesDemo() {
                                 {KINDS.map((k) => <button key={k.kind} type="button" role="radio" aria-checked={person.look.kind === k.kind} className="lab-chip" onClick={() => setKind(k.kind)} data-testid={`kind-${k.kind}`}>{k.label}</button>)}
                               </div>
                             )}
+                            {!result.accepted && result.from && (result.faces?.length ?? 0) > 1 && (
+                              <div className="bt-facepick" role="radiogroup" aria-label="Which face">
+                                <span>Which face?</span>
+                                {result.faces!.slice(0, 6).map((b, k) => (
+                                  <button key={k} type="button" role="radio" aria-checked={result.faceIndex === k} aria-label={`Face ${k + 1}`} className="bt-facechip" disabled={!!busy}
+                                    onClick={() => { const lp = lastPhoto.current; if (lp && lp.id === person.member.id && k !== result.faceIndex) void fromPhoto(lp.src, lp.label, lp.from, 'current', k); }} data-testid={`face-${k}`}>
+                                    <img src={result.from} alt="" style={{ width: `${44 / b[2]}px`, height: `${44 / b[3]}px`, left: `${(-44 * b[0]) / b[2]}px`, top: `${(-44 * b[1]) / b[3]}px` }} />
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                            {!isPet(person.look.kind) && (
+                              <div className="bt-quickpick">
+                                <span>Skin</span>
+                                <div className="bt-swatches is-small" role="radiogroup" aria-label="Skin tone">{SKIN_TONES.map((c) => <button key={c} type="button" role="radio" className="bt-swatch" style={{ background: c }} aria-checked={person.look.skin === c} aria-label={`Skin tone ${c}`} onClick={() => pick('skin', { skin: c })} data-testid="quick-skin" />)}</div>
+                                <span>Hair</span>
+                                <div className="bt-swatches is-small" role="radiogroup" aria-label="Hair colour">{HAIR_COLOURS.map((c) => <button key={c} type="button" role="radio" className="bt-swatch" style={{ background: c }} aria-checked={person.look.hair === c} aria-label={`Hair colour ${c}`} onClick={() => pick('hair', { hair: c })} />)}</div>
+                              </div>
+                            )}
                             <div className="bt-matched">{result.matched.map((m) => <span key={m.label} className={m.sure ? '' : 'is-guess'} title={m.sure ? 'Read from the photo' : 'A best guess; check it'}>{m.sure ? '' : '~ '}{m.label}</span>)}</div>
                             {result.kept.length > 0 && <small>Kept your own choice of {result.kept.map((k) => (k === 'hairStyle' ? 'hairstyle' : k === 'shape' ? 'face shape' : k)).join(', ')}.</small>}
                             {result.notes.length > 0 && <ul className="bt-notes">{result.notes.slice(0, 3).map((n) => <li key={n}>{n}</li>)}</ul>}
-                            <small>~ means a best guess. Fine-tune in Face & hair.</small>
+                            <small>~ means a best guess. Tap a colour above to fix it, or fine-tune everything in Face & hair.</small>
                             {result.accepted ? (
                               <p className="bt-accepted" data-testid="photo-accepted"><Icon name="check" size={14} /> Photo removed. Only the character is kept; your photo was never uploaded or stored.</p>
                             ) : (
                               <div className="bt-result-actions">
-                                <button type="button" className="btn btn-primary btn-sm" onClick={() => setResult((r) => (r ? { ...r, from: '', accepted: true } : r))} data-testid="photo-accept"><Icon name="check" size={14} /> Looks right</button>
+                                <button type="button" className="btn btn-primary btn-sm" onClick={() => { lastPhoto.current = null; setResult((r) => (r ? { ...r, from: '', accepted: true, faces: undefined } : r)); }} data-testid="photo-accept"><Icon name="check" size={14} /> Looks right</button>
                                 <button type="button" className="btn btn-ghost btn-sm" onClick={() => fileRef.current?.click()} data-testid="photo-retry">Use a different photo</button>
                               </div>
                             )}
@@ -1138,6 +1160,16 @@ export function BabyTalesDemo() {
                           <button type="button" className="btn btn-ghost btn-sm bt-hair-more" onClick={() => setAllHair((v) => !v)} aria-expanded={allHair} data-testid="hair-more">{allHair ? 'Fewer hairstyles' : `All ${Object.keys(HAIR_STYLES).length} hairstyles`}</button>
                           <p className="lab-sub">Eyes</p>
                           <div className="bt-swatches">{EYE_COLOURS.map((c) => <button key={c} type="button" className="bt-swatch" style={{ background: c }} aria-pressed={person.look.eyes === c} aria-label={`Eye colour ${c}`} onClick={() => pick('eyes', { eyes: c })} />)}</div>
+                          {!isPet(person.look.kind) && (
+                            <>
+                              <p className="lab-sub">Height <small>· next to others their age, in the story pictures</small></p>
+                              <div className="lab-chips" role="radiogroup" aria-label="Height">
+                                {([[-1, 'Petite'], [-0.5, 'A bit short'], [0, 'Average'], [0.5, 'A bit tall'], [1, 'Very tall']] as const).map(([v, label]) => (
+                                  <button key={v} type="button" role="radio" className="lab-chip" aria-checked={(person.look.height ?? 0) === v} onClick={() => update({ look: { height: v || undefined } })} data-testid={`height-${v}`}>{label}</button>
+                                ))}
+                              </div>
+                            </>
+                          )}
                           <details className="bt-shape" open={!!person.look.shape}>
                             <summary>Face shape {person.look.shape ? <small>· from the photo, adjust to taste</small> : <small>· make them look more like themselves</small>}</summary>
                             {SHAPE_KEYS.map((k) => (
