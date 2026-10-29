@@ -1,6 +1,7 @@
 import { exprOf, outfitColours, shade, type Expression, type HairStyle, type Look } from './character';
 import type { StyleMode } from './styles';
 import { thingArt } from './things';
+import { featureCharacter } from './feature';
 
 /**
  * Character designs: each look builds people its own way, like the difference
@@ -25,10 +26,10 @@ import { thingArt } from './things';
  * character.ts, standing on y 252, so scenes, covers and avatars place them alike.
  */
 
-export type DesignMode = Exclude<StyleMode, 'tales'>;
+export type DesignMode = StyleMode;
 /** Every look except Tales builds its own characters. */
 export const onTalesDrawing = (_m: StyleMode) => false;
-export const hasDesign = (m: StyleMode): m is DesignMode => m !== 'tales';
+export const hasDesign = (_m: StyleMode): _m is DesignMode => true;
 
 /* ── shared helpers ─────────────────────────────────────── */
 type Fam = 'none' | 'buzz' | 'tuft' | 'short' | 'side' | 'messy' | 'bob' | 'long' | 'curlyShort' | 'curlyLong' | 'afro' | 'bun' | 'pony' | 'pigtails' | 'sides';
@@ -129,6 +130,56 @@ function specs(l: Look, ex: number, ey: number, r: number, gap: number, square: 
     ? `<rect x="${n1(cx - r)}" y="${n1(ey - r * 0.82)}" width="${n1(r * 2)}" height="${n1(r * 1.64)}" rx="${n1(r * 0.3)}" fill="${sun ? '#2a2f3a' : '#ffffff'}" fill-opacity="${sun ? 0.9 : 0.12}" stroke="${col}" stroke-width="${n1(Math.max(2.2, r * 0.18))}"/>`
     : `<circle cx="${n1(cx)}" cy="${n1(ey)}" r="${n1(r)}" fill="${sun ? '#2a2f3a' : '#ffffff'}" fill-opacity="${sun ? 0.9 : 0.12}" stroke="${col}" stroke-width="${n1(Math.max(2.2, r * 0.16))}"/>`);
   return `${lens(ex - gap)}${lens(ex + gap)}<path d="M${n1(ex - gap + r)} ${n1(ey)} Q${ex} ${n1(ey - r * 0.3)} ${n1(ex + gap - r)} ${n1(ey)}" stroke="${col}" stroke-width="2.2" fill="none"/>`;
+}
+/* ── appealing eyes, drawn in each look's own way ─────────── */
+type EyeStyle = 'retro' | 'paper' | 'doll' | 'sketch';
+/**
+ * An almond eye under a strong upper lash line with a bright glint, the face turned a
+ * little to the right: `side` −1 is the near eye (bigger), 1 the far eye (a touch
+ * narrower). Each look draws it in its own medium: Retro a graphic dark pupil, Paper cut
+ * a cut-paper lid over a coloured iris, Patchwork a glossy doll's eye with stitched
+ * lashes, Sketchbook a pencil-drawn eye.
+ */
+function appealEye(id: string, x: number, y: number, w0: number, side: -1 | 1, style: EyeStyle, l: Look, state: EyeState, ink: string): string {
+  const w = w0 * (side > 0 ? 0.86 : 1), o = side;
+  const hK = style === 'doll' ? 0.92 : l.kind === 'baby' ? 0.92 : l.kind === 'kid' ? 0.84 : 0.72;
+  const h = w * hK * (state === 'wide' ? 1.2 : 1);
+  const xi = x - o * w * 0.5, yi = y + h * 0.06, xo = x + o * w * 0.52, yo = y - h * 0.02;
+  const up: [number, number] = [x - o * w * 0.06, y - h * 0.82], lo: [number, number] = [x + o * w * 0.04, y + h * 0.66];
+  const lid = `M${n1(xi)} ${n1(yi)} Q${n1(up[0])} ${n1(up[1])} ${n1(xo)} ${n1(yo)}`;
+  const shape = `${lid} Q${n1(lo[0])} ${n1(lo[1])} ${n1(xi)} ${n1(yi)} Z`;
+  const lw = style === 'sketch' ? 2 : 2.5;
+  const eyeCol = l.eyes ?? '#5a3a22';
+  if (state === 'closed' || (state === 'wink' && side > 0) || state === 'sleepy') {
+    const dip = state === 'sleepy' ? h * 0.15 : -h * 0.55;
+    return `<path d="M${n1(xi)} ${n1(y)} Q${n1(x)} ${n1(y + dip)} ${n1(xo)} ${n1(y)}" stroke="${ink}" stroke-width="${lw}" fill="none" stroke-linecap="round"/>${l.lashes ? `<path d="M${n1(xo)} ${n1(y)} l${n1(o * 3)} 1.5" stroke="${ink}" stroke-width="1.6" stroke-linecap="round"/>` : ''}`;
+  }
+  const cid = `ae${id}${side < 0 ? 'n' : 'f'}`;
+  const ix = x + w * 0.08, iy = y + h * 0.06;
+  let inside: string;
+  switch (style) {
+    case 'retro': // a big dark oval pupil, mid-century style
+      inside = `<ellipse cx="${n1(ix)}" cy="${n1(iy)}" rx="${n1(h * 0.42)}" ry="${n1(h * 0.54)}" fill="${shade(eyeCol, -0.55)}"/><circle cx="${n1(ix - h * 0.15)}" cy="${n1(iy - h * 0.2)}" r="${n1(h * 0.16)}" fill="#fff"/>`;
+      break;
+    case 'doll': { // glossy: a big iris with a dark rim, two glints
+      const r = h * 0.6;
+      inside = `<circle cx="${n1(ix)}" cy="${n1(iy)}" r="${n1(r)}" fill="${shade(eyeCol, -0.35)}"/><circle cx="${n1(ix)}" cy="${n1(iy)}" r="${n1(r * 0.82)}" fill="${eyeCol}"/><ellipse cx="${n1(ix)}" cy="${n1(iy + r * 0.4)}" rx="${n1(r * 0.55)}" ry="${n1(r * 0.3)}" fill="${shade(eyeCol, 0.4)}"/><circle cx="${n1(ix)}" cy="${n1(iy)}" r="${n1(r * 0.4)}" fill="#1a110e"/><circle cx="${n1(ix - r * 0.38)}" cy="${n1(iy - r * 0.4)}" r="${n1(r * 0.32)}" fill="#fff"/><circle cx="${n1(ix + r * 0.36)}" cy="${n1(iy + r * 0.32)}" r="${n1(r * 0.14)}" fill="#fff"/>`;
+      break;
+    }
+    default: { // paper and sketch: a coloured iris, a dark pupil, a glint
+      const r = h * 0.54;
+      inside = `<circle cx="${n1(ix)}" cy="${n1(iy)}" r="${n1(r)}" fill="${eyeCol}"/><circle cx="${n1(ix)}" cy="${n1(iy)}" r="${n1(r * 0.45)}" fill="#1a110e"/><circle cx="${n1(ix - r * 0.38)}" cy="${n1(iy - r * 0.42)}" r="${n1(r * 0.3)}" fill="#fff"/>`;
+    }
+  }
+  // the lid: a stroke of ink, or (paper) a cut crescent of dark paper
+  const lidMark = style === 'paper'
+    ? `<path d="${lid} Q${n1(up[0])} ${n1(up[1] + h * 0.42)} ${n1(xi)} ${n1(yi)} Z" fill="${ink}"/><path d="M${n1(xo)} ${n1(yo)} L${n1(xo + o * 4.2)} ${n1(yo - 3.4)} L${n1(xo - o * 1.4)} ${n1(yo - 1.8)} Z" fill="${ink}"/>`
+    : `<path d="${lid}" stroke="${ink}" stroke-width="${lw}" fill="none" stroke-linecap="round"/>` + (style === 'doll'
+      ? [0.15, 0.5, 0.85].map((t) => { const px = xi + (xo - xi) * t, py = y - h * (0.62 + 0.2 * Math.sin(t * Math.PI)); return `<path d="M${n1(px)} ${n1(py + 1)} l${n1(o * (1 + t * 2))} -3.2" stroke="${ink}" stroke-width="1.5" stroke-linecap="round"/>`; }).join('')
+      : `<path d="M${n1(xo - o)} ${n1(yo)} q${n1(o * 3.5)} -1 ${n1(o * 5.5)} ${l.lashes ? -4.5 : -1.5}" stroke="${ink}" stroke-width="${l.lashes ? 2 : 1.6}" fill="none" stroke-linecap="round"/>`);
+  const lower = style === 'sketch' ? `<path d="M${n1(xo)} ${n1(yo)} Q${n1(lo[0])} ${n1(lo[1])} ${n1(xi)} ${n1(yi)}" stroke="${ink}" stroke-width="0.9" fill="none" opacity=".6"/>` : '';
+  const sleepyLid = '';
+  return `<clipPath id="${cid}"><path d="${shape}"/></clipPath><path d="${shape}" fill="#fbf8f2" fill-opacity="1"/><g clip-path="url(#${cid})">${inside}</g>${lidMark}${lower}${sleepyLid}`;
 }
 const facialOf = (l: Look) => (l.kind === 'adult' || l.kind === 'elder' ? (l.facial ?? (l.beard ? 'trim' : 'none')) : 'none');
 
@@ -280,7 +331,7 @@ function ragdoll(l: Look, id: string): { svg: string; head: Head } {
   const overalls = l.outfit === 'overalls' ? `<path d="M${n1(cx - tw1 * 0.32)} ${n1(ty0 + 22)} H${n1(cx + tw1 * 0.32)} L${n1(cx + tw1 * 0.44)} ${ty1} H${n1(cx - tw1 * 0.44)} Z" fill="${C.legs}"/>${[-1, 1].map((sd) => `<circle cx="${n1(cx + sd * tw1 * 0.22)}" cy="${n1(ty0 + 28)}" r="3.4" fill="#e7b43c"/>`).join('')}` : '';
   const body = `${cape}${legs}${shoes}<path d="${torso}" fill="${C.top}"/>${stripes(l, id, `<path d="${torso}"/>`, ty0, ty1)}${overalls}${buttons}${collar}${skirt}`;
   const ears = [-1, 1].map((sd) => `<circle cx="${n1(cx + sd * hw * 0.98)}" cy="${n1(eY + 2)}" r="${n1(hw * 0.16)}" fill="${l.skin}"/>`).join('');
-  const face = `${back}${ears}<path d="${headPath}" fill="${l.skin}"/>${beard}${cheeks}<g class="bt-eyes">${eye(cx - eGap, -1)}${eye(cx + eGap, 1)}</g>${brows}${nose}${mouth}${stache}${freck}${front}${specs(l, cx, eY, er * 1.9, eGap, false, '#3a2a24')}${hat(l, head, false)}`;
+  const face = `${back}${ears}<path d="${headPath}" fill="${l.skin}"/>${beard}${cheeks}<g transform="translate(${n1(hw * 0.12)} 0)"><g class="bt-eyes">${appealEye(id, cx - eGap, eY, er * 3.5, -1, 'doll', l, es, '#2a1d18')}${appealEye(id, cx + eGap, eY, er * 3.5, 1, 'doll', l, es, '#2a1d18')}</g>${brows}${nose}${mouth}${stache}${freck}</g>${front}<g transform="translate(${n1(hw * 0.12)} 0)">${specs(l, cx, eY, er * 2.1, eGap, false, '#3a2a24')}</g>${hat(l, head, false)}`;
   return { svg: assemble(l, body, face, arm, A, head, held), head };
 }
 
@@ -320,7 +371,9 @@ function sketch(l: Look, id: string): { svg: string; head: Head } {
   // the nose has character: a long bulb on grown-ups, a button on kids, a dot on babies
   const nz = (k === 'elder' ? 0.85 : 0.68) * (1 + 0.22 * sh(l, 'nose'));
   const nY = eY + er * 0.8;
-  const nose = grown
+  const nose = grown && l.lashes
+    ? `<path d="M${n1(cx + 1)} ${n1(nY)} Q${n1(cx + 7 * nz)} ${n1(nY + 12 * nz)} ${n1(cx + 5 * nz)} ${n1(nY + 15 * nz)} Q${n1(cx + 2)} ${n1(nY + 17 * nz)} ${n1(cx - 2)} ${n1(nY + 15 * nz)}" stroke="${graphite}" stroke-width="1.6" fill="none" stroke-linecap="round"/>`
+    : grown
     ? `<path d="M${n1(cx - 1)} ${n1(nY - 2)} C${n1(cx + 2)} ${n1(nY + 8 * nz)} ${n1(cx + 11 * nz)} ${n1(nY + 10 * nz)} ${n1(cx + 10 * nz)} ${n1(nY + 16 * nz)} C${n1(cx + 9 * nz)} ${n1(nY + 21 * nz)} ${n1(cx - 1)} ${n1(nY + 21 * nz)} ${n1(cx - 5)} ${n1(nY + 18 * nz)} C${n1(cx - 7)} ${n1(nY + 15 * nz)} ${n1(cx - 3)} ${n1(nY + 6 * nz)} ${n1(cx - 1)} ${n1(nY - 2)} Z" fill="${shade(l.skin, -0.06)}"/>`
     : k === 'kid' ? `<path d="M${n1(cx - 1)} ${n1(nY + 2)} q6 6 1 10 q-4 2 -6 -1" fill="${shade(l.skin, -0.06)}"/>`
     : `<ellipse cx="${cx}" cy="${n1(nY + 7)}" rx="3" ry="2.2" fill="${shade(l.skin, -0.1)}"/>`;
@@ -395,7 +448,7 @@ function sketch(l: Look, id: string): { svg: string; head: Head } {
   const overalls = l.outfit === 'overalls' ? `<path d="M${n1(cx - tw1 * 0.3)} ${n1(ty0 + (k === 'baby' ? 22 : 18))} H${n1(cx + tw1 * 0.3)} L${n1(cx + tw1 * 0.42)} ${ty1} H${n1(cx - tw1 * 0.42)} Z" fill="${C.legs}"/>` : '';
   const body = `${cape}${legs}${shoes}${neck}<path d="${torso}" fill="${C.top}"/>${stripes(l, id, `<path d="${torso}"/>`, ty0, ty1)}${overalls}${placket}${skirt}`;
   const ears = [-1, 1].map((sd) => `<ellipse cx="${n1(cx + sd * hw * 0.98)}" cy="${n1(eY + er)}" rx="${n1(Math.max(4, hw * 0.16))}" ry="${n1(Math.max(5.5, hw * 0.22))}" fill="${l.skin}"/>`).join('');
-  const face = `${back}${ears}<path d="${headPath}" fill="${l.skin}"/>${beard}${cheeks}<g class="bt-eyes">${eye(cx - eGap, -1)}${eye(cx + eGap, 1)}</g>${brows}${nose}${mouth}${stache}${freck}${front}${specs(l, cx, eY, er * 2.6, eGap, false, graphite)}${hat(l, head, false)}`;
+  const face = `${back}${ears}<path d="${headPath}" fill="${l.skin}"/>${beard}${cheeks}<g transform="translate(${n1(hw * 0.16)} 0)"><g class="bt-eyes">${appealEye(id, cx - eGap, eY, er * 3.6, -1, 'sketch', l, es, graphite)}${appealEye(id, cx + eGap, eY, er * 3.6, 1, 'sketch', l, es, graphite)}</g>${brows}${nose}${mouth}${stache}${freck}</g>${front}<g transform="translate(${n1(hw * 0.16)} 0)">${specs(l, cx, eY, er * 2.7, eGap, false, graphite)}</g>${hat(l, head, false)}`;
   return { svg: assemble(l, body, face, arm, A, head, held), head };
 }
 
@@ -482,7 +535,7 @@ function retro(l: Look, id: string): { svg: string; head: Head } {
   const cape = C.cape ? `<path d="M${n1(cx - tw0 / 2)} ${ty0} H${n1(cx + tw0 / 2)} L${n1(cx + tw1 / 2 + 18)} ${ty1 + 24} H${n1(cx - tw1 / 2 - 18)} Z" fill="${C.cape}"/>` : '';
   const body = `${cape}${legs}${shoes}${neck}<path d="${torso}" fill="${C.top}"/>${stripes(l, id, `<path d="${torso}"/>`, ty0, ty1)}${l.outfit === 'overalls' ? `<rect x="${n1(cx - 16)}" y="${n1(ty0 + 22)}" width="32" height="${n1(ty1 - ty0 - 22)}" fill="${C.legs}"/>` : ''}${l.outfit === 'cardigan' || l.outfit === 'denim' ? `<path d="M${cx} ${ty0} V${ty1}" stroke="${shade(C.top, -0.25)}" stroke-width="3"/>` : ''}${skirt}`;
   const ears = grown ? [-1, 1].map((sd) => `<rect x="${n1(sd < 0 ? cx - hw - 6 : cx + hw - 2)}" y="${n1(eY - 4)}" width="8" height="14" rx="4" fill="${l.skin}"/>`).join('') : [-1, 1].map((sd) => `<circle cx="${n1(cx + sd * hw * 0.98)}" cy="${n1(eY + 6)}" r="6" fill="${l.skin}"/>`).join('');
-  const face = `${back}${ears}<path d="${headPath}" fill="${l.skin}"/>${beard}<circle cx="${n1(cx - eGap - 4)}" cy="${n1(nY + 10)}" r="${grown ? 0 : 6}" fill="#f08a8a" opacity=".45"/><circle cx="${n1(cx + eGap + 4)}" cy="${n1(nY + 10)}" r="${grown ? 0 : 6}" fill="#f08a8a" opacity=".45"/><g class="bt-eyes">${dot(cx - eGap, -1)}${dot(cx + eGap, 1)}</g>${brow}${nose}${mouth}${stache}${freck}${front}${specs(l, cx, eY, er * 2.6, eGap, true)}${hat(l, head, true)}`;
+  const face = `${back}${ears}<path d="${headPath}" fill="${l.skin}"/>${beard}<circle cx="${n1(cx - eGap - 4)}" cy="${n1(nY + 10)}" r="${grown ? 0 : 6}" fill="#f08a8a" opacity=".45"/><circle cx="${n1(cx + eGap + 4)}" cy="${n1(nY + 10)}" r="${grown ? 0 : 6}" fill="#f08a8a" opacity=".45"/><g transform="translate(${n1(hw * 0.14)} 0)"><g class="bt-eyes">${appealEye(id, cx - eGap, eY, er * 3.3, -1, 'retro', l, es, INK)}${appealEye(id, cx + eGap, eY, er * 3.3, 1, 'retro', l, es, INK)}</g>${brow}${nose}${mouth}${stache}${freck}</g>${front}<g transform="translate(${n1(hw * 0.14)} 0)">${specs(l, cx, eY, er * 2.7, eGap, true)}</g>${hat(l, head, true)}`;
   return { svg: assemble(l, body, face, arm, A, head, held), head };
 }
 
@@ -555,7 +608,7 @@ function paper(l: Look, id: string): { svg: string; head: Head } {
   const cape = C.cape ? `<path d="M${n1(cx - tw0 / 2)} ${ty0} H${n1(cx + tw0 / 2)} L${n1(cx + tw1 / 2 + 14)} ${ty1 + 20} H${n1(cx - tw1 / 2 - 14)} Z" fill="${C.cape}"/>` : '';
   const neck = `<rect x="${n1(cx - 5)}" y="${n1(cy + ry - 4)}" width="10" height="${n1(ty0 - cy - ry + 8)}" fill="${l.skin}"/>`;
   const body = `${cape}${legs}${shoes}${neck}<path d="${torso}" fill="${C.top}"/>${stripes(l, id, `<path d="${torso}"/>`, ty0, ty1)}${l.outfit === 'overalls' ? `<path d="M${n1(cx - tw1 * 0.28)} ${n1(ty0 + 30)} H${n1(cx + tw1 * 0.28)} L${n1(cx + tw1 * 0.42)} ${ty1} H${n1(cx - tw1 * 0.42)} Z" fill="${C.legs}"/>` : ''}<path d="M${n1(cx - 6)} ${ty0} L${cx} ${ty0 + 10} L${n1(cx + 6)} ${ty0} Z" fill="${l.skin}"/>${skirt}`;
-  const face = `<g transform="rotate(${tilt} ${cx} ${n1(cy + ry)})">${back}<ellipse cx="${cx}" cy="${n1(cy)}" rx="${n1(rx)}" ry="${n1(ry)}" fill="${l.skin}"/>${beard}${cheeks}<g class="bt-eyes">${eye(cx - eGap, -1)}${eye(cx + eGap, 1)}</g>${nose}${mouth}${stache}${freck}${front}${specs(l, cx, eY, er * 2.4, eGap, false, '#1f1a17')}${hat(l, head, true)}</g>`;
+  const face = `<g transform="rotate(${tilt} ${cx} ${n1(cy + ry)})">${back}<ellipse cx="${cx}" cy="${n1(cy)}" rx="${n1(rx)}" ry="${n1(ry)}" fill="${l.skin}"/>${beard}${cheeks}<g transform="translate(${n1(rx * 0.14)} 0)"><g class="bt-eyes">${appealEye(id, cx - eGap, eY, er * 4.3, -1, 'paper', l, es, '#1f1a17')}${appealEye(id, cx + eGap, eY, er * 4.3, 1, 'paper', l, es, '#1f1a17')}</g>${es === 'closed' ? '' : [-1, 1].map((sd) => { const bx = cx + sd * eGap, by = eY - er * 2.7 - (exprOf(l) === 'worried' ? 1.5 : 0); const ww = er * (sd > 0 ? 1.6 : 1.85); return `<path d="M${n1(bx - ww)} ${n1(by + 1.5)} Q${n1(bx)} ${n1(by - 3.2)} ${n1(bx + ww)} ${n1(by + 1.5)} Q${n1(bx)} ${n1(by - 0.6)} ${n1(bx - ww)} ${n1(by + 1.5)} Z" fill="${shade(l.hair, -0.15)}"/>`; }).join('')}${nose}${mouth}${stache}${freck}</g>${front}<g transform="translate(${n1(rx * 0.14)} 0)">${specs(l, cx, eY, er * 2.6, eGap, false, '#1f1a17')}</g>${hat(l, head, true)}</g>`;
   return { svg: assemble(l, body, face, arm, A, head, held), head };
 }
 
@@ -567,10 +620,10 @@ function assemble(l: Look, body: string, face: string, arm: (side: -1 | 1, pose:
   const m = /<(?:circle|ellipse) cx="([\d.-]+)" cy="([\d.-]+)"[^>]*\/>(?![\s\S]*<(?:circle|ellipse) cx)/.exec(right);
   const thing = l.hold && m ? hold(l, +m[1] + 4, +m[2]) : '';
   const lean = A.lean ? ` rotate(${A.lean} 100 252)` : '';
-  return `${shadow}<g class="bt-body" transform="translate(0 ${-A.lift})${lean}">${body}${left}<g class="bt-head">${face}</g>${right}${thing}</g>`;
+  return `${shadow}<g class="bt-body" transform="translate(0 ${-A.lift})${lean}">${body}${left}<g class="bt-head" transform="rotate(-3 ${h.cx} ${n1(h.chin)})">${face}</g>${right}${thing}</g>`;
 }
 
-const DRAW: Record<DesignMode, (l: Look, id: string) => { svg: string; head: Head }> = { pocketlight: ragdoll, gouache: retro, wondercut: paper, inked: sketch };
+const DRAW: Record<DesignMode, (l: Look, id: string) => { svg: string; head: Head }> = { tales: (l, id) => featureCharacter(l, id, { hat, held, clothes, stripes }), pocketlight: ragdoll, gouache: retro, wondercut: paper, inked: sketch };
 
 /** The character in a look's own design, or null when the old renderer should draw it (pets, image faces, drawings). */
 export function designCharacter(l: Look, mode: StyleMode, id: string): { svg: string; head: Head } | null {
