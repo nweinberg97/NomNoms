@@ -31,9 +31,11 @@ export const WORLDS: Record<WorldId, World> = {
   everyday: { id: 'everyday', name: 'Everyday', feeling: 'Home, the park, the zoo', blurb: 'Real places and everyday adventures.', places: [] },
   fairytale: { id: 'fairytale', name: 'Classic Fairytale', feeling: 'Drawn like a vintage storybook film', blurb: 'Slender, graceful characters with delicate faces, fine ink lines and painted colour; a hilltop castle and an enchanted wood.', places: ['hillcastle', 'enchanted'], story: 'fairytale' },
   adventure: { id: 'adventure', name: 'Adventure Story', feeling: 'Drawn like a modern 3D adventure film', blurb: 'Sturdy, expressive characters with big glossy eyes and rich 3D shading; a jungle trail and a mountain pass.', places: ['jungle', 'peaks'], story: 'expedition' },
+  ocean: { id: 'ocean', name: 'Under the Sea', feeling: 'Shimmering, like an undersea musical', blurb: 'A kingdom of coral and pearls, kelp forests and a sunken ship, with sea light rippling over everyone.', places: ['reef', 'kelp'], story: 'pearl' },
+  space: { id: 'space', name: 'Starlight Voyage', feeling: 'Glowing, like a space adventure at night', blurb: 'Astronaut suits, a rocket on the moon with the Earth rising, and a ringed planet in a rainbow nebula.', places: ['moon', 'rings'], story: 'comet' },
   mythic: { id: 'mythic', name: 'Mythic Hero', feeling: 'Drawn bold and graphic, like an epic', blurb: 'Tall heroic characters with strong angular faces, bold lines and dramatic light; a temple in the clouds and a starlit summit.', places: ['skytemple', 'starpeak'], story: 'legend' },
 };
-export const WORLD_IDS: WorldId[] = ['everyday', 'fairytale', 'adventure', 'mythic'];
+export const WORLD_IDS: WorldId[] = ['everyday', 'fairytale', 'adventure', 'ocean', 'space', 'mythic'];
 
 const SKIRTED = ['dress', 'party', 'tutu', 'fairy', 'gown', 'sunrobe'];
 
@@ -50,7 +52,7 @@ export function worldCostume(world: WorldId, look: Look, star: boolean): Partial
   const accent = accentOf(look.outfit);
   const c = costumeFor(world, star, skirt, elder, grown, look, glasses);
   // each world's mood: wide-eyed wonder, a big grin, a determined look
-  const expression = world === 'fairytale' ? (grown || elder ? 'smile' : 'starry') : world === 'adventure' ? 'grin' : look.kind === 'baby' ? 'grin' : 'smile';
+  const expression = world === 'fairytale' || world === 'ocean' ? (grown || elder ? 'smile' : 'starry') : world === 'space' ? (grown || elder ? 'grin' : 'wow') : world === 'adventure' ? 'grin' : look.kind === 'baby' ? 'grin' : 'smile';
   return { ...c, expression, ...(accent ? { accent } : {}) } as Partial<Look>;
 }
 /** A steady pick from a few options, by who someone is, so siblings and friends don't come out as clones. */
@@ -72,6 +74,16 @@ function costumeFor(world: WorldId, star: boolean, skirt: boolean, elder: boolea
       if (elder) return { outfit: 'ranger', hat: 'brimhat', extra: 'map', pose: 'stand' };
       if (grown) return [{ outfit: 'ranger', hat: skirt ? 'bandana' : 'brimhat', extra: 'spyglass', pose: 'hips' as Pose }, { outfit: 'explorer', hat: 'brimhat', extra: 'map', pose: 'point' as Pose }, { outfit: 'puffer', hat: 'beanie', extra: 'spyglass', pose: 'hips' as Pose }][v];
       return [{ outfit: 'explorer', hat: 'bandana', extra: 'net', pose: 'point' as Pose }, { outfit: 'explorer', hat: 'brimhat', extra: 'spyglass', pose: 'hips' as Pose }, { outfit: 'ranger', hat: 'capback', extra: 'map', pose: 'cheer' as Pose }][v];
+    case 'ocean': // the sea kingdom: sailors and sea royalty, flower-and-shell crowns
+      if (star) return { outfit: skirt ? 'fairy' : 'sailor', hat: look.kind === 'baby' ? 'crown' : 'flowers', extra: 'none', glasses, pose: 'wave' };
+      if (elder) return { outfit: 'sunrobe', hat: 'crown', extra: 'staff', glasses };
+      if (grown) return { outfit: skirt ? 'gown' : 'sailor', hat: skirt ? 'tiara' : 'none', extra: 'none', glasses, pose: 'wave' };
+      return [{ outfit: 'sailor', hat: 'flowers', extra: 'none', glasses, pose: 'cheer' as Pose }, { outfit: skirt ? 'fairy' : 'sailor', hat: 'circlet', extra: 'none', glasses, pose: 'wave' as Pose }, { outfit: skirt ? 'gown' : 'sailor', hat: 'tiara', extra: 'none', glasses, pose: 'hips' as Pose }][v];
+    case 'space': // a crew of astronauts (the helmet is a clear bubble, so faces show)
+      if (star) return { outfit: 'astronaut', hat: 'none', extra: 'none', pose: 'cheer' };
+      if (elder) return { outfit: 'astronaut', hat: 'none', extra: 'none', glasses, pose: 'stand' };
+      if (grown) return { outfit: 'astronaut', hat: 'none', extra: 'none', glasses, pose: v === 1 ? 'point' : 'wave' };
+      return { outfit: 'astronaut', hat: 'none', extra: 'none', glasses, pose: (['point', 'cheer', 'hips'] as Pose[])[v] };
     case 'mythic': // heroes of legend: armour, capes and gold
       if (star) return { outfit: 'armour', hat: 'helm', extra: 'shield', pose: 'hips' };
       if (elder) return { outfit: 'sunrobe', hat: 'laurel', extra: 'staff', pose: 'stand' };
@@ -135,6 +147,57 @@ export function worldBackdrop(art: string, seed: number, id: string): string | n
         <path d="M0 210 Q120 176 230 200 T400 186 V300 H0 Z" fill="#7fae7a"/>
         ${[14, 44, 336, 368, 392].map((x, i) => { const h = 50 + (i % 2) * 16, y = 206 - (i % 3) * 4; return `<path d="M${x} ${y - h} L${x + 18} ${y} L${x - 18} ${y} Z" fill="#3f7a5a"/><path d="M${x} ${y - h + 18} L${x + 22} ${y + 8} L${x - 22} ${y + 8} Z" fill="#4a8a63"/>`; }).join('')}
         <path d="M300 214 L334 168 L368 214 Z" fill="#e9876b"/><path d="M334 168 L334 214" stroke="#b8553e" stroke-width="2"/><path d="M326 214 L334 190 L342 214 Z" fill="#7a3a2a"/>`;
+    case 'reef': // the coral kingdom: rippling sea light, coral towers, a shell palace, fish and bubbles
+      return `<defs><linearGradient id="${id}s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a8fb0"/><stop offset=".6" stop-color="#4fc0cf"/><stop offset="1" stop-color="#8fe0d8"/></linearGradient>
+        <linearGradient id="${id}r" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity=".55"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/></linearGradient></defs>
+        <rect width="400" height="300" fill="url(#${id}s)"/>
+        <g opacity=".5">${[40, 120, 210, 300].map((x, i) => `<path d="M${x} 0 L${x + 34} 0 L${x + 70 + i * 6} 220 L${x + 20 + i * 6} 220 Z" fill="url(#${id}r)"/>`).join('')}</g>
+        <path d="M0 30 Q50 20 100 30 T200 30 T300 30 T400 30" stroke="#d9fbff" stroke-width="2" fill="none" opacity=".5"/>
+        <g transform="translate(250 70)">
+          <path d="M0 120 L0 40 Q0 14 26 10 Q30 -18 52 -22 Q74 -18 78 10 Q104 14 104 40 L104 120 Z" fill="#f5d6e4"/>
+          <path d="M26 10 Q52 -40 78 10 Q52 -6 26 10 Z" fill="#f2b8cf"/><path d="M40 120 L40 82 Q52 66 64 82 L64 120 Z" fill="#b36b8f"/>
+          ${[[14, 48], [76, 48], [45, 30]].map(([x, y]) => `<ellipse cx="${x + 6}" cy="${y + 8}" rx="6" ry="8" fill="#fff4e0"/>`).join('')}
+          <circle cx="52" cy="-26" r="7" fill="#fdf6ff" stroke="#e7c6dd" stroke-width="2"/>
+        </g>
+        <path d="M0 214 Q100 198 200 210 T400 206 V300 H0 Z" fill="#efdcae"/>
+        ${[[34, 210, '#f07a6a'], [92, 222, '#f2a65a'], [170, 216, '#d86ab0'], [372, 214, '#f07a6a'], [334, 230, '#f2c14e']].map(([x, y, c], i) => `<g transform="translate(${x} ${y})">${[-1, 0, 1].map((k) => `<path d="M0 0 Q${(k as number) * 12} -24 ${(k as number) * 18} ${-40 - (i % 2) * 10}" stroke="${c}" stroke-width="${7 - Math.abs(k as number) * 2}" fill="none" stroke-linecap="round"/>`).join('')}</g>`).join('')}
+        ${[[130, 236], [228, 252], [300, 270]].map(([x, y]) => `<path d="M${x} ${y} q8 -10 16 0 q-8 6 -16 0 Z" fill="#fde6c4"/><path d="M${x + 2} ${y} l14 0" stroke="#e8c79a" stroke-width="1"/>`).join('')}
+        ${[[60, 90, '#f2c14e', 1], [150, 60, '#f07a6a', -1], [100, 140, '#7fd3ff', 1], [210, 110, '#ffd36b', -1]].map(([x, y, c, d]) => `<g transform="translate(${x} ${y}) scale(${d} 1)"><ellipse rx="11" ry="6.5" fill="${c}"/><path d="M-10 0 L-19 -7 L-19 7 Z" fill="${c}"/><circle cx="5" cy="-1.5" r="1.6" fill="#1d2a33"/><path d="M-2 -6 Q1 0 -2 6" stroke="#fff" stroke-width="1.6" fill="none" opacity=".7"/></g>`).join('')}
+        ${Array.from({ length: 14 }, () => { const x = 10 + r() * 380, y = 20 + r() * 180, s = 2 + r() * 4; return `<circle class="bt-firefly" cx="${x.toFixed(0)}" cy="${y.toFixed(0)}" r="${s.toFixed(1)}" fill="#e8fbff" fill-opacity=".3" stroke="#fff" stroke-width="1" stroke-opacity=".8"/>`; }).join('')}`;
+    case 'kelp': // a kelp forest in deep blue, a sunken ship, a treasure chest, a curious turtle
+      return `<defs><linearGradient id="${id}s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#14506e"/><stop offset=".7" stop-color="#2a7f8f"/><stop offset="1" stop-color="#4f9f96"/></linearGradient></defs>
+        <rect width="400" height="300" fill="url(#${id}s)"/>
+        <g opacity=".22">${[70, 190, 320].map((x) => `<path d="M${x} 0 L${x + 30} 0 L${x + 60} 220 L${x + 20} 220 Z" fill="#dff8ff"/>`).join('')}</g>
+        <g transform="translate(220 120) rotate(-8)"><path d="M0 60 L150 60 L130 100 L20 100 Z" fill="#6b4a3a"/><path d="M10 60 L140 60" stroke="#4a3228" stroke-width="3"/><rect x="62" y="-10" width="7" height="72" fill="#5a3e30"/><path d="M69 -6 L110 20 L69 40 Z" fill="#cfc2a8" opacity=".8"/>${[30, 60, 90, 118].map((x) => `<circle cx="${x}" cy="78" r="5" fill="#2c4a52"/>`).join('')}</g>
+        ${[18, 58, 112, 352, 384].map((x, i) => `<path d="M${x} 300 C${x - 18} ${240 - i * 6} ${x + 18} ${170 - i * 8} ${x - 6} ${70 + (i % 2) * 30}" stroke="${i % 2 ? '#3f8a52' : '#4f9a5a'}" stroke-width="9" fill="none" stroke-linecap="round"/>${[0, 1, 2, 3].map((k) => `<ellipse cx="${x + (k % 2 ? 10 : -10)}" cy="${250 - k * 46}" rx="11" ry="5" fill="#5aaa62" transform="rotate(${k % 2 ? 30 : -30} ${x + (k % 2 ? 10 : -10)} ${250 - k * 46})"/>`).join('')}`).join('')}
+        <path d="M0 216 Q100 204 200 214 T400 210 V300 H0 Z" fill="#c9b98a"/>
+        <g transform="translate(150 214)"><rect x="0" y="0" width="40" height="24" rx="3" fill="#8a5a32"/><path d="M0 6 Q20 -14 40 6 Z" fill="#a8703e"/><rect x="17" y="6" width="6" height="8" fill="#f2c14e"/><circle cx="8" cy="-2" r="3" fill="#f6e6a8"/><circle cx="30" cy="-3" r="2.5" fill="#fff4c9"/></g>
+        <g transform="translate(96 96)"><ellipse rx="24" ry="16" fill="#6f9a5a"/><path d="M-14 -8 L0 -14 L14 -8 L10 6 L-10 6 Z" fill="#8fbf6a" opacity=".7"/><ellipse cx="28" cy="-2" rx="9" ry="7" fill="#a9c98a"/><circle cx="31" cy="-4" r="1.6" fill="#1d2a33"/>${[[-18, 14], [16, 14], [-20, -10], [16, -12]].map(([x, y]) => `<ellipse cx="${x}" cy="${y}" rx="8" ry="4" fill="#a9c98a" transform="rotate(${x < 0 ? -30 : 30} ${x} ${y})"/>`).join('')}</g>
+        ${Array.from({ length: 12 }, () => { const x = 10 + r() * 380, y = 20 + r() * 190, s = 1.6 + r() * 3.4; return `<circle class="bt-firefly" cx="${x.toFixed(0)}" cy="${y.toFixed(0)}" r="${s.toFixed(1)}" fill="#e8fbff" fill-opacity=".25" stroke="#fff" stroke-width="1" stroke-opacity=".7"/>`; }).join('')}`;
+    case 'moon': // the moon's surface, craters, a little rocket, the Earth rising
+      return `<defs><linearGradient id="${id}s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0f1638"/><stop offset="1" stop-color="#2f2a63"/></linearGradient>
+        <radialGradient id="${id}e" cx=".4" cy=".35" r=".7"><stop offset="0" stop-color="#7fc9f0"/><stop offset="1" stop-color="#2f6fb0"/></radialGradient></defs>
+        <rect width="400" height="300" fill="url(#${id}s)"/>
+        ${Array.from({ length: 50 }, () => `<circle cx="${(r() * 400).toFixed(0)}" cy="${(r() * 190).toFixed(0)}" r="${(0.5 + r() * 1.3).toFixed(1)}" fill="#fff" opacity="${(0.4 + r() * 0.6).toFixed(2)}"/>`).join('')}
+        <circle cx="300" cy="74" r="40" fill="url(#${id}e)"/><path d="M276 56 Q290 46 300 58 Q296 72 282 70 Z M306 84 Q322 78 330 92 Q318 104 306 96 Z" fill="#6fbf72"/><circle cx="300" cy="74" r="44" fill="none" stroke="#9fd8ff" stroke-width="4" opacity=".25"/>
+        <g transform="translate(70 104)"><path d="M20 0 Q40 26 40 70 L0 70 Q0 26 20 0 Z" fill="#f1f1f4"/><circle cx="20" cy="36" r="9" fill="#7fc9f0" stroke="#c9d3dc" stroke-width="3"/><path d="M0 50 L-14 80 L0 72 Z M40 50 L54 80 L40 72 Z" fill="#e86f5b"/><path d="M8 70 L32 70 L26 84 L14 84 Z" fill="#c9d3dc"/><path d="M14 84 Q20 106 26 84 Z" fill="#ffc35a"/></g>
+        <path d="M-10 214 Q100 192 210 206 T410 200 V300 H-10 Z" fill="#c9c6d6"/>
+        ${[[60, 240, 22], [180, 262, 14], [320, 236, 26], [250, 284, 10]].map(([x, y, w]) => `<ellipse cx="${x}" cy="${y}" rx="${w}" ry="${(w as number) * 0.32}" fill="#a9a6bb"/><ellipse cx="${x}" cy="${(y as number) + 2}" rx="${(w as number) * 0.8}" ry="${(w as number) * 0.22}" fill="#bdb9cc"/>`).join('')}
+        <path d="M232 206 V170 L258 178 L232 186" fill="#f2c14e" stroke="#9c9aa8" stroke-width="2"/>`;
+    case 'rings': // a ringed planet in a rainbow nebula, floating crystals, a shooting star
+      return `<defs><linearGradient id="${id}s" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1b1446"/><stop offset=".55" stop-color="#3b2470"/><stop offset="1" stop-color="#14204a"/></linearGradient>
+        <radialGradient id="${id}n1"><stop offset="0" stop-color="#ff8fc8" stop-opacity=".6"/><stop offset="1" stop-color="#ff8fc8" stop-opacity="0"/></radialGradient>
+        <radialGradient id="${id}n2"><stop offset="0" stop-color="#7fe0ff" stop-opacity=".5"/><stop offset="1" stop-color="#7fe0ff" stop-opacity="0"/></radialGradient>
+        <radialGradient id="${id}p" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#ffd9a0"/><stop offset="1" stop-color="#e88a5a"/></radialGradient></defs>
+        <rect width="400" height="300" fill="url(#${id}s)"/>
+        <ellipse cx="110" cy="90" rx="150" ry="90" fill="url(#${id}n1)"/><ellipse cx="300" cy="150" rx="160" ry="100" fill="url(#${id}n2)"/>
+        ${Array.from({ length: 46 }, () => `<circle cx="${(r() * 400).toFixed(0)}" cy="${(r() * 200).toFixed(0)}" r="${(0.5 + r() * 1.3).toFixed(1)}" fill="#fff" opacity="${(0.4 + r() * 0.6).toFixed(2)}"/>`).join('')}
+        <g transform="translate(270 82) rotate(-14)"><ellipse rx="78" ry="16" fill="none" stroke="#f6d7a8" stroke-width="7" opacity=".9"/><circle r="42" fill="url(#${id}p)"/><path d="M-40 -8 Q0 -2 40 -8 M-38 10 Q0 16 38 10" stroke="#f6b98a" stroke-width="4" fill="none"/><path d="M-78 0 A78 16 0 0 0 78 0" fill="none" stroke="#f6d7a8" stroke-width="7"/></g>
+        <circle cx="80" cy="60" r="12" fill="#b9a6ff"/><circle cx="76" cy="56" r="3" fill="#d9ceff"/>
+        <path d="M40 30 L120 10" stroke="#fff6d0" stroke-width="2" stroke-linecap="round" opacity=".8"/><circle cx="120" cy="10" r="3" fill="#fff6d0"/>
+        <path d="M-10 222 Q100 204 200 214 T410 208 V300 H-10 Z" fill="#5a4a8a"/>
+        ${[[50, 222, '#b9a6ff'], [150, 236, '#7fe0ff'], [350, 226, '#ff8fc8']].map(([x, y, c]) => `<path d="M${x} ${y} l8 -26 l8 26 Z" fill="${c}" opacity=".85"/><path d="M${(x as number) + 10} ${y} l6 -16 l6 16 Z" fill="${c}" opacity=".65"/>`).join('')}
+        ${Array.from({ length: 10 }, () => `<circle class="bt-firefly" cx="${(r() * 400).toFixed(0)}" cy="${(30 + r() * 170).toFixed(0)}" r="1.8" fill="#fff6d0"/>`).join('')}`;
     case 'skytemple': // white columns on a cloud platform, sunrise rays, distant floating islands
       return `<defs><linearGradient id="${id}s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f7b98a"/><stop offset=".5" stop-color="#fbd9a6"/><stop offset="1" stop-color="#fdf0d6"/></linearGradient>
         <radialGradient id="${id}sun" cx=".5" cy=".42" r=".5"><stop offset="0" stop-color="#fff3c4"/><stop offset=".25" stop-color="#ffe08a" stop-opacity=".8"/><stop offset="1" stop-color="#ffe08a" stop-opacity="0"/></radialGradient></defs>
@@ -176,6 +239,14 @@ export function worldAtmosphere(world: WorldId | undefined, id: string, seed: nu
     case 'adventure':
       return `<g pointer-events="none" opacity=".18">${[[60, 0], [150, 0], [260, 0]].map(([x]) => `<path d="M${x} 0 L${x + 40} 0 L${x + 140} 300 L${x + 80} 300 Z" fill="#fffbe0"/>`).join('')}</g>
         ${Array.from({ length: 6 }, () => `<ellipse class="bt-leaf" cx="${(20 + r() * 360).toFixed(0)}" cy="${(20 + r() * 160).toFixed(0)}" rx="5" ry="2.4" fill="#6faa4a" transform="rotate(${(r() * 180).toFixed(0)})" opacity=".8"/>`).join('')}`;
+    case 'ocean': // sea light rippling down, a drift of bubbles
+      return `<g pointer-events="none" opacity=".16">${[50, 170, 290].map((x) => `<path d="M${x} -10 L${x + 50} -10 L${x + 110} 300 L${x + 40} 300 Z" fill="#e9fdff"/>`).join('')}</g>
+        <rect width="400" height="300" fill="#0f5a78" opacity=".08" pointer-events="none"/>
+        ${Array.from({ length: 12 }, () => `<circle class="bt-mote" cx="${(r() * 400).toFixed(0)}" cy="${(r() * 280).toFixed(0)}" r="${(1.5 + r() * 2.5).toFixed(1)}" fill="none" stroke="#ffffff" stroke-width="1" opacity=".7"/>`).join('')}`;
+    case 'space': // a deep night vignette and twinkling stars
+      return `<defs><radialGradient id="${id}sx" cx=".5" cy=".45" r=".75"><stop offset=".6" stop-color="#0b0f2a" stop-opacity="0"/><stop offset="1" stop-color="#0b0f2a" stop-opacity=".35"/></radialGradient></defs>
+        <rect width="400" height="300" fill="url(#${id}sx)" pointer-events="none"/>
+        ${Array.from({ length: 10 }, () => `<path class="bt-mote" d="M0 -4 Q0 0 4 0 Q0 0 0 4 Q0 0 -4 0 Q0 0 0 -4 Z" transform="translate(${(20 + r() * 360).toFixed(0)} ${(10 + r() * 170).toFixed(0)}) scale(${(0.6 + r() * 1.2).toFixed(2)})" fill="#fff6d0" opacity=".9"/>`).join('')}`;
     case 'mythic':
       return `<defs><radialGradient id="${id}mx" cx=".5" cy=".45" r=".75"><stop offset=".55" stop-color="#2a1640" stop-opacity="0"/><stop offset="1" stop-color="#2a1640" stop-opacity=".35"/></radialGradient></defs>
         <g pointer-events="none" opacity=".16">${[-0.5, -0.2, 0.15, 0.45].map((a) => `<path d="M200 -40 L${(200 + 520 * Math.sin(a - 0.06)).toFixed(0)} 300 L${(200 + 520 * Math.sin(a + 0.06)).toFixed(0)} 300 Z" fill="#fff1b8"/>`).join('')}</g>

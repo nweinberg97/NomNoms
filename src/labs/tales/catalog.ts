@@ -28,7 +28,7 @@ export interface Place {
   night?: boolean;
   imaginary?: boolean;
   /** Drawn for a story world: the backdrop comes from worlds.ts instead of the generic one. */
-  world?: 'fairytale' | 'adventure' | 'mythic';
+  world?: 'fairytale' | 'adventure' | 'mythic' | 'ocean' | 'space';
   art?: string;
 }
 
@@ -38,6 +38,10 @@ export const PLACES: Place[] = [
   { id: 'enchanted', name: 'The Enchanted Wood', at: 'in the Enchanted Wood', sky: ['#28485e', '#5f8f7a'], ground: '#4f7f5f', groundKind: 'grass', horizon: 'none', props: ['🍄', '✨'], surprises: ['just a glowing mushroom', 'just a firefly saying hello'], doing: ['follow the fireflies', 'tiptoe past the glowing mushrooms', 'whisper to the old oak'], imaginary: true, world: 'fairytale', art: 'enchanted' },
   { id: 'jungle', name: 'The Jungle Trail', at: 'on the jungle trail', sky: ['#bfe6d6', '#eaf6d9'], ground: '#8fbf6a', groundKind: 'grass', horizon: 'none', props: ['🦜', '🦋'], surprises: ['just a parrot who can whistle', 'just a butterfly as big as a hand'], doing: ['swing past the vines', 'hop across the river stones', 'listen for the waterfall'], imaginary: true, world: 'adventure', art: 'jungle' },
   { id: 'peaks', name: 'The Mountain Pass', at: 'up the mountain pass', sky: ['#9fcdef', '#e6f3fa'], ground: '#7fae7a', groundKind: 'grass', horizon: 'none', props: ['🦅', '⛺'], surprises: ['just an eagle riding the wind', 'just a mountain goat with a beard'], doing: ['climb to the flag', 'pitch the tent', 'spot the eagle'], imaginary: true, world: 'adventure', art: 'peaks' },
+  { id: 'reef', name: 'The Coral Kingdom', at: 'in the Coral Kingdom', sky: ['#2a8fb0', '#8fe0d8'], ground: '#efdcae', groundKind: 'sand', horizon: 'none', props: ['🐠', '🐚'], surprises: ['just a fish blowing bubbles', 'just a crab dancing sideways'], doing: ['swim past the coral towers', 'count the bubbles', 'wave to the fish'], imaginary: true, world: 'ocean', art: 'reef' },
+  { id: 'kelp', name: 'The Kelp Forest', at: 'in the kelp forest', sky: ['#14506e', '#4f9f96'], ground: '#c9b98a', groundKind: 'sand', horizon: 'none', props: ['🐢', '🪸'], surprises: ['just a sleepy turtle', 'just a seahorse holding on tight'], doing: ['swim between the swaying kelp', 'peek inside the old ship', 'follow the turtle'], imaginary: true, world: 'ocean', art: 'kelp' },
+  { id: 'moon', name: 'The Moon', at: 'on the moon', sky: ['#0f1638', '#2f2a63'], ground: '#c9c6d6', groundKind: 'space', horizon: 'none', props: ['🚀', '🌍'], surprises: ['just a crater shaped like a smile', 'just the Earth waving hello'], doing: ['bounce in the low gravity', 'plant a flag', 'wave to the Earth'], imaginary: true, world: 'space', art: 'moon' },
+  { id: 'rings', name: 'The Ringed Planet', at: 'by the ringed planet', sky: ['#1b1446', '#14204a'], ground: '#5a4a8a', groundKind: 'space', horizon: 'none', props: ['🪐', '✨'], surprises: ['just a shooting star', 'just a crystal that hums'], doing: ['float past the rings', 'follow the shooting star', 'make a wish on a star'], imaginary: true, world: 'space', art: 'rings' },
   { id: 'skytemple', name: 'The Temple in the Clouds', at: 'at the temple in the clouds', sky: ['#f7b98a', '#fdf0d6'], ground: '#ffffff', groundKind: 'grass', horizon: 'none', props: ['☀️', '🕊️'], surprises: ['just a sleepy cloud', 'just a golden feather'], doing: ['ring the sunrise bell', 'walk between the tall columns', 'look down at the clouds'], imaginary: true, world: 'mythic', art: 'skytemple' },
   { id: 'starpeak', name: 'The Starlit Summit', at: 'on the starlit summit', sky: ['#1f2350', '#8a6aa0'], ground: '#4a4278', groundKind: 'grass', horizon: 'none', props: ['⭐', '🌙'], surprises: ['just a shooting star', 'just a constellation that winks'], doing: ['count the constellations', 'climb through the stone arch', 'follow the beam of light'], imaginary: true, night: true, world: 'mythic', art: 'starpeak' },
   { id: 'beach', name: 'The beach', at: 'at the beach', sky: ['#bfe3f2', '#e9f5f8'], ground: '#f0dcb4', groundKind: 'sand', horizon: 'sea', props: ['🐚', '⛱️', '🦀', '🏖️'], surprises: ['just a crab in a tiny hat', 'just a shell that sounds like the sea', 'just a sandcastle with a flag on top'], doing: ['dig in the sand', 'splash in the waves', 'build a sandcastle'], dress: { outfit: 'swimsuit', hat: 'sunhat', glasses: 'sun' } },
@@ -203,6 +207,8 @@ export const STORY_TYPES = [
   { id: 'fairytale', name: 'The Wishing Lantern', blurb: 'A fairytale of kindness and light' },
   { id: 'expedition', name: 'The Map with No Edges', blurb: 'An adventure up mountains and through jungles' },
   { id: 'legend', name: 'The Morning Star', blurb: 'A legend: a brave quest to wake the sun' },
+  { id: 'pearl', name: 'The Singing Pearl', blurb: 'Under the sea: a lost pearl that sings lullabies' },
+  { id: 'comet', name: 'The Little Comet', blurb: 'A starlight voyage to help a comet find her way home' },
   { id: 'lost', name: 'Lost something', blurb: 'Where’s the sock? Is it at the zoo? No!' },
   { id: 'water', name: 'Splash day', blurb: 'Pool, water slide, splash!' },
   { id: 'treasure', name: 'Treasure hunt', blurb: 'X marks the spot!' },

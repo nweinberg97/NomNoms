@@ -29,7 +29,7 @@ test('every world has its own costumes, places and story', () => {
     assert.ok(c.outfit && OUTFITS[c.outfit] && c.hat && HATS[c.hat] && c.extra && EXTRAS[c.extra], `${w} dresses the star`);
   }
   const costumes = WORLD_IDS.filter((x) => x !== 'everyday').map((w) => worldCostume(w, kid, true).outfit);
-  assert.equal(new Set(costumes).size, 3, 'three different costumes');
+  assert.equal(new Set(costumes).size, costumes.length, 'a different costume in every world');
 });
 
 test('a world changes how someone is drawn, never who they are', () => {
@@ -59,7 +59,7 @@ test('a world changes how someone is drawn, never who they are', () => {
 
 test('each world is its own art style, not just a costume', () => {
   const draw = (w: WorldId) => characterMarkup({ ...inWorld(w, mom), outfit: 'tee', hat: 'none', extra: 'none', accent: undefined });
-  const [every, fairy, adv, myth] = WORLD_IDS.map(draw);
+  const [every, fairy, adv, myth] = (['everyday', 'fairytale', 'adventure', 'mythic'] as WorldId[]).map(draw);
   // same clothes: what's left is the world's own drawing
   assert.notEqual(fairy, every); assert.notEqual(adv, every); assert.notEqual(myth, every);
   assert.match(fairy, /bt-twinkle/, 'fairytale glow and twinkles');
@@ -72,7 +72,7 @@ test('each world is its own art style, not just a costume', () => {
   for (const w of WORLD_IDS) assert.match(characterMarkup({ ...inWorld(w, mom), outfit: 'tee', hat: 'none', extra: 'none', accent: undefined }, { style: 'tales' }), /stroke-width="2.3" stroke-linejoin="round" paint-order="stroke"/);
   // grown-ups are built differently in each world; babies stay babies
   const bodyScale = (svg: string) => svg.match(/scale\(([\d.]+) ([\d.]+)\) translate\(-100 -252\)/)?.slice(1).map(Number);
-  const sz = WORLD_IDS.map((w) => bodyScale(draw(w)));
+  const sz = (['everyday', 'fairytale', 'adventure', 'mythic'] as WorldId[]).map((w) => bodyScale(draw(w)));
   assert.ok(sz[3]![1] > sz[1]![1] && sz[1]![1] > sz[0]![1], 'mythic tallest, fairytale taller than everyday');
   const baby = (w: WorldId) => bodyScale(characterMarkup({ ...kid, kind: 'baby', world: w }))!;
   assert.ok(baby('mythic')[1] - 1 < (sz[3]![1] - 1) / 2, 'a baby is changed much less');

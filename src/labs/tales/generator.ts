@@ -170,6 +170,8 @@ const ABOUT: Partial<Record<StoryType, string>> = {
   fairytale: 'A fairytale about {H}, a wishing lantern and the kindness that lights the way',
   expedition: 'An expedition over mountains and through jungles, following {H}’s map with no edges',
   legend: 'A legend of {H}’s brave quest to wake the morning sun',
+  pearl: 'Under the sea, {H} sets off to find the lost pearl that sings the ocean to sleep',
+  comet: 'A starlight voyage: {H} helps a little lost comet find her way home',
   lost: 'Something precious is missing, and {H} searches high and low to find it',
   water: 'A splashy, sunny day of pools and slides for {H}',
   treasure: 'A treasure hunt where {H} follows the clues to X marks the spot',
@@ -385,6 +387,28 @@ export function generateStory(type: StoryType, cast: CastMember[], opts: { seed:
       add({ place: 'peaks', text: `Up the mountain pass! ${tok(c1)} held the rope, and ${H} held on tight.`, cast: [hero.id, c1.id], focus: { e: '🧗' }, mood: 'brave', pose: 'hips' });
       add({ place: 'peaks', text: `At the very top, beside the flag: the X! Inside the box was… another map, full of places nobody had explored yet.`, cast: [hero.id, c0.id, c1.id], focus: { e: '📦' }, mood: 'starry', pose: 'cheer' });
       add({ place: 'peaks', text: `The world is bigger than any map, ${H}. Tomorrow, a brand-new adventure!`, cast: [hero.id, ...others.slice(0, 2).map((c) => c.id)], focus: { e: '🧭' }, mood: 'proud', pose: 'hips' });
+      break;
+    }
+    case 'pearl': {
+      title = `${H} and the Singing Pearl`;
+      const c0 = companion(0), c1 = companion(1);
+      add({ place: 'reef', text: `Deep under the sea, in the Coral Kingdom, everyone was too wide awake. The Singing Pearl was lost, and nobody could hear the ocean’s lullaby.`, cast: [hero.id, c0.id], focus: { e: '🐚' }, mood: 'worried' });
+      add({ place: 'reef', text: `“I’ll find it,” said ${H}. ${tok(c0)} swam alongside, past coral towers and a parade of bubbling fish.`, cast: [hero.id, c0.id], focus: { e: '🐠' }, mood: 'brave', pose: 'point' });
+      add({ place: 'kelp', text: `Into the kelp forest they swam, swish, swish, swish, where a sleepy turtle pointed a flipper at the old sunken ship.`, cast: [hero.id, c1.id], focus: { e: '🐢' }, mood: 'wow', pose: 'point' });
+      add({ place: 'kelp', text: `Inside a little treasure chest, something glowed and hummed. The Singing Pearl! ${tok(c1)} held the lantern, and ${H} lifted it out gently.`, cast: [hero.id, c0.id, c1.id], focus: { e: '🐚' }, mood: 'starry', pose: 'cheer' });
+      add({ place: 'reef', text: `Back home, the pearl began to sing. La, la, loo… the fish yawned, the coral swayed, and the whole sea grew soft and calm.`, cast: [hero.id, c0.id], focus: { e: '🎶' }, mood: 'dreamy' });
+      add({ place: 'reef', text: `“Goodnight, ocean,” whispered ${H}. And everyone, big and small, drifted off to sleep. The end.`, cast: [hero.id, ...others.slice(0, 2).map((c) => c.id)], focus: { e: '🌙' }, mood: 'sleepy' });
+      break;
+    }
+    case 'comet': {
+      title = `${H} and the Little Comet`;
+      const c0 = companion(0), c1 = companion(1);
+      add({ place: 'moon', text: `3, 2, 1… blast off! ${H} and ${tok(c0)} landed their little rocket on the moon. Boing, boing, boing!`, cast: [hero.id, c0.id], focus: { e: '🚀' }, mood: 'laugh', pose: 'cheer' });
+      add({ place: 'moon', text: `Behind a crater sat a little comet, sniffling. “I’ve lost my way home,” she said, and her sparkly tail drooped.`, cast: [hero.id, c0.id], focus: { e: '⭐' }, mood: 'worried' });
+      add({ place: 'rings', text: `“We’ll help!” said ${H}. Up they flew, past the ringed planet and through a rainbow cloud of stars.`, cast: [hero.id, c1.id], focus: { e: '🪐' }, mood: 'wow', pose: 'point' });
+      add({ place: 'rings', text: `${tok(c1)} spotted it first: a twinkly trail, just the same colours as the comet’s tail. “That way!”`, cast: [hero.id, c0.id, c1.id], focus: { e: '✨' }, mood: 'starry', pose: 'point' });
+      add({ place: 'rings', text: `There was her family, whooshing across the sky! The little comet glowed so bright she lit up the whole galaxy.`, cast: [hero.id, c0.id, c1.id], focus: { e: '🌟' }, mood: 'laugh', pose: 'cheer' });
+      add({ place: 'moon', text: `Back on the moon, ${H} waved goodbye. “Come and visit!” Every night now, a little comet waves back. The end.`, cast: [hero.id, ...others.slice(0, 2).map((c) => c.id)], focus: { e: '🌟' }, mood: 'proud', pose: 'wave' });
       break;
     }
     case 'legend': {

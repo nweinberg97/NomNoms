@@ -74,7 +74,7 @@ export type Pose = 'stand' | 'point' | 'hips' | 'cheer' | 'wave';
 /** What someone is doing in a picture. */
 export type Action = 'stand' | 'walk' | 'run' | 'jump' | 'sit' | 'wave' | 'cheer' | 'point' | 'dance' | 'sleep';
 export const ACTIONS: Record<Action, string> = { stand: 'Stand', walk: 'Walk', run: 'Run', jump: 'Jump', sit: 'Sit', wave: 'Wave', cheer: 'Cheer', point: 'Point', dance: 'Dance', sleep: 'Sleep' };
-export type WorldId = 'everyday' | 'fairytale' | 'adventure' | 'mythic';
+export type WorldId = 'everyday' | 'fairytale' | 'adventure' | 'mythic' | 'ocean' | 'space';
 /**
  * How each story world draws people: its art direction. Identity (skin, hair colour and
  * style, eye colour, face shape, facial hair, glasses: the Character DNA) is never touched;
@@ -92,6 +92,8 @@ export const WORLD_BODY: Record<WorldId, { head: number; body: number; slim: num
   fairytale: { head: 0.92, body: 1.1, slim: 0.92 },
   adventure: { head: 0.95, body: 1.04, slim: 1.04 },
   mythic: { head: 0.88, body: 1.16, slim: 1.1 },
+  ocean: { head: 0.94, body: 1.06, slim: 0.96 },
+  space: { head: 0.98, body: 1, slim: 1.04 },
 };
 /** Babies stay babies: the world's build is applied gently to little ones. */
 const WORLD_BODY_K: Record<string, number> = { baby: 0.35, kid: 0.7, adult: 1, elder: 0.85 };
@@ -109,9 +111,13 @@ const WORLD_ART: Record<WorldId, { eye: [number, number]; brow: [number, number]
   fairytale: { eye: [1.1, 1.14], brow: [0.85, -1.5] },
   adventure: { eye: [1.04, 1.04], brow: [1.12, 1] },
   mythic: { eye: [1.04, 0.88], brow: [1.4, 4] },
+  ocean: { eye: [1.1, 1.14], brow: [0.85, -1.5] },
+  space: { eye: [1.1, 1.14], brow: [0.85, -1.5] },
 };
 /** The world being drawn right now (set by characterMarkup; 'everyday' for pets, drawings and image faces). */
 let WORLD: WorldId = 'everyday';
+/** The story world as chosen (WORLD is how faces and bodies are drawn for it). */
+let RAW_WORLD: WorldId = 'everyday';
 
 /** A face proportion, clamped, and softened for babies and kids, whose storybook proportions lead. */
 export const shapeOf = (l: Look, k: keyof NonNullable<Look['shape']>) =>
@@ -1102,6 +1108,14 @@ function worldHair(l: Look): string {
  * `hy` is where the head sits after the world's build.
  */
 function worldAura(id: string, hy: number): string {
+  if (RAW_WORLD === 'ocean') // a shimmer of sea light and bubbles rising past
+    return `<defs><radialGradient id="au${id}"><stop offset="0" stop-color="#bff3ff" stop-opacity=".55"/><stop offset="1" stop-color="#bff3ff" stop-opacity="0"/></radialGradient></defs>
+      <ellipse cx="100" cy="${(hy + 60).toFixed(0)}" rx="108" ry="138" fill="url(#au${id})"/>
+      <g fill="#e8fbff" fill-opacity=".25" stroke="#ffffff" stroke-width="1.4" stroke-opacity=".8" class="bt-twinkles">${[[22, hy - 20, 6], [180, hy + 6, 4.5], [14, hy + 60, 3.5], [188, hy + 90, 5.5], [166, hy - 46, 3]].map(([x, y, r], i) => `<circle class="bt-twinkle" style="animation-delay:${(i * 0.41).toFixed(2)}s" cx="${x}" cy="${(y as number).toFixed(0)}" r="${r}"/>`).join('')}</g>`;
+  if (RAW_WORLD === 'space') // starlight: a soft violet glow and little stars
+    return `<defs><radialGradient id="au${id}"><stop offset="0" stop-color="#d9d2ff" stop-opacity=".55"/><stop offset="1" stop-color="#d9d2ff" stop-opacity="0"/></radialGradient></defs>
+      <ellipse cx="100" cy="${(hy + 60).toFixed(0)}" rx="110" ry="140" fill="url(#au${id})"/>
+      <g fill="#fff6d0" class="bt-twinkles">${[[24, hy - 30, 1], [178, hy - 6, 0.8], [12, hy + 70, 0.7], [186, hy + 96, 1], [160, hy - 52, 0.6]].map(([x, y, k], i) => `<path class="bt-twinkle" style="animation-delay:${(i * 0.37).toFixed(2)}s" transform="translate(${x} ${(y as number).toFixed(0)}) scale(${k})" d="M0 -7 Q0 0 7 0 Q0 0 0 7 Q0 0 -7 0 Q0 0 0 -7 Z"/>`).join('')}</g>`;
   switch (WORLD) {
     case 'fairytale':
       return `<defs><radialGradient id="au${id}"><stop offset="0" stop-color="#ffd6e6" stop-opacity=".7"/><stop offset=".55" stop-color="#ffe6c4" stop-opacity=".35"/><stop offset="1" stop-color="#ffe9c9" stop-opacity="0"/></radialGradient></defs>
@@ -1589,7 +1603,9 @@ export function characterMarkup(l: Look, opts: { animated?: boolean; style?: Sty
   // Plush and Pencil are the Tales characters made in another material
   if (opts.style && onTalesDrawing(opts.style)) MODE = 'tales';
   // in a story world, people are drawn in the world's own style (pets keep the book's look)
-  WORLD = isPet(l.kind) || l.face || l.drawing ? 'everyday' : l.world ?? 'everyday';
+  // Under the Sea and Starlight Voyage draw faces the wide-eyed fairytale way, with their own light round them
+  RAW_WORLD = isPet(l.kind) || l.face || l.drawing ? 'everyday' : l.world ?? 'everyday';
+  WORLD = RAW_WORLD === 'ocean' || RAW_WORLD === 'space' ? 'fairytale' : RAW_WORLD;
   const id = `c${++uid}`;
   const motion = l.personality ? ` m-${PERSONALITIES[l.personality].motion}` : '';
   // every look except Tales builds people its own way (designs.ts), in every world

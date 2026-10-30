@@ -644,7 +644,7 @@ export function BabyTalesDemo() {
   /** Step into a world: everyone dresses for it, and its story and places come along. */
   const chooseWorld = (w: WorldId) => {
     setWorld(w);
-    if (w === 'everyday') { if (['fairytale', 'expedition', 'legend'].includes(type)) setType('lost'); setPlaces((ps) => ps.filter((id) => !PLACES.find((x) => x.id === id)?.world)); }
+    if (w === 'everyday') { if (['fairytale', 'expedition', 'legend', 'pearl', 'comet'].includes(type)) setType('lost'); setPlaces((ps) => ps.filter((id) => !PLACES.find((x) => x.id === id)?.world)); }
     else { setType(WORLDS[w].story!); setPlaces(WORLDS[w].places); }
   };
   /** Wardrobe changes made inside a world stay in that world; Everyday clothes are untouched. */
@@ -661,6 +661,8 @@ export function BabyTalesDemo() {
     fairytale: { outfit: ['gown', 'ftunic', 'cloak', 'fairy'], hat: ['crown', 'tiara', 'circlet', 'flowers', 'wizard'], extra: ['lantern', 'staff', 'wand'] },
     adventure: { outfit: ['explorer', 'ranger'], hat: ['brimhat', 'bandana', 'bucket', 'sunhat'], extra: ['map', 'spyglass', 'net'] },
     mythic: { outfit: ['armour', 'sunrobe', 'knight'], hat: ['laurel', 'helm'], extra: ['shield', 'staff'] },
+    ocean: { outfit: ['sailor', 'fairy', 'gown', 'sunrobe'], hat: ['flowers', 'tiara', 'crown', 'circlet'], extra: ['staff'] },
+    space: { outfit: ['astronaut', 'puffer'], hat: ['none', 'helmet'], extra: [] },
   };
   const worldPicks = (t: WardrobeTab) => WORLD_WEAR[world][t] ?? [];
   /** The world's own pieces first, then everything else. */
@@ -681,7 +683,7 @@ export function BabyTalesDemo() {
       <optgroup label="Places">{PLACES.filter((p) => !p.world).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</optgroup>
     </>
   );
-  const FEATURED: StoryType[] = ['fairytale', 'expedition', 'legend', 'lost', 'animals', 'bedtime'];
+  const FEATURED: StoryType[] = ['fairytale', 'expedition', 'pearl', 'comet', 'legend', 'lost', 'animals', 'bedtime'];
   const typesShown = showAllTypes ? STORY_TYPES : STORY_TYPES.filter((t) => FEATURED.includes(t.id) || t.id === type);
   const placeSummary = places.length ? `${places.length} chosen` : 'Let NomNoms choose';
   const tabs: [EditorTab, string][] = [...(!pet && !drawing ? [['photo', 'Photo'] as [EditorTab, string]] : []), ['face', pet ? 'Pet' : drawing ? 'Drawing' : 'Face & hair'], ...(!drawing ? [['clothes', 'Clothes'] as [EditorTab, string]] : []), ['personality', 'Personality']];
