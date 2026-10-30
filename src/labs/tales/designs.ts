@@ -27,8 +27,9 @@ import { thingArt } from './things';
 
 export type DesignMode = Exclude<StyleMode, 'tales'>;
 /** Every look except Tales builds its own characters. */
-export const onTalesDrawing = (_m: StyleMode) => false;
-export const hasDesign = (m: StyleMode): m is DesignMode => m !== 'tales';
+/** Movie 3D is drawn on the Tales construction (character.ts), rendered as a 3D film. */
+export const onTalesDrawing = (m: StyleMode) => m !== 'tales';
+export const hasDesign = (_m: StyleMode): _m is DesignMode => false;
 
 /* ── shared helpers ─────────────────────────────────────── */
 type Fam = 'none' | 'buzz' | 'tuft' | 'short' | 'side' | 'messy' | 'bob' | 'long' | 'curlyShort' | 'curlyLong' | 'afro' | 'bun' | 'pony' | 'pigtails' | 'sides';

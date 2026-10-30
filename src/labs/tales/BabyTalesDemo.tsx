@@ -9,7 +9,7 @@ import { NAMES, PET_NAMES, PLACES, ROLE_LABEL, STORY_TYPES, type Place, type Rol
 import {
   ACTIONS, type Action,
   EXPRESSIONS, EXTRAS, EYE_COLOURS, FACE_VIEWBOX, fitViewBox, FACIAL, GLASSES, HAIR_COLOURS, HAIR_STYLES, HATS, OUTFITS, PERSONALITIES, SKIN_TONES, WEAR_BOX,
-  characterSvg, exprOf, isPet, type Expression, type Facial, type HairStyle, type Kind, type Look, type Personality, type WearSlot, type WorldId,
+  characterSvg, emblemSvg, EMBLEMS, exprOf, HERO_COLOURS, isPet, superOf, type Expression, type Facial, type HairStyle, type Kind, type Look, type Personality, type WearSlot, type WorldId,
 } from './character';
 import { DrawPad, type DrawMode } from './DrawPad';
 import { SAMPLE_PHOTOS, samplePhotoUrl } from './fromPhoto';
@@ -1215,6 +1215,35 @@ export function BabyTalesDemo() {
 
                   {activeTab === 'clothes' && (
                     <div className="lab-card">
+                      {mode === 'inked' && !pet && !drawing && (() => {
+                        // Super Heroes: this person's own costume (it shows whenever the look is Super Heroes)
+                        const H = superOf({ ...shown, outfit: 'supersuit' });
+                        const set = (patch: Record<string, string>) => update({ look: { hero: { ...person.look.hero, ...patch } } });
+                        const none = { background: 'repeating-linear-gradient(45deg, #fff 0 4px, #e7ddd2 4px 8px)' };
+                        const row = (label: string, key: 'suit' | 'cape' | 'mask', canHide: boolean) => (
+                          <div className="bt-hero-row">
+                            <small>{label}</small>
+                            <div className="bt-swatches is-small" role="radiogroup" aria-label={`${label} colour`}>
+                              {canHide && <button type="button" role="radio" className="bt-swatch" style={none} aria-checked={H[key] === 'none'} aria-label={`No ${label.toLowerCase()}`} title={`No ${label.toLowerCase()}`} onClick={() => set({ [key]: 'none' })} data-testid={`hero-${key}-none`} />}
+                              {HERO_COLOURS.map((c) => <button key={c} type="button" role="radio" className="bt-swatch" style={{ background: c }} aria-checked={H[key] === c} aria-label={`${label} colour ${c}`} onClick={() => set({ [key]: c })} data-testid={`hero-${key}`} />)}
+                            </div>
+                          </div>
+                        );
+                        return (
+                          <div className="bt-hero" data-testid="hero-costume">
+                            <p className="lab-sub"><b>Super hero costume</b> for {person.member.name || 'this hero'}</p>
+                            {row('Suit', 'suit', false)}
+                            {row('Cape', 'cape', true)}
+                            {row('Mask', 'mask', true)}
+                            <div className="bt-hero-row">
+                              <small>Emblem</small>
+                              <div className="bt-emblems" role="radiogroup" aria-label="Emblem">
+                                {EMBLEMS.map((e) => <button key={e} type="button" role="radio" className="bt-emblem" aria-checked={H.emblem === e} aria-label={`${e} emblem`} onClick={() => set({ emblem: e })} data-testid={`hero-emblem-${e}`} dangerouslySetInnerHTML={{ __html: emblemSvg(e, H.trim, H.cape === 'none' ? H.suit : H.cape) }} />)}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
                       {world !== 'everyday' && <p className="lab-sub">Dressed for {WORLDS[world].name}. Changes here stay in this world; ✦ marks its own pieces.</p>}
                       <div className="lab-tabs" role="tablist">
                         {(Object.keys(WARDROBE) as WardrobeTab[]).map((k) => <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => setTab(k)} data-testid={`tab-${k}`}>{WARDROBE[k][0]}</button>)}
