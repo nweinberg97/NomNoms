@@ -1,7 +1,6 @@
 import { exprOf, outfitColours, shade, type Expression, type HairStyle, type Look } from './character';
 import type { StyleMode } from './styles';
 import { thingArt } from './things';
-import { featureCharacter } from './feature';
 
 /**
  * Character designs: each look builds people its own way, like the difference
@@ -26,10 +25,10 @@ import { featureCharacter } from './feature';
  * character.ts, standing on y 252, so scenes, covers and avatars place them alike.
  */
 
-export type DesignMode = StyleMode;
+export type DesignMode = Exclude<StyleMode, 'tales'>;
 /** Every look except Tales builds its own characters. */
 export const onTalesDrawing = (_m: StyleMode) => false;
-export const hasDesign = (_m: StyleMode): _m is DesignMode => true;
+export const hasDesign = (m: StyleMode): m is DesignMode => m !== 'tales';
 
 /* ── shared helpers ─────────────────────────────────────── */
 type Fam = 'none' | 'buzz' | 'tuft' | 'short' | 'side' | 'messy' | 'bob' | 'long' | 'curlyShort' | 'curlyLong' | 'afro' | 'bun' | 'pony' | 'pigtails' | 'sides';
@@ -623,7 +622,7 @@ function assemble(l: Look, body: string, face: string, arm: (side: -1 | 1, pose:
   return `${shadow}<g class="bt-body" transform="translate(0 ${-A.lift})${lean}">${body}${left}<g class="bt-head" transform="rotate(-3 ${h.cx} ${n1(h.chin)})">${face}</g>${right}${thing}</g>`;
 }
 
-const DRAW: Record<DesignMode, (l: Look, id: string) => { svg: string; head: Head }> = { tales: (l, id) => featureCharacter(l, id, { hat, held, clothes, stripes }), pocketlight: ragdoll, gouache: retro, wondercut: paper, inked: sketch };
+const DRAW: Record<DesignMode, (l: Look, id: string) => { svg: string; head: Head }> = { pocketlight: ragdoll, gouache: retro, wondercut: paper, inked: sketch };
 
 /** The character in a look's own design, or null when the old renderer should draw it (pets, image faces, drawings). */
 export function designCharacter(l: Look, mode: StyleMode, id: string): { svg: string; head: Head } | null {
