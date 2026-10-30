@@ -562,7 +562,7 @@ function coreDefs(id: string, l: Look, skin: string, fur: string): string {
   const eye = l.eyes ?? EYE_COLOURS[0];
   const st = (pairs: [number, string, number?][]) => pairs.map(([o, c, a]) => `<stop offset="${o}" stop-color="${c}"${a === undefined ? '' : ` stop-opacity="${a}"`}/>`).join('');
   // Movie 3D: real volume, light from the top left, a glossy band on the hair
-  const film = DESIGN === 'pocketlight' || DESIGN === 'wondercut';
+  const film = DESIGN === 'pocketlight' || DESIGN === 'wondercut' || DESIGN === 'gouache';
   // (Sparkle shares the glossy hair; its skin stays soft and flat-lit)
   return `<defs><radialGradient id="sk${id}" cx="40%" cy="32%" r="80%">${DESIGN === 'pocketlight' ? st([[0, shade(skin, 0.14)], [0.55, skin], [1, shade(skin, -0.06)]]) : st([[0, skin], [1, skin]])}</radialGradient>
     <linearGradient id="hr${id}" gradientUnits="userSpaceOnUse" x1="70" y1="12" x2="112" y2="212">${film ? st([[0, shade(l.hair, 0.34)], [0.18, shade(l.hair, 0.12)], [0.45, l.hair], [1, shade(l.hair, -0.26)]]) : st([[0, shade(l.hair, 0.16)], [0.55, l.hair], [1, shade(l.hair, -0.14)]])}</linearGradient>
@@ -634,7 +634,7 @@ function coreEye(id: string, s: FaceSpec, l: Look, side: -1 | 1, gap: number, w:
   const lidEdge = `M${cx - rx - 1.5} ${endY} Q${cx} ${ctrlY} ${cx + rx + 1.5} ${endY}`;
   const lidFill = `M${cx - rx - 4} ${cy - ry * 1.7} L${cx + rx + 4} ${cy - ry * 1.7} L${cx + rx + 1.5} ${endY} Q${cx} ${ctrlY} ${cx - rx - 1.5} ${endY} Z`;
   const lidCol = mixHex(l.skin, '#b9776a', 0.1);
-  const starry = ex === 'starry' || (DESIGN === 'wondercut' && ex !== 'wow');
+  const starry = ex === 'starry' || ((DESIGN === 'wondercut' || DESIGN === 'gouache') && ex !== 'wow');
   const shine = starry
     ? sparkle(ix - ir * 0.2, iy - ir * 0.18, ir * 0.6, '#fff') + `<circle cx="${ix + ir * 0.45}" cy="${iy + ir * 0.42}" r="${ir * 0.14}" fill="#fff"/>`
     : `<ellipse cx="${ix - ir * 0.32}" cy="${iy - ir * 0.26}" rx="${ir * 0.38}" ry="${ir * 0.34}" fill="#fff"/><circle cx="${ix + ir * 0.42}" cy="${iy + ir * 0.42}" r="${ir * 0.17}" fill="#fff" opacity=".95"/>`;
@@ -816,27 +816,25 @@ let DESIGN: StyleMode = 'tales';
 const DESIGN_PROPS: Partial<Record<StyleMode, Record<'baby' | 'kid' | 'adult' | 'elder', { head: number; body: number; slim: number }>>> = {
   // Movie 3D: a modern animated film. Big heads on slim bodies, little ones round
   pocketlight: { baby: { head: 1.02, body: 0.98, slim: 1.02 }, kid: { head: 0.9, body: 1.04, slim: 0.96 }, adult: { head: 0.7, body: 1.24, slim: 0.9 }, elder: { head: 0.74, body: 1.16, slim: 0.96 } },
-  // Classic Fairytale: graceful, real-feeling proportions
-  gouache: { baby: { head: 1, body: 1.02, slim: 0.98 }, kid: { head: 0.82, body: 1.15, slim: 0.9 }, adult: { head: 0.62, body: 1.3, slim: 0.86 }, elder: { head: 0.66, body: 1.24, slim: 0.92 } },
+  // Chibi: giant heads on tiny toy bodies (grown-ups a little taller, so they still read as grown-ups)
+  gouache: { baby: { head: 1.04, body: 0.76, slim: 1.02 }, kid: { head: 1.02, body: 0.8, slim: 0.98 }, adult: { head: 1, body: 0.9, slim: 0.96 }, elder: { head: 1, body: 0.84, slim: 1 } },
   // Super Heroes: heroic, broad-shouldered, standing tall
   inked: { baby: { head: 1, body: 1, slim: 1.06 }, kid: { head: 0.78, body: 1.16, slim: 1 }, adult: { head: 0.6, body: 1.36, slim: 1.06 }, elder: { head: 0.64, body: 1.26, slim: 1.06 } },
   // Sparkle: a modern storybook: graceful, slim, a little big-headed
   wondercut: { baby: { head: 1.02, body: 0.98, slim: 0.98 }, kid: { head: 0.86, body: 1.08, slim: 0.9 }, adult: { head: 0.66, body: 1.27, slim: 0.84 }, elder: { head: 0.7, body: 1.2, slim: 0.9 } },
 };
-const DESIGN_LEGS: Partial<Record<StyleMode, number>> = { pocketlight: 0.8, gouache: 1, inked: 1.1, wondercut: 1 };
+const DESIGN_LEGS: Partial<Record<StyleMode, number>> = { pocketlight: 0.8, gouache: 0.25, inked: 1.1, wondercut: 1 };
 function designSpec(S: FaceSpec, l: Look): FaceSpec {
   const f = femme(l), grown = l.kind === 'adult' || l.kind === 'elder';
   switch (DESIGN) {
     // big round eyes set a little low, round cheeks, a small soft chin
     case 'pocketlight': return { ...S, top: S.top - 2, chin: S.chin - (grown ? 6 : 4), cheek: S.cheek + (grown ? 5 : 3), chinW: Math.max(9, S.chinW - 2), erx: S.erx * 1.2, ery: S.ery * (grown ? 1.42 : 1.3), ey: S.ey + 3 };
     // a soft oval, gentle eyes with more white, set high
-    case 'gouache': return l.kind === 'baby'
-      // a baby's face is a soft oval here, not a ball
-      ? { ...S, top: S.top + 2, chin: S.chin + 4, cran: S.cran - 4, cheek: S.cheek - 9, chinW: S.chinW - 8, erx: S.erx * 0.94, ery: S.ery * 0.94 }
-      : { ...S, top: S.top - 2, chin: S.chin + 3, cran: S.cran - 1, cheek: S.cheek - 2, chinW: S.chinW + (f ? -2 : 2), erx: S.erx * 0.94, ery: S.ery * 0.94, ey: S.ey - 1 };
-    // angular: a long face, high cheekbones, a pointed or a square chin, narrow slanted eyes
+    // Chibi: a wide round face, huge tall eyes set low, everything else tiny
+    case 'gouache': return { ...S, top: S.top - 4, chin: S.chin - (grown ? 6 : 4), cheek: S.cran - 1, chinW: S.chinW + (grown ? (f ? 10 : 14) : 8), erx: S.erx * 1.26, ery: S.ery * (grown ? 1.9 : 1.62), ey: S.ey + 6 };
     // a hero's face: a strong jaw on grown men, determined eyes
-    case 'inked': return { ...S, chin: S.chin + (grown ? 3 : 0), cheek: S.cheek + (grown && !f ? 4 : 0), chinW: grown ? (f ? S.chinW : S.chinW + 7) : S.chinW, ery: S.ery * 0.9 };
+    // heroes: the Tales face with a softer, rounder chin (a mask puts all the attention on the lower face)
+    case 'inked': return { ...S, chin: S.chin - 2, chinW: S.chinW + (l.kind === 'baby' ? 0 : grown ? 6 : 5), cheek: S.cheek + (l.kind === 'baby' ? 0 : 2), ery: S.ery * 0.92 };
     // heart-shaped: full at the cheekbones, a small pointed chin; big lashed eyes
     case 'wondercut': return { ...S, cheek: S.cran + (l.kind === 'baby' ? -4 : 1), chinW: l.kind === 'baby' ? S.chinW - 6 : grown ? (f ? 6 : 11) : 9, chin: S.chin + (grown ? 2 : 0), erx: S.erx * 1.16, ery: S.ery * 1.24, ey: S.ey + 1 };
     default: return S;
@@ -861,7 +859,7 @@ function talesEye(id: string, s: FaceSpec, l: Look, side: -1 | 1, gap: number): 
   const ry = s.ery * es * (big ? 1.14 : ex === 'dreamy' ? 0.8 : ex === 'shy' ? 0.9 : 1);
   // delicate: a fine warm-brown lash line, never a heavy black rim
   const ink = '#4a2f26', f = femme(l), little = l.kind === 'baby' || l.kind === 'kid';
-  const lw = (l.kind === 'baby' ? 1.8 : l.kind === 'kid' ? 2 : f ? 2.3 : 2) * (DESIGN === 'wondercut' && f ? 1.3 : DESIGN === 'gouache' ? 0.8 : 1);
+  const lw = (l.kind === 'baby' ? 1.8 : l.kind === 'kid' ? 2 : f ? 2.3 : 2) * (DESIGN === 'wondercut' && f ? 1.3 : DESIGN === 'gouache' ? 1.1 : 1);
   const n = (v: number) => v.toFixed(1);
   // corners: the outer corner sits a touch higher than the inner (a lifted, friendly almond)
   // Bold Hero: a slanted almond, the outer corner swept up
@@ -879,7 +877,7 @@ function talesEye(id: string, s: FaceSpec, l: Look, side: -1 | 1, gap: number): 
   // the upper lid overlaps the top of the iris and the lower lid crosses its bottom: white only at the sides
   // (the eye's width sets how much white shows at the sides: about a third of it)
   // the iris is about 60% of the eye's width, so clear white shows on both sides (a bigger iris looks possessed)
-  const ir = Math.min(rx * (l.kind === 'baby' ? 0.66 : l.kind === 'kid' ? 0.62 : 0.58) * (DESIGN === 'gouache' ? 0.86 : DESIGN === 'pocketlight' || DESIGN === 'wondercut' ? 1.06 : 1), ry * 1.02), ix = cx + gx + side * 0.4, iy = cy - ry * 1.02 + ir * 0.9 + gy;
+  const ir = Math.min(rx * (l.kind === 'baby' ? 0.66 : l.kind === 'kid' ? 0.62 : 0.58) * (DESIGN === 'gouache' ? 1.12 : DESIGN === 'pocketlight' || DESIGN === 'wondercut' ? 1.06 : 1), ry * 1.02), ix = cx + gx + side * 0.4, iy = cy - ry * 1.02 + ir * 0.9 + gy;
   const eyeCol = l.eyes ?? EYE_COLOURS[0];
   const clip = `te${id}${side}`;
   const starry = ex === 'starry';
@@ -947,8 +945,8 @@ function talesNose(s: FaceSpec, l: Look): string {
     return `<ellipse cx="100" cy="${n(ny + 1)}" rx="${grownN ? 4.4 : 3.8}" ry="${grownN ? 3.4 : 2.8}" fill="${shade(l.skin, -0.07)}" stroke="none"/><path d="M96.6 ${n(ny + 2.6)} Q100 ${n(ny + 4.6)} 103.4 ${n(ny + 2.6)}" stroke="${d}" stroke-width="1.2" fill="none" stroke-linecap="round" opacity=".6"/><ellipse cx="99" cy="${n(ny - 0.4)}" rx="1.7" ry="1.1" fill="#fff" opacity=".5"/>`;
   if (DESIGN === 'wondercut' && l.kind !== 'baby') // Sparkle: a small, upturned tip
     return `<path d="M97.6 ${n(ny + 1.8)} Q100.6 ${n(ny + 3.4)} 103.4 ${n(ny + 1.2)}" stroke="${d}" stroke-width="1.3" fill="none" stroke-linecap="round"/><ellipse cx="100.4" cy="${n(ny)}" rx="2.6" ry="1.8" fill="#fff" opacity=".4"/>`;
-  if (DESIGN === 'gouache' && l.kind !== 'baby') // Classic Fairytale: a small, delicate tip and nothing more
-    return `<path d="M97.4 ${n(ny + 1.6)} Q100.6 ${n(ny + 3.6)} 103.6 ${n(ny + 1.2)}" stroke="${d}" stroke-width="1.3" fill="none" stroke-linecap="round"/><path d="M103.4 ${n(ny - 3)} Q105 ${n(ny - 0.6)} 103.6 ${n(ny + 1.2)}" stroke="${d}" stroke-width="1.1" fill="none" stroke-linecap="round" opacity=".6"/>`;
+  if (DESIGN === 'gouache') // Chibi: just a tiny dot of a nose
+    return `<ellipse cx="100" cy="${n(ny + 2)}" rx="2.2" ry="1.5" fill="${shade(l.skin, -0.22)}" stroke="none"/>`;
   const hi = `<ellipse cx="100.6" cy="${n(ny - 1.4)}" rx="2.2" ry="1.3" fill="#fff" opacity=".35"/>`;
   if (l.kind === 'baby') {
     // a button nose: a soft round tip and two tiny nostrils
@@ -967,13 +965,13 @@ function talesNose(s: FaceSpec, l: Look): string {
 
 function talesMouth(id: string, s: FaceSpec, l: Look): string {
   const ex = exprOf(l), f = femme(l), grown = l.kind === 'adult' || l.kind === 'elder';
-  const my = s.ey + (l.kind === 'baby' ? 26 : l.kind === 'kid' ? 30 : 35) + (DESIGN === 'inked' && (l.kind === 'adult' || l.kind === 'elder') ? 2 : 0);
+  const my = s.ey + (l.kind === 'baby' ? 26 : l.kind === 'kid' ? 30 : 35) + (DESIGN === 'inked' && (l.kind === 'adult' || l.kind === 'elder') ? 2 : DESIGN === 'gouache' ? -4 : 0);
   const n = (v: number) => v.toFixed(1);
   // lips in the person's own colouring: a natural rose for grown women, a soft flush of the skin for everyone else
   const lower = f && grown ? mixHex(l.skin, '#c95a68', 0.5) : mixHex(l.skin, '#c96f78', l.kind === 'baby' ? 0.26 : 0.24);
   const upper = shade(lower, f && grown ? -0.14 : -0.1);
   const seam = mixHex(shade(l.skin, -0.58), '#6e2230', 0.35);
-  const wd = (l.kind === 'baby' ? 7.5 : l.kind === 'kid' ? 9.5 : f ? 11.5 : 12) * (DESIGN === 'gouache' ? 0.78 : DESIGN === 'wondercut' ? 0.9 : 1);
+  const wd = (l.kind === 'baby' ? 7.5 : l.kind === 'kid' ? 9.5 : f ? 11.5 : 12) * (DESIGN === 'gouache' ? 0.62 : DESIGN === 'wondercut' ? 0.9 : 1);
   // lip thickness at the middle: the upper lip thinner than the lower, both fuller for grown women
   const tu = l.kind === 'baby' ? 1.3 : l.kind === 'kid' ? 1.8 : f ? 3.2 : 2.1;
   const tl = l.kind === 'baby' ? 2.4 : l.kind === 'kid' ? 2.9 : f ? 4.2 : 3;
@@ -1074,7 +1072,7 @@ function talesFace(id: string, l: Look): string {
   // cel shading: one shadow tone down the far side of the face and under the hairline
   const shadowTone = DESIGN === 'pocketlight' ? shade(l.skin, -0.035) : mixHex(shade(l.skin, -0.13), '#b4524a', 0.12);
   return `${back}
-    <path d="M${100 - neckW} 134 L${100 + neckW} 134 L${100 + neckW - 1} 160 L${100 - neckW + 1} 160 Z" fill="${shade(l.skin, -0.14)}"/>
+    <path d="M${100 - neckW} 134 L${100 + neckW} 134 L${100 + neckW - 1} 160 L${100 - neckW + 1} 160 Z" fill="${l.outfit === 'supersuit' ? shade(superOf(l).suit, -0.12) : shade(l.skin, -0.14)}"/>
     ${ears}
     <clipPath id="${clip}"><path d="${head}"/></clipPath>
     <path d="${head}" fill="${shadowTone}"/>
@@ -1094,7 +1092,7 @@ function talesFace(id: string, l: Look): string {
 /** The storybook line: every filled shape gets a soft outline in a darker shade of its own colour. */
 function coreInk(svg: string, l: Look, id: string): string {
   // Classic Fairytale: a fine line; Bold Hero: a heavy, dark one
-  const width = DESIGN === 'gouache' ? 1.5 : DESIGN === 'wondercut' ? 1.8 : DESIGN === 'inked' ? 2.6 : 2.3;
+  const width = DESIGN === 'gouache' ? 2.2 : DESIGN === 'wondercut' ? 1.8 : DESIGN === 'inked' ? 2.6 : 2.3;
   const ink = (fill: string): string | null => {
     if (fill.startsWith('#')) return darken(fill.length === 4 ? `#${fill[1]}${fill[1]}${fill[2]}${fill[2]}${fill[3]}${fill[3]}` : fill, LINE);
     if (fill.startsWith(`url(#sk${id}`)) return darken(l.skin, LINE);
@@ -1416,7 +1414,7 @@ function emblemArt(e: (typeof EMBLEMS)[number], x: number, y: number, r: number,
 }
 /** A domino mask across the eyes, in the hero's own colour (drawn under the eyes, so they show through). */
 function heroMask(s: FaceSpec, l: Look, gap: number): string {
-  if (l.outfit !== 'supersuit') return '';
+  if (l.outfit !== 'supersuit' || l.kind === 'baby') return '';
   const H = superOf(l), W = s.ex + gap + s.erx * 1.55, ey = s.ey, ry = s.ery, n = (v: number) => v.toFixed(1);
   const d = `M${n(100 - W)} ${n(ey - ry * 0.5)} Q${n(100 - W * 0.55)} ${n(ey - ry * 2.3)} 100 ${n(ey - ry * 1.15)} Q${n(100 + W * 0.55)} ${n(ey - ry * 2.3)} ${n(100 + W)} ${n(ey - ry * 0.5)} L${n(100 + W + 6)} ${n(ey - ry * 0.9)} L${n(100 + W + 2)} ${n(ey + ry * 0.3)} Q${n(100 + W * 0.9)} ${n(ey + ry * 1.7)} ${n(100 + W * 0.45)} ${n(ey + ry * 1.75)} Q${n(100 + W * 0.15)} ${n(ey + ry * 1.8)} 100 ${n(ey + ry * 0.75)} Q${n(100 - W * 0.15)} ${n(ey + ry * 1.8)} ${n(100 - W * 0.45)} ${n(ey + ry * 1.75)} Q${n(100 - W * 0.9)} ${n(ey + ry * 1.7)} ${n(100 - W - 2)} ${n(ey + ry * 0.3)} L${n(100 - W - 6)} ${n(ey - ry * 0.9)} Z`;
   return `<path d="${d}" fill="${shade(H.cape, -0.18)}"/>`;

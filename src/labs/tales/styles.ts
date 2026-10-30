@@ -64,8 +64,8 @@ export const STYLES: Record<StyleMode, StyleConfig> = {
   },
   gouache: {
     id: 'gouache',
-    name: 'Classic Fairytale',
-    blurb: 'Like a golden-age fairytale film: soft oval faces, gentle lashed eyes, rosebud mouths and a painted glow',
+    name: 'Chibi',
+    blurb: 'Super cute and toy-like: tiny bodies, giant round heads and huge sparkly eyes',
     palette: { swatches: ['#e9b38c', '#d9776b', '#e8b64a', '#7fae7a', '#6f97b8', '#a48fc4', '#f4ead8', '#4f4038'], ink: '#4f4038', shadow: '#6b5446', paper: '#f4ecdf', light: '#fff4dd' },
     colour: { pull: 0.3, saturation: 0.88, brightness: 1.02, warmth: 0.08 },
     materials: { shading: 'painted', contrast: 0.45, gloss: 0 },

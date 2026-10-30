@@ -29,11 +29,11 @@ export function lookFilters(mode: StyleMode, id: string, part: 'character' | 'ba
       <feColorMatrix in="glow" type="matrix" values="1.04 0.02 0.02 0 0.012  0 1 0.02 0 0.004  0.02 0 1.02 0 0.012  0 0 0 1 0" result="rosy"/>
       <feColorMatrix in="rosy" type="saturate" values="1.08"/>
     </filter>`;
-  if (mode === 'gouache') // Classic Fairytale: a soft painted glow, warm light
+  if (mode === 'gouache') // Chibi: bright, clean toy colours with a soft bloom
     return `<filter id="lk${id}" x="-6%" y="-6%" width="112%" height="112%" color-interpolation-filters="sRGB">
-      <feGaussianBlur in="SourceGraphic" stdDeviation="${part === 'backdrop' ? 1.2 : 2.2}" result="soft"/>
-      <feComposite in="soft" in2="SourceGraphic" operator="arithmetic" k2="${part === 'backdrop' ? 0.45 : 0.22}" k3="${part === 'backdrop' ? 0.6 : 0.82}" result="glow"/>
-      <feColorMatrix in="glow" type="matrix" values="1.03 0.02 0 0 0.01  0.01 1 0.01 0 0.005  0 0.02 0.95 0 0  0 0 0 1 0"/>
+      <feGaussianBlur in="SourceGraphic" stdDeviation="${part === 'backdrop' ? 1 : 1.8}" result="soft"/>
+      <feComposite in="soft" in2="SourceGraphic" operator="arithmetic" k2="${part === 'backdrop' ? 0.3 : 0.14}" k3="${part === 'backdrop' ? 0.74 : 0.9}" result="glow"/>
+      <feColorMatrix in="glow" type="saturate" values="1.18"/>
     </filter>`;
   if (mode === 'inked') // Super Heroes: crisp, saturated colour
     return `<filter id="lk${id}" x="-4%" y="-4%" width="108%" height="108%" color-interpolation-filters="sRGB"><feColorMatrix type="saturate" values="1.15"/></filter>`;

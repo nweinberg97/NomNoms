@@ -31,7 +31,7 @@ test('each look is its own character design, drawn from the same person', () => 
   // Movie 3D is lit in 3D with no ink line; Classic Fairytale and Sparkle have fine lines and a glow
   assert.match(out.pocketlight, /feDiffuseLighting[\s\S]*feSpecularLighting/);
   assert.doesNotMatch(out.pocketlight, /paint-order="stroke"/);
-  assert.match(out.gouache, /stroke-width="1.5" stroke-linejoin="round" paint-order="stroke"/);
+  assert.match(out.gouache, /stroke-width="2.2" stroke-linejoin="round" paint-order="stroke"/);
   assert.match(out.wondercut, /stroke-width="1.8" stroke-linejoin="round" paint-order="stroke"/);
   // Super Heroes: everyone in their own suit, cape and mask, the same person underneath
   assert.match(out.inked, /stroke-width="2.6" stroke-linejoin="round" paint-order="stroke"/);
@@ -47,7 +47,7 @@ test('a look applies in every story world, not just everyday', () => {
     const w = { ...look, world };
     assert.match(characterMarkup(w, { style: 'pocketlight' }), /feDiffuseLighting/, `${world}: movie 3D`);
     assert.match(characterMarkup(w, { style: 'inked' }), /stroke-width="2.6"/, `${world}: super heroes`);
-    assert.match(characterMarkup(w, { style: 'gouache' }), /feComposite in="soft"/, `${world}: classic glow`);
+    assert.match(characterMarkup(w, { style: "gouache" }), /feComposite in="soft"/, `${world}: chibi glow`);
   }
 });
 
