@@ -41,6 +41,17 @@ export function LikenessDebug() {
     const c = canvas.current; if (c) { c.width = 0; c.height = 0; }
   };
   useEffect(() => () => clear(), []); // eslint-disable-line react-hooks/exhaustive-deps
+  // for the developer test bench: read a photo (a data URL) and return what was measured, without the pixels
+  useEffect(() => {
+    const w = window as unknown as { __lkdRead?: (url: string) => Promise<unknown> };
+    w.__lkdRead = async (url: string) => {
+      const blob = await (await fetch(url)).blob();
+      const reading = await readFace(await openPhoto(new File([blob], 'x')), {});
+      const { debug, ...m } = reading.measurements;
+      return { ...m, extra: debug.extra, look: applyDNA({ ...BASE }, buildDNA(reading.measurements, 'adult')) };
+    };
+    return () => { delete w.__lkdRead; };
+  }, []);
 
   useEffect(() => {
     const c = canvas.current, d = run?.reading.debug;

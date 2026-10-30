@@ -163,7 +163,8 @@ test('skin and hair are read from the right places, and say where they came from
   const sk = hex(m.skin.value!);
   assert.ok(sk.every((v, i) => v >= [222, 176, 146][i] - 6 && v <= [222, 176, 146][i] + 40), `skin ${m.skin.value}`);
   assert.equal(m.hair.status, 'measured');
-  assert.ok(near(m.hair.value!, [60, 38, 22], 6), `hair ${m.hair.value}`);
+  // hair is corrected to daylight like skin (this test photo is a little dim), so it reads a touch brighter than painted
+  assert.ok(near(m.hair.value!, [60, 38, 22], 10), `hair ${m.hair.value}`);
   assert.equal(m.hairTexture.status === 'missing' || m.hairTexture.status === 'inferred', true, 'curls are only ever a best guess');
   const bald = measure(faceOf(grace), paint(grace, { hair: false }));
   assert.equal(bald.hair.status, 'missing', 'no hair, no hair colour');

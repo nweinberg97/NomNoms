@@ -18,8 +18,8 @@ import { SHAPE_KEYS, type HairLength, type HairTexture, type Measurement, type M
 
 export type Source = 'measured' | 'inferred' | 'parent';
 export interface Trait<T> { value: T; source: Source; confidence: number; basis?: string }
-export type IdentityKey = 'skin' | 'hair' | 'eyes' | 'hairStyle' | 'facial' | 'shape' | 'kind';
-export const IDENTITY_KEYS: IdentityKey[] = ['skin', 'hair', 'eyes', 'hairStyle', 'facial', 'shape', 'kind'];
+export type IdentityKey = 'skin' | 'hair' | 'eyes' | 'hairStyle' | 'facial' | 'shape' | 'kind' | 'presents';
+export const IDENTITY_KEYS: IdentityKey[] = ['skin', 'hair', 'eyes', 'hairStyle', 'facial', 'shape', 'kind', 'presents'];
 
 export interface CharacterDNA {
   version: 1;
@@ -33,6 +33,10 @@ export interface CharacterDNA {
   hairStyle?: Trait<HairStyle>;
   facial?: Trait<Facial>;
   shape: Partial<Record<ShapeKey, Trait<number>>>;
+  /** Woman or man, when the photo shows it clearly (drawn with or without lashes and softer features). */
+  presents?: Trait<'woman' | 'man'>;
+  /** Glasses seen in the photo: a suggestion for the wardrobe, never forced. */
+  glasses?: Trait<boolean>;
   /** The hair readings the hairstyle was chosen from. */
   hairDetail: { length?: Trait<HairLength>; texture?: Trait<HairTexture>; volume?: Trait<number>; bangs?: Trait<boolean>; part?: Trait<number>; up?: Trait<number> };
   warnings: string[];
@@ -137,6 +141,10 @@ export function buildDNA(m: Measurements, kind: Kind, keep: Partial<Pick<Charact
   if (style) dna.hairStyle = style;
   const facial = pickFacial(kind, m.facialHair);
   if (facial) dna.facial = facial;
+  const pres = trait(m.presents);
+  if (pres) dna.presents = pres;
+  const gl = trait(m.glasses);
+  if (gl) dna.glasses = gl;
   for (const k of IDENTITY_KEYS) if (k !== 'kind' && keep[k] !== undefined) (dna as unknown as Record<string, unknown>)[k] = keep[k];
   return dna;
 }
@@ -153,6 +161,9 @@ export function applyDNA(look: Look, dna: CharacterDNA): Look {
   if (dna.eyes) next.eyes = dna.eyes.source === 'parent' ? dna.eyes.value : tame(dna.eyes.value, EYE_COLOURS, 0.5);
   if (dna.hairStyle) next.hairStyle = dna.hairStyle.value;
   if (dna.facial) next.facial = dna.facial.value;
+  if (dna.presents) next.lashes = dna.presents.value === 'woman';
+  // glasses in the photo: put a pair on, unless they already wear some (or a drawn pair)
+  if (dna.glasses?.value && (!look.glasses || look.glasses === 'none')) next.glasses = 'round';
   const shape: FaceShape = {};
   for (const k of SHAPE_KEYS) { const t = dna.shape[k]; if (t) shape[k] = t.value; }
   // shapes the photo couldn't read keep their current value
@@ -170,6 +181,7 @@ export function parentTraits(look: Look, keys: IdentityKey[]): Partial<Pick<Char
     else if (k === 'eyes' && look.eyes) out.eyes = p(look.eyes);
     else if (k === 'hairStyle') out.hairStyle = p(look.hairStyle);
     else if (k === 'facial' && look.facial) out.facial = p(look.facial);
+    else if (k === 'presents') out.presents = p(look.lashes ? 'woman' : 'man');
     else if (k === 'shape' && look.shape) out.shape = Object.fromEntries(Object.entries(look.shape).map(([s, v]) => [s, p(v as number)]));
   }
   return out;
@@ -198,5 +210,6 @@ export function describeDNA(dna: CharacterDNA): { label: string; sure: boolean }
   const shapes = SHAPE_KEYS.filter((k) => dna.shape[k] && dna.shape[k]!.source !== 'parent');
   if (shapes.length) out.push({ label: `Face shape (${shapes.length} of ${SHAPE_KEYS.length})`, sure: shapes.filter((k) => dna.shape[k]!.source === 'measured').length >= 4 });
   add(dna.facial, dna.facial ? (dna.facial.value === 'none' ? 'No beard' : `Facial hair: ${dna.facial.value}`) : '');
+  if (dna.glasses?.value) add(dna.glasses, 'Glasses');
   return out;
 }

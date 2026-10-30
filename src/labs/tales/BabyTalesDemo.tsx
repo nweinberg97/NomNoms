@@ -1085,6 +1085,14 @@ export function BabyTalesDemo() {
                                 {KINDS.map((k) => <button key={k.kind} type="button" role="radio" aria-checked={person.look.kind === k.kind} className="lab-chip" onClick={() => setKind(k.kind)} data-testid={`kind-${k.kind}`}>{k.label}</button>)}
                               </div>
                             )}
+                            {readings[person.member.id] && !isPet(person.look.kind) && (
+                              <div className="bt-kindpick" role="radiogroup" aria-label="Woman or man">
+                                <span>Drawn as</span>
+                                {([['woman', person.look.kind === 'kid' || person.look.kind === 'baby' ? 'Girl' : 'Woman'], ['man', person.look.kind === 'kid' || person.look.kind === 'baby' ? 'Boy' : 'Man']] as const).map(([v, label]) => (
+                                  <button key={v} type="button" role="radio" aria-checked={!!person.look.lashes === (v === 'woman')} className="lab-chip" onClick={() => pick('presents', { lashes: v === 'woman' })} data-testid={`presents-${v}`}>{label}</button>
+                                ))}
+                              </div>
+                            )}
                             {!result.accepted && result.from && (result.faces?.length ?? 0) > 1 && (
                               <div className="bt-facepick" role="radiogroup" aria-label="Which face">
                                 <span>Which face?</span>
@@ -1098,7 +1106,7 @@ export function BabyTalesDemo() {
                             )}
                             {!isPet(person.look.kind) && (
                               <div className="bt-quickpick">
-                                <span>Skin</span>
+                                <span title="Lighting changes how skin looks in photos, so check this one">Skin tone (tap the closest)</span>
                                 <div className="bt-swatches is-small" role="radiogroup" aria-label="Skin tone">{SKIN_TONES.map((c) => <button key={c} type="button" role="radio" className="bt-swatch" style={{ background: c }} aria-checked={person.look.skin === c} aria-label={`Skin tone ${c}`} onClick={() => pick('skin', { skin: c })} data-testid="quick-skin" />)}</div>
                                 <span>Hair</span>
                                 <div className="bt-swatches is-small" role="radiogroup" aria-label="Hair colour">{HAIR_COLOURS.map((c) => <button key={c} type="button" role="radio" className="bt-swatch" style={{ background: c }} aria-checked={person.look.hair === c} aria-label={`Hair colour ${c}`} onClick={() => pick('hair', { hair: c })} />)}</div>
@@ -1107,7 +1115,7 @@ export function BabyTalesDemo() {
                             <div className="bt-matched">{result.matched.map((m) => <span key={m.label} className={m.sure ? '' : 'is-guess'} title={m.sure ? 'Read from the photo' : 'A best guess; check it'}>{m.sure ? '' : '~ '}{m.label}</span>)}</div>
                             {result.kept.length > 0 && <small>Kept your own choice of {result.kept.map((k) => (k === 'hairStyle' ? 'hairstyle' : k === 'shape' ? 'face shape' : k)).join(', ')}.</small>}
                             {result.notes.length > 0 && <ul className="bt-notes">{result.notes.slice(0, 3).map((n) => <li key={n}>{n}</li>)}</ul>}
-                            <small>~ means a best guess. Tap a colour above to fix it, or fine-tune everything in Face & hair.</small>
+                            <small>~ means a best guess. Photos change how skin and hair look (lamps, old prints, hats), so tap the closest colours above; fine-tune everything in Face & hair.</small>
                             {result.accepted ? (
                               <p className="bt-accepted" data-testid="photo-accepted"><Icon name="check" size={14} /> Photo removed. Only the character is kept; your photo was never uploaded or stored.</p>
                             ) : (

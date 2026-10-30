@@ -75,6 +75,10 @@ export interface Measurements {
   glasses: Measurement<boolean>;
   /** Baby, kid, grown-up or grandparent: a best guess the parent confirms with a tap. */
   ageGroup: Measurement<'baby' | 'kid' | 'adult' | 'elder'>;
+  /** Fine lines in the skin (forehead, under the eyes, cheeks): raw is a score, higher is more lined. */
+  skinTexture: Measurement;
+  /** Woman or man, only when the photo shows clear signs (a beard, long hair); otherwise missing. */
+  presents: Measurement<'woman' | 'man'>;
   warnings: string[];
   /** Points and regions in image pixels, for drawing the debug overlay. */
   debug: {
@@ -84,6 +88,8 @@ export interface Measurements {
     irises: { x: number; y: number; r: number }[];
     regions: { name: string; poly: number[][] }[];
     hairPixels?: Uint8Array;
+    /** Raw numbers for calibration. */
+    extra?: Record<string, number>;
   };
 }
 
@@ -148,17 +154,18 @@ export function photoWhite(r: Raster): number {
  * Checked on adult photos under simulated lamp, dim, cool and bright light, and on
  * people across a range of skin tones (none of them children).
  */
-export function skinInDaylight(cheekLabs: number[][], sclera: number[] | null, white: number): { lab: number[]; gain: number; cast: number } {
+export function skinInDaylight(cheekLabs: number[][], sclera: number[] | null, white: number): { lab: number[]; gain: number; cast: number; gains: number[] } {
   const lins = cheekLabs.map((v) => labToRgb(v[0], v[1], v[2]).map(linear));
   lins.sort((p, q) => luma(p) - luma(q));
   let c = lins[Math.min(lins.length - 1, Math.floor(lins.length * 0.7))].slice();
   let cast = 0;
+  let gains = [1, 1, 1];
   if (sclera && luma(sclera) > 0.01 && sclera[1] > 1e-4) {
     // eye whites aren't pure white and vary a lot from photo to photo (pink corners, lids), so
     // only a tint well beyond that normal range counts as coloured light, and only the excess is removed
     const dead = Math.log(1.3);
     const fix = (ratio: number, usual: number) => { const d = Math.log(ratio / usual); const e = Math.sign(d) * Math.max(0, Math.abs(d) - dead); return Math.exp(-Math.max(-0.5, Math.min(0.5, e))); };
-    const gains = [fix(sclera[0] / sclera[1], SCLERA_RG), 1, fix(sclera[2] / sclera[1], SCLERA_BG)];
+    gains = [fix(sclera[0] / sclera[1], SCLERA_RG), 1, fix(sclera[2] / sclera[1], SCLERA_BG)];
     cast = Math.max(...gains.map((v) => Math.abs(Math.log(v))));
     const before = luma(c);
     c = c.map((v, k) => v * gains[k]);
@@ -167,9 +174,19 @@ export function skinInDaylight(cheekLabs: number[][], sclera: number[] | null, w
   }
   const gain = Math.min(2.5, Math.max(1, 0.9 / Math.max(white, 1e-3)));
   c = c.map((v) => Math.min(1, v * gain));
-  return { lab: rgbToLab(toByte(c[0]), toByte(c[1]), toByte(c[2])), gain, cast };
+  return { lab: rgbToLab(toByte(c[0]), toByte(c[1]), toByte(c[2])), gain, cast, gains };
 }
 
+
+/** Any colour (Lab, as photographed) as it would look in the same daylight the skin was corrected to. */
+export function labInDaylight(v: number[], gains: number[], gain: number): number[] {
+  const c = labToRgb(v[0], v[1], v[2]).map(linear);
+  const before = luma(c);
+  let d = c.map((x, k) => x * gains[k]);
+  const after = luma(d) || 1;
+  d = d.map((x) => Math.min(1, ((x * before) / after) * gain));
+  return rgbToLab(toByte(d[0]), toByte(d[1]), toByte(d[2]));
+}
 
 /** A face-local frame: origin between the eyes, x along the eye line, 1 unit = pupil distance. */
 export interface Frame { o: P; angle: number; iod: number; toLocal: (p: P) => P; toImage: (p: P) => P }
@@ -219,7 +236,7 @@ export function measure(face: FaceInput | null, px: PixelInput): Measurements {
   const allMissing = (why: string): Measurements => ({
     quality: { score: face?.score ?? 0, faces: face?.faces ?? 0, iodPx: 0, roll: 0, mouthOpen: 0, smile: 0 },
     shape: Object.fromEntries(SHAPE_KEYS.map((k) => [k, missing(why)])) as Record<ShapeKey, Measurement>,
-    skin: missing(why), eyes: missing(why), hair: missing(why), hairLength: missing(why), hairVolume: missing(why), hairTexture: missing(why), bangs: missing(why), hairPart: missing(why), hairUp: missing(why), facialHair: missing(why), glasses: missing(why), ageGroup: missing(why),
+    skin: missing(why), eyes: missing(why), hair: missing(why), hairLength: missing(why), hairVolume: missing(why), hairTexture: missing(why), bangs: missing(why), hairPart: missing(why), hairUp: missing(why), facialHair: missing(why), glasses: missing(why), ageGroup: missing(why), skinTexture: missing(why), presents: missing(why),
     warnings: [why], debug: { oval: [], eyes: [], skinPatches: [], irises: [], regions: [] },
   });
   if (!face || !face.mesh || face.mesh.length < 468) return allMissing('No face was found in this photo.');
@@ -333,7 +350,20 @@ export function measure(face: FaceInput | null, px: PixelInput): Measurements {
     return labs;
   };
   const sides = [[LM.skinR, LM.skinR2], [LM.skinL, LM.skinL2]].map((ids) => ids.flatMap((i) => patchAt(L(i))));
+  const extra: Record<string, number> = {};
   let skinLab: number[] | null = null;
+  let light = { gains: [1, 1, 1], gain: 1 };
+  const sclera = scleraOf();
+  /** True when a colour is as neutral as the whites of the eyes (so grey or white in real life, whatever the light). */
+  // eye whites seen through tinted lenses or in a faded print can read far from white; then they're no reference
+  const scleraOk = !!sclera && sclera[1] > 1e-4 && sclera[0] / sclera[1] > 1 && sclera[0] / sclera[1] < 2.4 && sclera[2] / sclera[1] > 0.55 && sclera[2] / sclera[1] < 1.3;
+  const neutralLikeEyes = (v: number[]) => {
+    // no usable eye whites: only clearly colourless counts
+    if (!scleraOk || !sclera) return Math.hypot(v[1], v[2]) < 7;
+    const c = labToRgb(v[0], v[1], v[2]).map(linear);
+    if (c[1] < 1e-4) return false;
+    return Math.abs(Math.log((c[0] / c[1]) / (sclera[0] / sclera[1]))) < 0.16 && Math.abs(Math.log((c[2] / c[1]) / (sclera[2] / sclera[1]))) < 0.2;
+  };
   let skin: Measurement<string>;
   let both = [...sides[0], ...sides[1]];
   if (both.length >= 20) {
@@ -347,7 +377,16 @@ export function measure(face: FaceInput | null, px: PixelInput): Measurements {
     skinLab = medianLab(both.filter((p) => p[0] >= lo && p[0] <= hi));
     // the skin tone itself is read as if in plain daylight: lamps, dim rooms and blue shade otherwise
     // turn the same skin several shades darker or a different colour (see skinInDaylight)
-    const daylight = skinInDaylight(both, scleraOf(), photoWhite(raster));
+    const daylight = skinInDaylight(both, sclera, photoWhite(raster));
+    light = { gains: daylight.gains, gain: daylight.gain };
+    {
+      // raw numbers for calibrating skin against the eye whites
+      const lins = both.map((v) => labToRgb(v[0], v[1], v[2]).map(linear)).sort((p, q) => luma(p) - luma(q));
+      const lit = lins[Math.min(lins.length - 1, Math.floor(lins.length * 0.7))];
+      extra.skinLuma = round(luma(lit), 4); extra.skinR = round(lit[0], 4); extra.skinG = round(lit[1], 4); extra.skinB = round(lit[2], 4);
+      if (sclera) { extra.scleraLuma = round(luma(sclera), 4); extra.scleraR = round(sclera[0], 4); extra.scleraG = round(sclera[1], 4); extra.scleraB = round(sclera[2], 4); }
+      extra.photoWhite = round(photoWhite(raster), 4);
+    }
     let conf = 0.85, status: Status = 'inferred';
     const why: string[] = ['Read from the photo’s light'];
     const sideL = sides.map((s) => (s.length ? median(s.map((p) => p[0])) : NaN));
@@ -396,9 +435,15 @@ export function measure(face: FaceInput | null, px: PixelInput): Measurements {
   const temples = band('sides', halfW + 0.05, halfW + 0.9, topY, 0.3, true);
   // where hair almost always shows and hats rarely sit: just outside the face, beside the forehead
   const temple = band('temple', halfW - 0.2, halfW + 0.35, topY + 0.1, -0.25, true);
+  // beside the ears: under a hat or cap, this is often the only hair that shows
+  const ears = band('ears', halfW - 0.1, halfW + 0.45, -0.2, 0.5, true);
+  // right against the side of the face, where hair under a hat shows and background rarely does
+  const earsNear = band('earsNear', halfW - 0.14, halfW + 0.1, -0.3, 0.35, true);
   let hair: Measurement<string>, hairLength: Measurement<HairLength>, hairVolume: Measurement, hairTexture: Measurement<HairTexture>, bangs: Measurement<boolean>;
   let hairPart: Measurement = missing('No hair to measure.'), hairUp: Measurement = missing('No hair to measure.');
   let hairLab: number[] | null = null;
+  let hairDay: number[] | null = null;
+  let greyHair = false;
   const crownFrac = crown.n ? crown.found.length / crown.n : 0;
   const sideFrac = temples.n ? temples.found.length / temples.n : 0;
   const hairConf = px.person ? 1 : 0.6;
@@ -414,7 +459,24 @@ export function measure(face: FaceInput | null, px: PixelInput): Measurements {
     covered = true;
     warnings.push('Something seems to cover the top of the head (a hat?), so hair was read from beside the face.');
   }
-  if (templeLab && (covered || !crownLab)) hairLab = templeLab;
+  const earFrac = ears.n ? ears.found.length / ears.n : 0;
+  const earLab = ears.found.length >= 20 && earFrac >= 0.12 ? medianLab(ears.found) : null;
+  // a hat with a band down to the temples: the top and the temples match, but the hair at the ears is
+  // clearly lighter or a different colour (grey or fair hair under a dark cap)
+  // hats and caps have badges, logos or trim: bright saturated colour on top that hair doesn't have
+  const crownBadge = crown.found.length ? crown.found.filter((v) => Math.hypot(v[1], v[2]) > 30).length / crown.found.length : 0;
+  extra.crownBadge = round(crownBadge, 3);
+  if (!covered && crownBadge >= 0.05 && crownLab && earLab && deltaE(crownLab, earLab) > 25 && (earLab[0] > crownLab[0] + 18 || Math.hypot(crownLab[1] - earLab[1], crownLab[2] - earLab[2]) > 14)) {
+    covered = true;
+    warnings.push('Something seems to cover the top of the head (a hat?), so hair was read from beside the ears.');
+  }
+  // grey or white hair beside the ears (as neutral as the eye whites, and light): under a hat that's
+  // often all that shows, as a thin silver edge between the hat and the ears
+  const silver = earsNear.found.filter((v) => v[0] > 42 && neutralLikeEyes(v));
+  extra.earSilver = silver.length; extra.earFound = earsNear.found.length;
+  if (covered && silver.length >= 8 && silver.length >= earsNear.found.length * 0.2) hairLab = medianLab(silver);
+  else if (covered && earLab && (!templeLab || (crownLab && deltaE(templeLab, crownLab) < 18))) hairLab = earLab;
+  else if (templeLab && (covered || !crownLab)) hairLab = templeLab;
   else if (crownLab) hairLab = crownLab;
   else if (temples.found.length >= 30 && sideFrac >= 0.2) hairLab = medianLab(temples.found);
   const hairPixels = new Uint8Array(W * H);
@@ -457,7 +519,9 @@ export function measure(face: FaceInput | null, px: PixelInput): Measurements {
     }
     const lengthY = lastRow - chinY;
     const len: HairLength = lastRow === -Infinity ? 'short' : lengthY < -0.3 ? 'short' : lengthY < 0.5 ? 'medium' : 'long';
-    hair = { status: 'measured', value: hexOf(hairLab), confidence: round(0.85 * hairConf, 2), raw: round(hairLab[0], 1) };
+    hairDay = labInDaylight(hairLab, light.gains, light.gain);
+    greyHair = hairDay[0] > 52 && (neutralLikeEyes(hairLab) || (hairDay[0] > 62 && Math.hypot(hairDay[1], hairDay[2]) < 9));
+    hair = { status: 'measured', value: hexOf(hairDay), confidence: round(0.85 * hairConf, 2), raw: round(hairDay[0], 1), ...(covered ? { why: 'Read from beside the ears (a hat covers the top)' } : {}) };
     hairLength = { status: 'inferred', value: len, confidence: round((ranOff ? 0.5 : 0.7) * hairConf, 2), raw: Number.isFinite(lengthY) ? round(lengthY, 2) : undefined, why: ranOff ? 'Hair runs past the bottom of the photo' : 'Measured beside the jaw; tied-up hair reads as short' };
     if (coverTop < 0.3 && coverSide < 0.15) hairLength = { status: 'inferred', value: 'none', confidence: round(0.6 * hairConf, 2), raw: round(coverTop, 2), why: 'Little or no hair on top' };
     hairVolume = { status: 'measured', value: round(clamp((coverSide - 0.3) / 0.3)), confidence: round(0.7 * hairConf, 2), raw: round(coverSide, 2), average: 0.3 };
@@ -527,6 +591,80 @@ export function measure(face: FaceInput | null, px: PixelInput): Measurements {
     facialHair = turned > 0.35 ? missing('Head turned, so facial hair wasn’t checked.') : { status: 'inferred', value: v, confidence: round(0.45 * sizeConf, 2), why: 'Shadows can look like stubble; please check' };
   }
 
+  /* ── glasses: frame lines across the nose bridge, under the eyes and beside them ── */
+  let glasses: Measurement<boolean> = missing('Glasses weren’t checked.');
+  if (!skinLab || turned > 0.35 || iodPx < 30) glasses = missing('Glasses weren’t checked in this photo.');
+  else {
+    const Lat = (lx: number, ly: number) => { const [ix, iy] = f.toImage([lx, ly]); const v = labAt(ix, iy); return v ? v[0] : null; };
+    const ds = Math.max(1 / iodPx, 0.008), w = 0.06;
+    /** The strongest thin line (dark or light) along a short path, against the skin either side. */
+    const lineOn = (path: (t: number) => P) => {
+      let best = 0;
+      for (let t = 0; t <= 1; t += ds / 0.3) {
+        const p = path(t);
+        const c = Lat(p[0], p[1]);
+        const dir = path(Math.min(1, t + 0.01)), dx = dir[0] - p[0], dy = dir[1] - p[1], dl = Math.hypot(dx, dy) || 1;
+        const a = Lat(p[0] - (dx / dl) * w, p[1] - (dy / dl) * w), b = Lat(p[0] + (dx / dl) * w, p[1] + (dy / dl) * w);
+        if (c === null || a === null || b === null) continue;
+        const side = Math.min(Math.abs(c - a), Math.abs(c - b)) * Math.sign((a + b) / 2 - c);
+        if (Math.abs(side) > Math.abs(best)) best = side;
+      }
+      return best;
+    };
+    const med3 = (xs: number[]) => median(xs.map(Math.abs));
+    const bridge = med3([-0.05, 0, 0.05].map((x) => lineOn((t) => [x, -0.16 + t * 0.26])));
+    const lower = med3([-0.6, -0.5, -0.4, 0.4, 0.5, 0.6].map((x) => lineOn((t) => [x, 0.16 + t * 0.36])));
+    const outer = med3([-0.08, 0, 0.08].flatMap((y) => [lineOn((t) => [-0.8 - t * 0.32, y]), lineOn((t) => [0.8 + t * 0.32, y])]));
+    extra.glassBridge = round(bridge, 2); extra.glassLower = round(lower, 2); extra.glassOuter = round(outer, 2);
+    // calibrated on adult photos: with glasses, both the bridge and the lower rims show a clear line
+    const on = lower >= 25 && bridge >= 12;
+    glasses = { status: 'inferred', value: on, confidence: round((on ? clamp((lower - 20) / 20, 0.4, 0.85) : 0.6) * sizeConf, 2), raw: round(lower, 1), why: 'Frame lines across the nose and under the eyes; thin or rimless frames can be missed' };
+  }
+
+  /* ── skin texture: fine lines on the forehead, under the eyes and at their outer corners ── */
+  // each skin pixel against its neighbours a short way off (scaled to the face, so a big photo
+  // and a small one are read alike): smooth young skin barely differs, lined skin does
+  let skinTexture: Measurement = missing('Skin texture wasn’t read.');
+  if (!skinLab) skinTexture = missing('Skin tone unknown.');
+  else if (iodPx < 45) skinTexture = missing('The face is too small in this photo to see skin detail.');
+  else if (turned > 0.35) skinTexture = missing('Head turned, so skin detail wasn’t read.');
+  else {
+    const dd = 1 / 26;
+    const Lat = (lx: number, ly: number) => { const [ix, iy] = f.toImage([lx, ly]); const v = labAt(ix, iy); return v ? v[0] : null; };
+    let vals: number[] = [];
+    const region = (x0: number, x1: number, y0: number, y1: number, mirror: boolean) => {
+      for (const sgn of mirror ? [-1, 1] : [1]) {
+        const [a, b] = mirror ? (sgn < 0 ? [-x1, -x0] : [x0, x1]) : [x0, x1];
+        scan(a, b, y0, y1, (lx, ly, ix, iy) => {
+          if (!inOval([lx, ly])) return;
+          const c = labAt(ix, iy);
+          if (!c || deltaE(c, skinLab!) > 18) return;
+          const nb = [Lat(lx - dd, ly), Lat(lx + dd, ly), Lat(lx, ly - dd), Lat(lx, ly + dd)];
+          if (nb.some((v) => v === null)) return;
+          vals.push(Math.abs(c[0] - (nb as number[]).reduce((s2, v) => s2 + v, 0) / 4));
+        });
+      }
+    };
+    const meanOf = (xs: number[]) => (xs.length ? xs.reduce((s2, v) => s2 + v, 0) / xs.length : NaN);
+    const parts: Record<string, number[]> = {};
+    const take = (name: string) => { parts[name] = vals; vals = []; };
+    region(-0.45, 0.45, browY - 0.42, browY - 0.12, false); take('forehead');
+    // glasses frames would read as lines, so with glasses only the skin away from them counts
+    if (!glasses.value) { region(0.22, 0.72, 0.15, 0.34, true); take('undereye'); region(0.74, 0.98, -0.14, 0.16, true); take('corners'); }
+    region(0.42, 0.78, 0.62, 1.0, true); take('cheeks');
+    for (const [k, v] of Object.entries(parts)) extra['tex_' + k] = round(meanOf(v) / Math.max(0.5, skinLab[0] / 65), 3);
+    vals = Object.values(parts).flat();
+    if (vals.length < 150) skinTexture = missing('Not enough clear skin to read.');
+    else {
+      vals.sort((a, b) => a - b);
+      const mean = vals.reduce((s2, v) => s2 + v, 0) / vals.length;
+      // relative to how bright the skin is: lines on darker skin are lower contrast
+      const score = mean / Math.max(0.5, skinLab[0] / 65);
+      extra.textureMean = round(mean, 3); extra.textureScore = round(score, 3); extra.textureN = vals.length;
+      skinTexture = { status: 'inferred', value: round(score, 3), confidence: round(0.5 * clamp(iodPx / 90, 0.5, 1), 2), raw: round(score, 3), why: 'Lines in the skin; lighting and photo sharpness change this' };
+    }
+  }
+
   /* ── eye colour, from the iris ring ────────────────────────────── */
   let eyes: Measurement<string>;
   const irises: { x: number; y: number; r: number }[] = [];
@@ -572,13 +710,26 @@ export function measure(face: FaceInput | null, px: PixelInput): Measurements {
     }
   } else shape.browWeight = missing(skinLab ? 'Brows not readable.' : 'Skin tone unknown.');
 
+  /**
+   * Woman or man, only from clear signs in the photo: a full moustache and beard means a man; long hair
+   * with no beard is read as a woman (a best guess; short-haired women and long-haired men are left to
+   * the parent). Anything else is left unread rather than guessed.
+   */
+  function presentsOf(): Measurement<'woman' | 'man'> {
+    const fh = facialHair.status === 'missing' ? undefined : facialHair.value;
+    if (fh && fh.moustache >= 0.8 && fh.chin >= 0.8) return { status: 'inferred', value: 'man', confidence: 0.7, why: 'A moustache and beard' };
+    if (hairLength.status !== 'missing' && hairLength.value === 'long' && (!fh || fh.moustache < 0.6)) return { status: 'inferred', value: 'woman', confidence: 0.45, why: 'Long hair; tap to change' };
+    return missing('Not clear from the photo; tap Woman or Man.');
+  }
   const toImg = (poly: P[]) => poly.map((p) => f.toImage(p));
   const rect = (x0: number, x1: number, y0: number, y1: number): P[] => [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
   return {
     quality: { score: round(face.score, 3), faces: face.faces, iodPx: round(iodPx, 1), yaw: yaw === undefined ? undefined : round(yaw, 3), pitch: pitch === undefined ? undefined : round(pitch, 3), roll: round(f.angle, 3), mouthOpen: round(mouthOpen, 3), smile: round(smile, 3), brightness: skinLab ? round(skinLab[0], 1) : undefined },
     shape, skin, eyes, hair, hairLength, hairVolume, hairTexture, bangs, hairPart, hairUp, facialHair,
-    glasses: missing('Glasses aren’t detected; choose them in the wardrobe.'),
-    ageGroup: face.age !== undefined ? ageGroupOf(face.age, hairLab, sizeConf) : ageFromShape(L, r.mouthOpen - AVERAGE.mouthOpen, pitch, hairLab, sizeConf),
+    glasses,
+    skinTexture,
+    presents: presentsOf(),
+    ageGroup: face.age !== undefined ? ageGroupOf(face.age, hairLab, sizeConf) : ageFromShape(L, r.mouthOpen - AVERAGE.mouthOpen, pitch, greyHair, skinTexture.status === 'missing' ? undefined : skinTexture.value as number, sizeConf),
     warnings,
     debug: {
       oval: FACE_OVAL.map((i) => pt(i)),
@@ -597,6 +748,7 @@ export function measure(face: FaceInput | null, px: PixelInput): Measurements {
         { name: 'fringe', poly: toImg(rect(-0.7, 0.7, topY + 0.05, browY - 0.25)) },
       ],
       hairPixels,
+      extra,
     },
   };
 }
@@ -615,19 +767,20 @@ export function measure(face: FaceInput | null, px: PixelInput): Measurements {
  * Not checked on photos of children (none are used for testing).
  */
 export const NOSE_ADULT = 0.74, NOSE_BABY = 0.64;
-function ageFromShape(L: (i: number) => P, mouthOpen: number, pitch: number | undefined, hairLab: number[] | null, sizeConf: number): Measurement<'baby' | 'kid' | 'adult' | 'elder'> {
+function ageFromShape(L: (i: number) => P, mouthOpen: number, pitch: number | undefined, greyHair: boolean, texture: number | undefined, sizeConf: number): Measurement<'baby' | 'kid' | 'adult' | 'elder'> {
   if (pitch !== undefined && Math.abs(pitch) > 0.35) return missing('The head is tipped up or down, so age wasn’t read. Pick the age group.');
   const nose = dist(L(168), L(2)), lower = dist(L(2), L(152));
   const grownLower = mouthOpen > 0.08 || lower >= 1.0;
-  // silver or white, clearly: light, and almost no colour (light brown and blonde have colour)
-  const grey = !!hairLab && hairLab[0] > 70 && Math.hypot(hairLab[1], hairLab[2]) < 7;
+  // grey or white hair (as neutral as the eye whites) on a grown-up face, unless the skin is very smooth
+  // (silver dye on a young face); too small a photo to see skin detail counts as grey hair alone
+  const grey = greyHair && (texture === undefined || texture >= 1.2);
   let value: 'baby' | 'kid' | 'adult' | 'elder';
   let conf: number;
   if (nose >= NOSE_ADULT || (nose >= 0.69 && lower >= 1.08)) { value = grey ? 'elder' : 'adult'; conf = Math.min(0.85, 0.5 + (nose - 0.69) * 4); }
   else if (nose < NOSE_BABY && !grownLower) { value = 'baby'; conf = Math.min(0.75, 0.45 + (NOSE_BABY - nose) * 4); }
   else if (nose < NOSE_BABY) { value = 'baby'; conf = 0.4; }
   else { value = 'kid'; conf = 0.35; }
-  return { status: 'inferred', value, confidence: round(conf * sizeConf, 2), raw: round(nose, 3), why: value === 'elder' ? 'Grown-up face and grey or white hair' : 'From the shape of the face; check it' };
+  return { status: 'inferred', value, confidence: round(conf * sizeConf, 2), raw: round(nose, 3), why: value === 'elder' ? 'Grown-up face and grey or white hair' : greyHair && value === 'adult' ? 'Grey hair, but young-looking skin' : 'From the shape of the face; check it' };
 }
 
 /**
