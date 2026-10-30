@@ -84,3 +84,17 @@ test('scenes take the mode, photo places and things', () => {
   assert.equal(svg.split('data:image/png;base64,P').length - 1, 1, 'a photo place is drawn once (no sliding copy that doubles edges)');
   assert.match(svg, /href="data:image\/png;base64,T"[^>]*height="95.0"/, 'a thing half a grown-up tall is 95 units');
 });
+
+test('a super hero costume can be changed: suit, cape, mask and emblem, and babies wear masks too', () => {
+  const baby: Look = { ...look, kind: 'baby' };
+  const plain = characterMarkup(baby, { style: 'inked' });
+  const mask = /<path d="M[^"]+" fill="(#[0-9a-f]{6})"[^>]*\/><g class="bt-eyes">/;
+  assert.match(plain, mask, 'a baby wears a mask');
+  const custom = characterMarkup({ ...baby, hero: { suit: '#22a06b', cape: '#7b4bc9', mask: '#2a2a33', emblem: 'heart' } }, { style: 'inked' });
+  assert.ok(custom.includes('fill="#22a06b"') && custom.includes('fill="#7b4bc9"'), 'suit and cape colours');
+  assert.equal(custom.match(mask)?.[1], '#2a2a33', 'mask colour');
+  const bare = characterMarkup({ ...baby, hero: { cape: 'none', mask: 'none' } }, { style: 'inked' });
+  assert.doesNotMatch(bare, /L176 250 Q140 240 100 246/, 'no cape');
+  assert.doesNotMatch(bare, mask, 'no mask');
+  assert.ok(bare.includes(look.skin) && bare.includes(look.eyes!), 'still the same person');
+});

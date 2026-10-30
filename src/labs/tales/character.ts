@@ -66,6 +66,8 @@ export interface Look {
   /** The story world being drawn (art direction, not identity): posture and finishing light. */
   world?: WorldId;
   /** A world costume's signature colour, carried over from the person's everyday clothes. */
+  /** Super Heroes: the costume a parent chose (suit, cape and mask colours, 'none' for no cape or mask, and the emblem). */
+  hero?: { suit?: string; cape?: string; mask?: string; emblem?: string };
   accent?: string;
   /** Taller or shorter than most people their age, −1…1 (story pictures only; photos can't tell height). */
   height?: number;
@@ -1327,7 +1329,7 @@ export function accentOf(outfit: string): string | undefined {
 const WORLD_TINTED = ['gown', 'ftunic', 'cloak', 'armour', 'sunrobe', 'ranger', 'explorer'];
 /** The colours of someone's outfit (with a world costume's own tint), for the other character designs (designs.ts). */
 export function outfitColours(l: Look): Outfit {
-  let o = l.outfit === 'drawn' ? OUTFIT.none : l.outfit === 'supersuit' ? { top: superOf(l).suit, sleeve: 'long', bottom: shade(superOf(l).suit, -0.18), shoes: superOf(l).cape } as Outfit : OUTFIT[l.outfit] ?? OUTFIT.tee;
+  let o = l.outfit === 'drawn' ? OUTFIT.none : l.outfit === 'supersuit' ? superOutfit(l) : OUTFIT[l.outfit] ?? OUTFIT.tee;
   const tint = l.accent && WORLD_TINTED.includes(l.outfit) ? l.accent : undefined;
   if (tint && (l.outfit === 'ftunic' || l.outfit === 'gown')) o = { ...o, top: tint, skirt: o.skirt ? shade(tint, -0.12) : undefined };
   return o;
@@ -1392,14 +1394,28 @@ const SUPER = [
   { suit: '#7b4bc9', cape: '#2bb3a3', trim: '#ffe07a' }, { suit: '#22a06b', cape: '#f08a2e', trim: '#fff2c4' },
   { suit: '#e0569b', cape: '#ffc93a', trim: '#ffffff' }, { suit: '#1f3f7a', cape: '#ffb52e', trim: '#ffcf3f' },
 ];
-const EMBLEMS = ['star', 'bolt', 'heart', 'moon', 'sun', 'drop'] as const;
-function superOf(l: Look) {
+export const EMBLEMS = ['star', 'bolt', 'heart', 'moon', 'sun', 'drop'] as const;
+export type Emblem = (typeof EMBLEMS)[number];
+/** Colours a parent can pick for a suit, cape or mask. */
+export const HERO_COLOURS = ['#d9463f', '#f08a2e', '#ffc93a', '#22a06b', '#2bb3a3', '#2f6fd0', '#1f3f7a', '#7b4bc9', '#e0569b', '#2a2a33', '#f4f4f6', '#b9c2cc'];
+function superOutfit(l: Look): Outfit {
+  const H = superOf(l);
+  return { top: H.suit, sleeve: 'long', bottom: shade(H.suit, -0.18), shoes: H.cape === 'none' ? shade(H.suit, -0.3) : H.cape } as Outfit;
+}
+export function superOf(l: Look) {
   const key = `${l.skin}|${l.hair}|${l.hairStyle}|${l.kind}|${l.eyes ?? ''}`;
   let h = 2166136261; for (let i = 0; i < key.length; i++) h = Math.imul(h ^ key.charCodeAt(i), 16777619) >>> 0;
   h = Math.imul(h ^ (h >>> 15), 2246822507) >>> 0;
-  return { ...SUPER[(h >>> 8) % SUPER.length], emblem: EMBLEMS[(h >>> 20) % EMBLEMS.length] };
+  const base = SUPER[(h >>> 8) % SUPER.length], c = l.hero ?? {};
+  const suit = c.suit ?? base.suit;
+  // the trim (belt and badge) stays gold, unless the suit is gold itself
+  const trim = c.suit && /^#(ffc93a|ffcf3f|ffd84a)$/i.test(c.suit) ? '#1f3f7a' : base.trim;
+  const emblem = (EMBLEMS as readonly string[]).includes(c.emblem ?? '') ? c.emblem as Emblem : EMBLEMS[(h >>> 20) % EMBLEMS.length];
+  return { suit, cape: c.cape ?? base.cape, mask: c.mask ?? shade(c.cape && c.cape !== 'none' ? c.cape : base.cape, -0.18), trim, emblem };
 }
-function emblemArt(e: (typeof EMBLEMS)[number], x: number, y: number, r: number, fill: string, ink: string): string {
+/** An emblem on its own (for the costume picker). */
+export const emblemSvg = (e: Emblem, fill = '#ffc93a', ink = '#2a2a33') => `<svg viewBox="-20 -20 40 40" aria-hidden="true">${emblemArt(e, 0, 0, 14, fill, ink)}</svg>`;
+function emblemArt(e: Emblem, x: number, y: number, r: number, fill: string, ink: string): string {
   const n = (v: number) => v.toFixed(1);
   const badge = `<circle cx="${n(x)}" cy="${n(y)}" r="${n(r * 1.25)}" fill="${ink}"/><circle cx="${n(x)}" cy="${n(y)}" r="${n(r * 1.05)}" fill="${fill}"/>`;
   const p = (pts: number[][]) => pts.map(([a, b], i) => `${i ? 'L' : 'M'}${n(x + a * r)} ${n(y + b * r)}`).join(' ') + ' Z';
@@ -1407,21 +1423,24 @@ function emblemArt(e: (typeof EMBLEMS)[number], x: number, y: number, r: number,
     case 'star': return badge + `<path d="${p([[0, -0.8], [0.22, -0.26], [0.78, -0.24], [0.34, 0.12], [0.5, 0.7], [0, 0.36], [-0.5, 0.7], [-0.34, 0.12], [-0.78, -0.24], [-0.22, -0.26]])}" fill="${ink}"/>`;
     case 'bolt': return badge + `<path d="${p([[0.12, -0.82], [-0.46, 0.08], [-0.04, 0.08], [-0.16, 0.82], [0.46, -0.12], [0.04, -0.12]])}" fill="${ink}"/>`;
     case 'heart': return badge + `<path d="M${n(x)} ${n(y + 0.62 * r)} C${n(x - 0.9 * r)} ${n(y)} ${n(x - 0.6 * r)} ${n(y - 0.75 * r)} ${n(x)} ${n(y - 0.3 * r)} C${n(x + 0.6 * r)} ${n(y - 0.75 * r)} ${n(x + 0.9 * r)} ${n(y)} ${n(x)} ${n(y + 0.62 * r)} Z" fill="${ink}"/>`;
-    case 'moon': return badge + `<path d="M${n(x + 0.2 * r)} ${n(y - 0.7 * r)} A${n(0.7 * r)} ${n(0.7 * r)} 0 1 0 ${n(x + 0.2 * r)} ${n(y + 0.7 * r)} A${n(0.55 * r)} ${n(0.55 * r)} 0 1 1 ${n(x + 0.2 * r)} ${n(y - 0.7 * r)} Z" fill="${ink}"/>`;
+    case 'moon': return badge + `<circle cx="${n(x - 0.08 * r)}" cy="${n(y)}" r="${n(0.62 * r)}" fill="${ink}"/><circle cx="${n(x + 0.22 * r)}" cy="${n(y - 0.14 * r)}" r="${n(0.5 * r)}" fill="${fill}"/>`;
     case 'sun': return badge + `<circle cx="${n(x)}" cy="${n(y)}" r="${n(0.36 * r)}" fill="${ink}"/>` + Array.from({ length: 8 }, (_, i) => { const a = (i / 8) * Math.PI * 2; return `<path d="M${n(x + Math.cos(a) * 0.52 * r)} ${n(y + Math.sin(a) * 0.52 * r)} L${n(x + Math.cos(a) * 0.8 * r)} ${n(y + Math.sin(a) * 0.8 * r)}" stroke="${ink}" stroke-width="${n(r * 0.16)}" stroke-linecap="round"/>`; }).join('');
     default: return badge + `<path d="M${n(x)} ${n(y - 0.75 * r)} C${n(x + 0.2 * r)} ${n(y - 0.3 * r)} ${n(x + 0.55 * r)} ${n(y)} ${n(x + 0.55 * r)} ${n(y + 0.25 * r)} A${n(0.55 * r)} ${n(0.55 * r)} 0 1 1 ${n(x - 0.55 * r)} ${n(y + 0.25 * r)} C${n(x - 0.55 * r)} ${n(y)} ${n(x - 0.2 * r)} ${n(y - 0.3 * r)} ${n(x)} ${n(y - 0.75 * r)} Z" fill="${ink}"/>`;
   }
 }
 /** A domino mask across the eyes, in the hero's own colour (drawn under the eyes, so they show through). */
 function heroMask(s: FaceSpec, l: Look, gap: number): string {
-  if (l.outfit !== 'supersuit' || l.kind === 'baby') return '';
-  const H = superOf(l), W = s.ex + gap + s.erx * 1.55, ey = s.ey, ry = s.ery, n = (v: number) => v.toFixed(1);
+  if (l.outfit !== 'supersuit') return '';
+  const H = superOf(l);
+  if (H.mask === 'none') return '';
+  // a baby's mask is a little one, snug round the eyes
+  const baby = l.kind === 'baby', W = s.ex + gap + s.erx * (baby ? 1.3 : 1.55), ey = s.ey, ry = s.ery * (baby ? 0.82 : 1), n = (v: number) => v.toFixed(1);
   const d = `M${n(100 - W)} ${n(ey - ry * 0.5)} Q${n(100 - W * 0.55)} ${n(ey - ry * 2.3)} 100 ${n(ey - ry * 1.15)} Q${n(100 + W * 0.55)} ${n(ey - ry * 2.3)} ${n(100 + W)} ${n(ey - ry * 0.5)} L${n(100 + W + 6)} ${n(ey - ry * 0.9)} L${n(100 + W + 2)} ${n(ey + ry * 0.3)} Q${n(100 + W * 0.9)} ${n(ey + ry * 1.7)} ${n(100 + W * 0.45)} ${n(ey + ry * 1.75)} Q${n(100 + W * 0.15)} ${n(ey + ry * 1.8)} 100 ${n(ey + ry * 0.75)} Q${n(100 - W * 0.15)} ${n(ey + ry * 1.8)} ${n(100 - W * 0.45)} ${n(ey + ry * 1.75)} Q${n(100 - W * 0.9)} ${n(ey + ry * 1.7)} ${n(100 - W - 2)} ${n(ey + ry * 0.3)} L${n(100 - W - 6)} ${n(ey - ry * 0.9)} Z`;
-  return `<path d="${d}" fill="${shade(H.cape, -0.18)}"/>`;
+  return `<path d="${d}" fill="${H.mask}"/>`;
 }
 
 function humanBody(id: string, l: Look, E = 0) {
-  let o = l.outfit === 'drawn' ? OUTFIT.none : l.outfit === 'supersuit' ? { top: superOf(l).suit, sleeve: 'long', bottom: shade(superOf(l).suit, -0.18), shoes: superOf(l).cape } as Outfit : OUTFIT[l.outfit] ?? OUTFIT.tee;
+  let o = l.outfit === 'drawn' ? OUTFIT.none : l.outfit === 'supersuit' ? superOutfit(l) : OUTFIT[l.outfit] ?? OUTFIT.tee;
   // world costumes take the person's own colour: the cape, tunic or gown in their shade
   const tint = l.accent && WORLD_TINTED.includes(l.outfit) ? l.accent : undefined;
   if (tint && (l.outfit === 'ftunic' || l.outfit === 'gown')) o = { ...o, top: tint, skirt: o.skirt ? shade(tint, -0.12) : undefined };
@@ -1433,8 +1452,8 @@ function humanBody(id: string, l: Look, E = 0) {
   switch (l.outfit) {
     case 'supersuit': {
       const H = superOf(l);
-      back = `<path d="M62 152 Q100 142 138 152 L176 250 Q140 240 100 246 Q60 240 24 250 Z" fill="${H.cape}"/><path d="M62 152 Q100 142 138 152 L132 160 Q100 152 68 160 Z" fill="${shade(H.cape, -0.2)}"/>`;
-      over = `${emblemArt(H.emblem, 100, 182, 12, H.trim, shade(H.cape, -0.25))}<rect x="56" y="210" width="88" height="7" fill="${H.trim}" clip-path="url(#tc${id})"/><rect x="95" y="208" width="10" height="11" rx="2" fill="${shade(H.trim, -0.2)}"/>`;
+      back = H.cape === 'none' ? '' : `<path d="M62 152 Q100 142 138 152 L176 250 Q140 240 100 246 Q60 240 24 250 Z" fill="${H.cape}"/><path d="M62 152 Q100 142 138 152 L132 160 Q100 152 68 160 Z" fill="${shade(H.cape, -0.2)}"/>`;
+      over = `${emblemArt(H.emblem, 100, 182, 12, H.trim, shade(H.cape === 'none' ? H.suit : H.cape, -0.3))}<rect x="56" y="210" width="88" height="7" fill="${H.trim}" clip-path="url(#tc${id})"/><rect x="95" y="208" width="10" height="11" rx="2" fill="${shade(H.trim, -0.2)}"/>`;
       break;
     }
     case 'bee': back = `<ellipse cx="52" cy="168" rx="28" ry="18" fill="#d6ecf7" opacity=".9" transform="rotate(-25 52 168)"/><ellipse cx="148" cy="168" rx="28" ry="18" fill="#d6ecf7" opacity=".9" transform="rotate(25 148 168)"/>`;
@@ -1703,7 +1722,7 @@ export function characterMarkup(l: Look, opts: { animated?: boolean; style?: Sty
   if (DESIGN === 'inked' && !isPet(l.kind) && (l.world ?? 'everyday') === 'everyday' && l.outfit !== 'drawn') {
     // Super Heroes: everyone in their own super suit, standing like a hero (a baby gets a fist in the air)
     const still = !l.action && (!l.pose || l.pose === 'stand');
-    l = { ...l, outfit: 'supersuit', hat: l.hat === 'drawn' ? l.hat : 'none', extra: l.extra === 'drawn' ? l.extra : 'none', ...(still ? { pose: 'hips' } : {}) };
+    l = { ...l, outfit: 'supersuit', ...(still ? { pose: 'hips' } : {}) };
   }
   if (opts.style && onTalesDrawing(opts.style)) MODE = 'tales';
   // in a story world, people are drawn in the world's own style (pets keep the book's look)
