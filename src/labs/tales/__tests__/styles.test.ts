@@ -21,27 +21,33 @@ test('every mode has a complete configuration', () => {
   }
 });
 
-test('each look is made of something different', () => {
+test('each look is its own character design, drawn from the same person', () => {
   const out = Object.fromEntries(STYLE_MODES.map((m) => [m, characterMarkup(look, { style: m })]));
-  // every look builds its own characters: rag dolls, sketches, retro shapes, paper cut-outs
-  const shapes = (svg: string) => (svg.match(/<(path|ellipse|circle|rect)\b/g) ?? []).length;
-  assert.equal(new Set(STYLE_MODES.map((m) => shapes(out[m]))).size, STYLE_MODES.length, 'every look draws a different construction');
-  // patchwork: felt patches on a quilt; sketchbook: graphite drawing with coloured pencil over it
-  assert.match(out.pocketlight, /feDisplacementMap[\s\S]*feDiffuseLighting/);
-  assert.doesNotMatch(out.pocketlight, /feSpecularLighting/, 'no clay sheen any more');
-  assert.match(out.inked, /<mask id="hm[^"]*"[\s\S]*mask="url\(#hm/);
-  assert.doesNotMatch(out.inked, /stroke="#1d1412"/, 'no comic ink any more');
-  assert.match(out.gouache, /feOffset in="darks"/, 'retro print');
-  assert.match(out.wondercut, /flood-color="#fffaf1"/);
-  assert.match(out.tales, /paint-order="stroke"/);
+  // every look sets the face up its own way: its own proportions and its own head
+  const build = (svg: string) => svg.match(/scale\(([\d.]+) ([\d.]+)\) translate\(-100 -252\)/)?.slice(1).join(' ');
+  assert.equal(new Set(STYLE_MODES.map((m) => build(out[m]))).size, STYLE_MODES.length, 'every look has its own proportions');
+  const head = (svg: string) => svg.match(/<clipPath id="th[^"]*"><path d="([^"]+)"/)?.[1];
+  assert.equal(new Set(STYLE_MODES.map((m) => head(out[m]))).size, STYLE_MODES.length, 'every look has its own head shape');
+  // Movie 3D is lit in 3D with no ink line; Classic Fairytale and Sparkle have fine lines and a glow
+  assert.match(out.pocketlight, /feDiffuseLighting[\s\S]*feSpecularLighting/);
+  assert.doesNotMatch(out.pocketlight, /paint-order="stroke"/);
+  assert.match(out.gouache, /stroke-width="1.5" stroke-linejoin="round" paint-order="stroke"/);
+  assert.match(out.wondercut, /stroke-width="1.8" stroke-linejoin="round" paint-order="stroke"/);
+  // Super Heroes: everyone in their own suit, cape and mask, the same person underneath
+  assert.match(out.inked, /stroke-width="2.6" stroke-linejoin="round" paint-order="stroke"/);
+  const hero = (l: Look) => characterMarkup(l, { style: 'inked' });
+  const kidSuit = hero(look), momSuit = hero({ ...look, kind: 'adult', skin: '#d39a6e', hair: '#1f1a17', hairStyle: 'curtain', lashes: true });
+  assert.ok(kidSuit.includes(look.skin) && kidSuit.includes(look.hair) && kidSuit.includes(look.eyes!), 'same person in the suit');
+  assert.notEqual(kidSuit.match(/<path d="M62 152 Q100 142 138 152 L176 250[^"]*" fill="([^"]+)"/)?.[1], momSuit.match(/<path d="M62 152 Q100 142 138 152 L176 250[^"]*" fill="([^"]+)"/)?.[1], 'each hero has their own cape colour');
+  assert.match(out.tales, /stroke-width="2.3" stroke-linejoin="round" paint-order="stroke"/);
 });
 
 test('a look applies in every story world, not just everyday', () => {
-  for (const world of ['fairytale', 'adventure', 'mythic'] as const) {
+  for (const world of ['fairytale', 'adventure', 'mythic', 'ocean', 'space'] as const) {
     const w = { ...look, world };
-    assert.match(characterMarkup(w, { style: 'pocketlight' }), /feDiffuseLighting/, `${world}: patchwork`);
-    assert.match(characterMarkup(w, { style: 'gouache' }), /feOffset in="darks"/, `${world}: retro`);
-    assert.match(characterMarkup(w, { style: 'inked' }), /<pattern id="ht/, `${world}: sketchbook`);
+    assert.match(characterMarkup(w, { style: 'pocketlight' }), /feDiffuseLighting/, `${world}: movie 3D`);
+    assert.match(characterMarkup(w, { style: 'inked' }), /stroke-width="2.6"/, `${world}: super heroes`);
+    assert.match(characterMarkup(w, { style: 'gouache' }), /feComposite in="soft"/, `${world}: classic glow`);
   }
 });
 

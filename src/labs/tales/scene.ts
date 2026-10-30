@@ -116,8 +116,7 @@ export function sceneSvg(opts: {
   const inkFor = (fill: string) => (fill.startsWith('#') && fill.length === 7 ? darken(fill, 0.35) : null);
   if (!opts.photo && !opts.drawn) {
     // the place is made in the look's medium too: clay hills, washes of paint, layers of paper, inked lines
-    if (mode === 'wondercut') back = `<g filter="url(#paper${id})">${stylizeShapes(back, 'wondercut', id, inkFor)}</g>`;
-    else back = finishInLook(`<g>${back}</g>`, mode, `${id}B`, 'backdrop');
+    back = finishInLook(`<g>${back}</g>`, mode, `${id}B`, 'backdrop');
   } else if (opts.drawn && mode === 'gouache') back = `<g filter="url(#grain${id})">${back}</g>`;
   let s = `<defs>${styleFilters(mode, id)}</defs>${back}`;
   // things made from photos stand on the ground, sized against a grown-up

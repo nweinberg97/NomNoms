@@ -22,41 +22,49 @@ import type { StyleMode } from './styles';
 
 /** Filters for a character or a scene, ids made unique by `id`. */
 export function lookFilters(mode: StyleMode, id: string, part: 'character' | 'backdrop' = 'character'): string {
+  if (mode === 'wondercut') // Sparkle: a soft, rosy glow
+    return `<filter id="lk${id}" x="-6%" y="-6%" width="112%" height="112%" color-interpolation-filters="sRGB">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="${part === 'backdrop' ? 1.4 : 2.4}" result="soft"/>
+      <feComposite in="soft" in2="SourceGraphic" operator="arithmetic" k2="${part === 'backdrop' ? 0.4 : 0.2}" k3="${part === 'backdrop' ? 0.66 : 0.86}" result="glow"/>
+      <feColorMatrix in="glow" type="matrix" values="1.04 0.02 0.02 0 0.012  0 1 0.02 0 0.004  0.02 0 1.02 0 0.012  0 0 0 1 0" result="rosy"/>
+      <feColorMatrix in="rosy" type="saturate" values="1.08"/>
+    </filter>`;
+  if (mode === 'gouache') // Classic Fairytale: a soft painted glow, warm light
+    return `<filter id="lk${id}" x="-6%" y="-6%" width="112%" height="112%" color-interpolation-filters="sRGB">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="${part === 'backdrop' ? 1.2 : 2.2}" result="soft"/>
+      <feComposite in="soft" in2="SourceGraphic" operator="arithmetic" k2="${part === 'backdrop' ? 0.45 : 0.22}" k3="${part === 'backdrop' ? 0.6 : 0.82}" result="glow"/>
+      <feColorMatrix in="glow" type="matrix" values="1.03 0.02 0 0 0.01  0.01 1 0.01 0 0.005  0 0.02 0.95 0 0  0 0 0 1 0"/>
+    </filter>`;
+  if (mode === 'inked') // Super Heroes: crisp, saturated colour
+    return `<filter id="lk${id}" x="-4%" y="-4%" width="108%" height="108%" color-interpolation-filters="sRGB"><feColorMatrix type="saturate" values="1.15"/></filter>`;
   switch (mode) {
     case 'pocketlight':
-      // plush: a felt toy. The edge goes soft and fuzzy, the figure puffs up like a stuffed
-      // cushion (darker into the seams, lit on top), colours go matte and a fine fibre covers it all
-      return `<filter id="lk${id}" x="-10%" y="-10%" width="120%" height="120%" color-interpolation-filters="sRGB">
-        <feTurbulence type="fractalNoise" baseFrequency="${part === 'backdrop' ? 0.09 : 0.7}" numOctaves="2" seed="4" result="fz"/>
-        <feDisplacementMap in="SourceGraphic" in2="fz" scale="${part === 'backdrop' ? 2 : 2.6}" xChannelSelector="R" yChannelSelector="G" result="fuzzy"/>
-        <feColorMatrix in="fuzzy" type="matrix" values="0.86 0.08 0.02 0 0.05  0.04 0.88 0.04 0 0.045  0.02 0.06 0.86 0 0.045  0 0 0 1 0" result="matte"/>
-        <feGaussianBlur in="SourceAlpha" stdDeviation="${part === 'backdrop' ? 6 : 4}" result="puff"/>
-        <feDiffuseLighting in="puff" surfaceScale="${part === 'backdrop' ? 2 : 3.2}" diffuseConstant="1.08" lighting-color="#fff" result="diff"><feDistantLight azimuth="235" elevation="58"/></feDiffuseLighting>
-        <feComposite in="matte" in2="diff" operator="arithmetic" k1="1.06" k4="-0.03" result="lit"/>
-        <feTurbulence type="fractalNoise" baseFrequency="${part === 'backdrop' ? 0.18 : 0.55}" numOctaves="3" seed="2" result="fibreRaw"/>
-        <feGaussianBlur in="fibreRaw" stdDeviation="${part === 'backdrop' ? 0.9 : 0.6}" result="fibre"/>
-        <feColorMatrix in="fibre" type="matrix" values="0 0 0 0 1  0 0 0 0 0.98  0 0 0 0 0.94  0 0 ${part === 'backdrop' ? '-0.2 0 0.1' : '-0.6 0 0.31'}" result="fibreLight"/>
-        <feColorMatrix in="fibre" type="matrix" values="0 0 0 0 0.25  0 0 0 0 0.18  0 0 0 0 0.14  0 0 ${part === 'backdrop' ? '0.2 0 -0.09' : '0.6 0 -0.26'}" result="fibreDark"/>
-        <feMerge result="felt"><feMergeNode in="lit"/>${part === 'backdrop' ? '' : '<feMergeNode in="fibreLight"/><feMergeNode in="fibreDark"/>'}</feMerge>
-        <feComposite in="felt" in2="fuzzy" operator="in"/>
-      </filter>
-      <filter id="pb${id}" x="-15%" y="-12%" width="130%" height="126%" color-interpolation-filters="sRGB">
-        <feMorphology in="SourceAlpha" operator="dilate" radius="5.5" result="pad"/>
-        <feTurbulence type="fractalNoise" baseFrequency="0.7" numOctaves="2" seed="4" result="fz"/>
-        <feDisplacementMap in="pad" in2="fz" scale="2.4" xChannelSelector="R" yChannelSelector="G" result="padF"/>
-        <feFlood flood-color="#fbf1df"/><feComposite in2="padF" operator="in" result="felt"/>
-        <feGaussianBlur in="padF" stdDeviation="2.2" result="sb"/><feOffset in="sb" dx="1.5" dy="3" result="so"/>
-        <feFlood flood-color="#3b2a20" flood-opacity=".3"/><feComposite in2="so" operator="in" result="shadow"/>
-        <feMerge><feMergeNode in="shadow"/><feMergeNode in="felt"/></feMerge>
-      </filter>
-      <filter id="ps${id}" x="-15%" y="-12%" width="130%" height="126%">
-        <feMorphology in="SourceAlpha" operator="dilate" radius="3.6" result="o"/>
-        <feMorphology in="SourceAlpha" operator="dilate" radius="2.3" result="i"/>
-        <feComposite in="o" in2="i" operator="out" result="ring"/>
-        <feFlood flood-color="#b0644f"/><feComposite in2="ring" operator="in"/>
-      </filter>
-      <pattern id="sp${id}" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="2.6" height="5" fill="#fff"/></pattern>
-      <mask id="sm${id}" maskContentUnits="userSpaceOnUse"><rect x="-300" y="-300" width="1000" height="900" fill="url(#sp${id})"/></mask>`;
+      // Movie 3D: lit like a modern animated film. The figure rounds off at its edges (lit from the
+      // top left, falling into soft shade), a warm rim of light catches the far edge, colours are rich
+      // and clean. The place behind is a soft, out-of-focus film set.
+      if (part === 'backdrop') return `<filter id="lk${id}" x="-5%" y="-5%" width="110%" height="110%" color-interpolation-filters="sRGB">
+        <feGaussianBlur in="SourceGraphic" stdDeviation="1.6" result="dof"/>
+        <feColorMatrix in="dof" type="saturate" values="1.12" result="rich"/>
+        <feComponentTransfer in="rich"><feFuncR type="gamma" amplitude="1.03" exponent="0.95"/><feFuncG type="gamma" amplitude="1.03" exponent="0.95"/><feFuncB type="gamma" amplitude="1.02" exponent="0.97"/></feComponentTransfer>
+      </filter>`;
+      return `<filter id="lk${id}" x="-10%" y="-8%" width="120%" height="116%" color-interpolation-filters="sRGB">
+        <feGaussianBlur in="SourceAlpha" stdDeviation="5" result="round"/>
+        <feColorMatrix in="SourceGraphic" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0.25 0.5 0.1 0 0" result="lum"/>
+        <feGaussianBlur in="lum" stdDeviation="2" result="lumSoft"/>
+        <feComposite in="round" in2="lumSoft" operator="arithmetic" k2="1" k3="0" result="bump"/>
+        <feDiffuseLighting in="bump" surfaceScale="2.6" diffuseConstant="1.08" lighting-color="#fffaf2" result="diff"><feDistantLight azimuth="230" elevation="66"/></feDiffuseLighting>
+        <feSpecularLighting in="bump" surfaceScale="4" specularConstant=".35" specularExponent="22" lighting-color="#fff6ea" result="spec"><feDistantLight azimuth="230" elevation="55"/></feSpecularLighting>
+        <feColorMatrix in="SourceGraphic" type="saturate" values="1.12" result="rich"/>
+        <feComposite in="rich" in2="diff" operator="arithmetic" k1="0.62" k2="0.42" result="lit"/>
+        <feOffset in="SourceAlpha" dx="-3.2" dy="0" result="sh"/>
+        <feComposite in="SourceAlpha" in2="sh" operator="out" result="edge"/>
+        <feGaussianBlur in="edge" stdDeviation="1.4" result="edgeSoft"/>
+        <feFlood flood-color="#fff1d8" flood-opacity=".75"/><feComposite in2="edgeSoft" operator="in" result="rim"/>
+        <feComposite in="spec" in2="SourceAlpha" operator="in" result="specIn"/>
+        <feComposite in="rim" in2="SourceAlpha" operator="in" result="rimIn"/>
+        <feComposite in="lit" in2="SourceAlpha" operator="in" result="litIn"/>
+        <feMerge><feMergeNode in="litIn"/><feMergeNode in="specIn"/><feMergeNode in="rimIn"/></feMerge>
+      </filter>`;
     case 'gouache':
       // retro print: flat inks on warm paper, a touch of grain, and the dark ink printed
       // a hair off-register, like a mid-century picture book
@@ -186,6 +194,19 @@ function stroke(svg: string, attrsFor: (fill: string, tag: string, attrs: string
  */
 export function finishInLook(markup: string, mode: StyleMode, id: string, part: 'character' | 'backdrop' = 'character'): string {
   if (mode === 'tales') return markup;
+  if (mode === 'wondercut' || mode === 'gouache' || mode === 'inked') {
+    // Shape Toon (lit like Movie 3D), Classic Fairytale (a painted glow), Bold Hero (crisp colour)
+    const open0 = /^\s*<g\b[^>]*>/.exec(markup);
+    const h0 = open0 ? open0[0] : '<g>';
+    let b0 = open0 ? markup.slice(open0[0].length).replace(/<\/g>\s*$/, '') : markup;
+    const au: string[] = [];
+    b0 = b0.replace(/<g class="bt-aura">[\s\S]*?<\/g><!--aura-->/g, (a) => { au.push(a); return ''; });
+    // Super Heroes: the place gets a burst of action rays behind everyone
+    const burst = mode === 'inked' && part === 'backdrop'
+      ? `<g opacity=".16" pointer-events="none">${Array.from({ length: 18 }, (_, i) => { const a0 = (i / 18) * Math.PI * 2, a1 = a0 + Math.PI / 30; return `<path d="M200 150 L${(200 + 420 * Math.cos(a0)).toFixed(0)} ${(150 + 420 * Math.sin(a0)).toFixed(0)} L${(200 + 420 * Math.cos(a1)).toFixed(0)} ${(150 + 420 * Math.sin(a1)).toFixed(0)} Z" fill="#fff8d6"/>`; }).join('')}</g>`
+      : '';
+    return `${h0}${au.join('')}<defs>${lookFilters(mode, id, part)}</defs><g filter="url(#lk${id})">${b0}</g>${burst}</g>`;
+  }
   const open = /^\s*<g\b[^>]*>/.exec(markup);
   let head = open ? open[0] : '<g>';
   let body = open ? markup.slice(open[0].length).replace(/<\/g>\s*$/, '') : markup;
@@ -197,13 +218,7 @@ export function finishInLook(markup: string, mode: StyleMode, id: string, part: 
   const defs = `<defs>${lookFilters(mode, id, part)}</defs>`;
   switch (mode) {
     case 'pocketlight':
-      if (part === 'backdrop') return `${head}${defs}<g filter="url(#lk${id})">${body}</g>${quilt(id)}</g>`;
-      // a felt patch sewn on: a cream felt border, a running stitch round it, a little shadow
-      {
-        // the patch's outline: the figure only, not its shadow on the ground or a world's glow
-        const patch = body.replace(/\bid="[^"]+"/g, '').replace(/<ellipse\b[^>]*fill="#000"[^>]*\/>/g, '');
-        return `${head}${defs}<g filter="url(#pb${id})">${patch}</g><g mask="url(#sm${id})"><g filter="url(#ps${id})">${patch}</g></g><g filter="url(#lk${id})">${body}</g></g>`;
-      }
+      return `${head}${defs}<g filter="url(#lk${id})">${body}</g></g>`;
     case 'gouache':
       return `${head}${defs}<g filter="url(#lk${id})">${body}</g></g>`;
     case 'wondercut':

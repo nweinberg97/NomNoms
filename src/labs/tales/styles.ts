@@ -10,7 +10,7 @@
 
 export type StyleMode = 'pocketlight' | 'gouache' | 'wondercut' | 'inked' | 'tales';
 /** Looks that share the soft, lit storybook backgrounds. */
-export const softLook = (m: StyleMode) => m === 'pocketlight' || m === 'tales';
+export const softLook = (m: StyleMode) => m === 'pocketlight' || m === 'tales' || m === 'wondercut' || m === 'gouache';
 
 export interface StyleConfig {
   id: StyleMode;
@@ -50,8 +50,8 @@ export const STYLES: Record<StyleMode, StyleConfig> = {
   },
   pocketlight: {
     id: 'pocketlight',
-    name: 'Patchwork',
-    blurb: 'A cosy quilt: the world sewn from fabric squares, everyone a felt patch stitched on',
+    name: 'Movie 3D',
+    blurb: 'Like a modern animated film: soft round 3D shapes, big glossy eyes and warm light',
     palette: { swatches: ['#f6c9a8', '#e8907a', '#f2c14e', '#8fbf9f', '#7fa8d1', '#b9a5e3', '#fbf3e6', '#5a4a42'], ink: '#4a3a33', shadow: '#5a3f3a', paper: '#fbf7f0', light: '#fff1d6' },
     colour: { pull: 0.15, saturation: 1.05, brightness: 1.04, warmth: 0.06 },
     materials: { shading: 'soft-volume', contrast: 1, gloss: 1 },
@@ -64,8 +64,8 @@ export const STYLES: Record<StyleMode, StyleConfig> = {
   },
   gouache: {
     id: 'gouache',
-    name: 'Retro',
-    blurb: 'Bold shapes from a mid-century picture book: square grown-ups, round little ones',
+    name: 'Classic Fairytale',
+    blurb: 'Like a golden-age fairytale film: soft oval faces, gentle lashed eyes, rosebud mouths and a painted glow',
     palette: { swatches: ['#e9b38c', '#d9776b', '#e8b64a', '#7fae7a', '#6f97b8', '#a48fc4', '#f4ead8', '#4f4038'], ink: '#4f4038', shadow: '#6b5446', paper: '#f4ecdf', light: '#fff4dd' },
     colour: { pull: 0.3, saturation: 0.88, brightness: 1.02, warmth: 0.08 },
     materials: { shading: 'painted', contrast: 0.45, gloss: 0 },
@@ -78,8 +78,8 @@ export const STYLES: Record<StyleMode, StyleConfig> = {
   },
   wondercut: {
     id: 'wondercut',
-    name: 'Paper cut',
-    blurb: 'Cut from coloured paper: round heads, scalloped hair, little A-line bodies',
+    name: 'Sparkle',
+    blurb: 'Like a modern storybook film: heart-shaped faces, big sparkling lashed eyes, glossy hair and a rosy glow',
     palette: { swatches: ['#f2b896', '#e66a52', '#f4c23c', '#5fa36a', '#4f86c6', '#9a7ad1', '#fbf6ec', '#3a3330'], ink: '#3a3330', shadow: '#3a2a22', paper: '#f7f0e2', light: '#fffaf0' },
     colour: { pull: 0.45, saturation: 1.12, brightness: 1.02, warmth: 0.02 },
     materials: { shading: 'flat', contrast: 0, gloss: 0 },
@@ -92,8 +92,8 @@ export const STYLES: Record<StyleMode, StyleConfig> = {
   },
   inked: {
     id: 'inked',
-    name: 'Sketchbook',
-    blurb: 'Drawn in pencil on a white sketchbook page: graphite lines and soft coloured-pencil shading',
+    name: 'Super Heroes',
+    blurb: 'Everyone becomes a superhero of their own: their own suit, cape, mask and emblem, standing tall',
     palette: { swatches: ['#f0c39e', '#d9654f', '#efb94a', '#6aa36b', '#5b8fc9', '#8e6bb8', '#fbf5ea', '#3b2a26'], ink: '#3b2a26', shadow: '#5d4250', paper: '#fbf5ea', light: '#fff4dc' },
     colour: { pull: 0.2, saturation: 1.08, brightness: 1, warmth: 0.04 },
     materials: { shading: 'cel', contrast: 1, gloss: 0.4 },
